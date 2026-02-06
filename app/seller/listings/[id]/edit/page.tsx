@@ -37,14 +37,6 @@ import { RequireAuth } from '@/components/auth/RequireAuth';
 import { SellerContentSkeleton } from '@/components/skeletons/SellerContentSkeleton';
 import { CategoryAttributeForm } from '@/components/listings/CategoryAttributeForm';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { DocumentUpload } from '@/components/compliance/DocumentUpload';
 import { uploadListingImage } from '@/lib/firebase/storage';
 import { getDocuments } from '@/lib/firebase/documents';
@@ -56,6 +48,7 @@ import { getUserProfile } from '@/lib/firebase/users';
 import { getIdToken } from '@/lib/firebase/auth-helper';
 import { ImageGallery } from '@/components/listing/ImageGallery';
 import { KeyFactsPanel } from '@/components/listing/KeyFactsPanel';
+import { SellerAnimalAckModal } from '@/components/listing/SellerAnimalAckModal';
 import { Separator } from '@/components/ui/separator';
 import { ListingPhotoPicker, type ListingPhotoSnapshot } from '@/components/photos/ListingPhotoPicker';
 
@@ -2492,8 +2485,8 @@ function EditListingPageContent() {
           </CardContent>
         </Card>
 
-        {/* Seller acknowledgment at publish time (not in a step) */}
-        <Dialog
+        {/* Seller acknowledgment at publish time (same as create listing) */}
+        <SellerAnimalAckModal
           open={sellerAckModalOpen}
           onOpenChange={(open) => {
             setSellerAckModalOpen(open);
@@ -2504,56 +2497,57 @@ function EditListingPageContent() {
             }
             justConfirmedSellerAckRef.current = false;
           }}
-        >
-          <DialogContent className="sm:max-w-xl">
-            <DialogHeader>
-              <DialogTitle>Seller acknowledgment</DialogTitle>
-              <DialogDescription>
-                You must accept this acknowledgment to publish an animal listing.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="rounded-lg border border-border/60 bg-muted/20 p-3 md:p-4">
-              <div className="flex items-start gap-2 md:gap-3">
-                <Checkbox
-                  id="seller-animal-ack-modal-edit"
-                  className="mt-1 min-h-[20px] min-w-[20px]"
-                  checked={sellerAckModalChecked}
-                  onCheckedChange={(checked) => setSellerAckModalChecked(Boolean(checked))}
-                />
-                <Label htmlFor="seller-animal-ack-modal-edit" className="cursor-pointer leading-relaxed text-sm">
-                  I acknowledge I am solely responsible for all representations, permits/records, and legal compliance for this animal listing, and that
-                  Agchange does not take custody of animals.
-                </Label>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSellerAckModalOpen(false);
-                  setSellerAckModalChecked(false);
-                  setPublishAfterSellerAck(false);
-                  sellerAckForceRef.current = false;
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                disabled={!sellerAckModalChecked}
-                onClick={() => {
-                  justConfirmedSellerAckRef.current = true;
-                  sellerAckForceRef.current = true;
-                  setSellerAnimalAttestationAccepted(true);
-                  setSellerAckModalChecked(false);
-                  setSellerAckModalOpen(false);
-                  setPublishAfterSellerAck(true);
-                }}
-              >
-                Publish
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          checked={sellerAckModalChecked}
+          onCheckedChange={(c) => setSellerAckModalChecked(Boolean(c))}
+          category={formData.category}
+          checkboxId="seller-animal-ack-modal-edit"
+          onCancel={() => {
+            setSellerAckModalOpen(false);
+            setSellerAckModalChecked(false);
+            setPublishAfterSellerAck(false);
+            sellerAckForceRef.current = false;
+          }}
+          onConfirm={() => {
+            justConfirmedSellerAckRef.current = true;
+            sellerAckForceRef.current = true;
+            setSellerAnimalAttestationAccepted(true);
+
+            const category = formData.category;
+            const updatedAttributes: any = { ...formData.attributes };
+
+            if (category === 'sporting_working_dogs') {
+              updatedAttributes.identificationDisclosure = true;
+              updatedAttributes.healthDisclosure = true;
+              updatedAttributes.transportDisclosure = true;
+            } else if (category === 'wildlife_exotics') {
+              updatedAttributes.animalIdDisclosure = true;
+              updatedAttributes.healthDisclosure = true;
+              updatedAttributes.transportDisclosure = true;
+            } else if (category === 'cattle_livestock') {
+              updatedAttributes.identificationDisclosure = true;
+              updatedAttributes.healthDisclosure = true;
+            } else if (category === 'farm_animals') {
+              updatedAttributes.identificationDisclosure = true;
+              updatedAttributes.healthDisclosure = true;
+            } else if (category === 'horse_equestrian') {
+              updatedAttributes.disclosures = {
+                ...(updatedAttributes.disclosures || {}),
+                identificationDisclosure: true,
+                healthDisclosure: true,
+                transportDisclosure: true,
+                titleOrLienDisclosure: true,
+              };
+            }
+
+            if (category === 'sporting_working_dogs' || category === 'wildlife_exotics' || category === 'cattle_livestock' || category === 'farm_animals' || category === 'horse_equestrian') {
+              setFormData({ ...formData, attributes: updatedAttributes });
+            }
+
+            setSellerAckModalChecked(false);
+            setSellerAckModalOpen(false);
+            setPublishAfterSellerAck(true);
+          }}
+        />
 
         <LegalDocsModal
           open={legalTermsModalOpen}

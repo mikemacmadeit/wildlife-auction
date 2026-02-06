@@ -40,12 +40,9 @@ export function Footer() {
         { href: '/how-it-works', label: 'Overview' },
         { href: '/how-it-works/plans', label: 'Seller Tiers' },
         { href: '/how-it-works/trust', label: 'Trust & Compliance' },
-        { href: '/field-notes', label: 'Field Notes' },
-      ],
-      trust: [
-        { href: '/how-it-works/trust', label: 'Trust & Compliance' },
         { href: '/how-it-works/trust#badges', label: 'Seller Verification' },
         { href: '/how-it-works/trust#safety', label: 'Safety Tips' },
+        { href: '/field-notes', label: 'Field Notes' },
       ],
       legal: [
         { href: '/privacy', label: 'Privacy Policy' },
@@ -103,10 +100,10 @@ export function Footer() {
         <div className="absolute inset-0 opacity-[0.08] dark:opacity-[0.18] [background-image:linear-gradient(to_right,hsl(37_27%_30%/.05)_1px,transparent_1px),linear-gradient(to_bottom,hsl(37_27%_30%/.05)_1px,transparent_1px)] dark:[background-image:linear-gradient(to_right,hsl(37_27%_70%/.08)_1px,transparent_1px),linear-gradient(to_bottom,hsl(37_27%_70%/.08)_1px,transparent_1px)] [background-size:42px_42px]" />
       </div>
 
-      <div className="relative container mx-auto px-4 md:px-6 py-12">
-        <div className="grid gap-10 lg:grid-cols-[1.3fr_1fr_1fr_1fr_1.3fr]">
+      <div className="relative container mx-auto px-4 md:px-6 py-8 md:py-10">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 lg:grid-cols-6">
           {/* Brand */}
-          <div className="space-y-4">
+          <div className="col-span-2 sm:col-span-3 lg:col-span-1 space-y-3">
             <Link href="/" className="inline-flex items-center gap-3 group">
               <div className="relative h-10 w-10">
                 <div
@@ -131,30 +128,30 @@ export function Footer() {
               </div>
             </Link>
 
-            <p className="text-sm text-[hsl(37_27%_35%)] dark:text-[hsl(37_27%_78%)] max-w-sm">
+            <p className="text-sm text-[hsl(37_27%_35%)] dark:text-[hsl(37_27%_78%)] max-w-xs">
               Texas marketplace for whitetail breeders, registered livestock, and cattle—built for trust and compliance.
             </p>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-1.5">
               <Badge
                 variant="secondary"
-                className="bg-black/5 dark:bg-white/10 text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)] border border-black/10 dark:border-white/10"
+                className="text-[10px] px-2 py-0 bg-black/5 dark:bg-white/10 text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)] border border-black/10 dark:border-white/10"
               >
-                Texas-only animals
+                Texas-only
               </Badge>
               <Badge
                 variant="secondary"
-                className="bg-black/5 dark:bg-white/10 text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)] border border-black/10 dark:border-white/10"
+                className="text-[10px] px-2 py-0 bg-black/5 dark:bg-white/10 text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)] border border-black/10 dark:border-white/10"
               >
-                Pre-listing verification + seller eligibility
+                Pre-listing verification
               </Badge>
             </div>
           </div>
 
           {/* Marketplace */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="text-sm font-semibold text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)]">Marketplace</div>
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-1.5 text-sm">
               {links.marketplace.map((l) =>
                 l.href === '/dashboard/listings/new' ? (
                   <li key={l.href}>
@@ -179,10 +176,10 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* How It Works */}
-          <div className="space-y-3">
+          {/* How It Works + Trust */}
+          <div className="space-y-2">
             <div className="text-sm font-semibold text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)]">How It Works</div>
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-1.5 text-sm">
               {links.howItWorks.map((l) => (
                 <li key={l.href}>
                   <Link
@@ -196,28 +193,11 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Trust */}
-          <div className="space-y-3">
-            <div className="text-sm font-semibold text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)]">Trust</div>
-            <ul className="space-y-2 text-sm">
-              {links.trust.map((l) => (
-                <li key={l.href}>
-                  <Link
-                    href={l.href}
-                    className="text-[hsl(37_27%_35%)] dark:text-[hsl(37_27%_78%)] hover:text-[hsl(37_27%_15%)] dark:hover:text-[hsl(37_27%_92%)] transition-colors underline-offset-4 hover:underline"
-                  >
-                    {l.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
           {/* Legal + Support */}
-          <div className="space-y-6">
-            <div className="space-y-3">
+          <div className="space-y-4">
+            <div className="space-y-2">
               <div className="text-sm font-semibold text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)]">Legal</div>
-              <ul className="space-y-2 text-sm">
+              <ul className="space-y-1.5 text-sm">
                 {links.legal.map((l) => (
                   <li key={l.href}>
                     <Link
@@ -231,9 +211,9 @@ export function Footer() {
               </ul>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               <div className="text-sm font-semibold text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)]">Support</div>
-              <ul className="space-y-2 text-sm">
+              <ul className="space-y-1.5 text-sm">
                 {links.support.map((l) => (
                   <li key={l.href}>
                     <Link
@@ -249,7 +229,7 @@ export function Footer() {
           </div>
 
           {/* Newsletter */}
-          <div className="space-y-4">
+          <div className="col-span-2 sm:col-span-3 lg:col-span-2 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm font-semibold text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)]">Newsletter</div>
               <Mail className="h-4 w-4 text-[hsl(37_27%_35%)] dark:text-[hsl(37_27%_78%)]" />
@@ -310,7 +290,7 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-10 pt-6 border-t border-black/10 dark:border-white/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+        <div className="mt-8 pt-5 border-t border-black/10 dark:border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-center sm:text-left">
           <div className="text-xs text-[hsl(37_27%_45%)] dark:text-[hsl(37_27%_70%)]">
             © {currentYear()} Agchange. All rights reserved.
           </div>

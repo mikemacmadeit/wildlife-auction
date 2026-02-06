@@ -58,7 +58,6 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
   );
   // Phase 3A (A4): anon-safe trust signals come from listing.sellerSnapshot (copied at publish time).
   const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
-  const sellerBadges = Array.isArray(listing.sellerSnapshot?.badges) ? listing.sellerSnapshot!.badges! : [];
   const watchers = typeof listing.watcherCount === 'number' ? listing.watcherCount : listing.metrics?.favorites || 0;
   const bidCount = typeof listing.metrics?.bidCount === 'number' ? listing.metrics.bidCount : 0;
   const sold = useMemo(() => getSoldSummary(listing), [listing]);
@@ -448,20 +447,9 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
                     </div>
                   </div>
                   <div className="hidden sm:flex items-center gap-1.5 flex-wrap justify-end max-w-full">
-                    {listing.sellerSnapshot?.verified && (
-                      <Badge variant="secondary" className="text-[10px] font-semibold flex-shrink-0">
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        Verified
-                      </Badge>
-                    )}
                     {sellerTxCount !== null && sellerTxCount > 0 && (
                       <Badge variant="outline" className="text-[10px] font-semibold flex-shrink-0">
                         {sellerTxCount} tx
-                      </Badge>
-                    )}
-                    {sellerBadges.includes('Identity verified') && (
-                      <Badge variant="outline" className="text-[10px] font-semibold flex-shrink-0">
-                        ID verified
                       </Badge>
                     )}
                   </div>

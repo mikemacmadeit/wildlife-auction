@@ -38,6 +38,7 @@ import { Badge } from '@/components/ui/badge';
 import { HelpTooltip } from '@/components/help/HelpTooltip';
 import { ImageGallery } from '@/components/listing/ImageGallery';
 import { KeyFactsPanel } from '@/components/listing/KeyFactsPanel';
+import { SellerAnimalAckModal } from '@/components/listing/SellerAnimalAckModal';
 import { Separator } from '@/components/ui/separator';
 import { getUserProfile } from '@/lib/firebase/users';
 import { UserProfile } from '@/lib/types';
@@ -3296,7 +3297,7 @@ function NewListingPageContent() {
         </DialogContent>
       </Dialog>
 
-      <Dialog
+      <SellerAnimalAckModal
         open={sellerAnimalAckModalOpen}
         onOpenChange={(open) => {
           setSellerAnimalAckModalOpen(open);
@@ -3306,155 +3307,56 @@ function NewListingPageContent() {
             submittingRef.current = false;
           }
         }}
-      >
-        <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Seller acknowledgment</DialogTitle>
-            <DialogDescription>
-              You must accept this acknowledgment to publish an animal listing.
-            </DialogDescription>
-          </DialogHeader>
+        checked={Boolean(sellerAnimalAckModalChecked)}
+        onCheckedChange={setSellerAnimalAckModalChecked}
+        category={formData.category}
+        onCancel={() => {
+          setSellerAnimalAckModalOpen(false);
+          setSellerAnimalAckModalChecked(false);
+          pendingPublishPayloadRef.current = null;
+          submittingRef.current = false;
+        }}
+        onConfirm={() => {
+          sellerAnimalAckForceRef.current = true;
+          setSellerAnimalAttestationAccepted(true);
 
-          <div className="space-y-4 overflow-y-auto flex-1 px-1">
-            <div className="rounded-lg border border-border/60 bg-muted/20 p-3 md:p-4">
-              <div className="flex items-start gap-2 md:gap-3">
-                <Checkbox
-                  id="seller-animal-ack-modal"
-                  className="mt-1 min-h-[20px] min-w-[20px]"
-                  checked={Boolean(sellerAnimalAckModalChecked)}
-                  onCheckedChange={(checked) => setSellerAnimalAckModalChecked(Boolean(checked))}
-                />
-                <Label htmlFor="seller-animal-ack-modal" className="cursor-pointer leading-relaxed text-sm">
-                  <div className="space-y-2">
-                    <div>
-                      I acknowledge I am solely responsible for all representations, permits/records, and legal compliance for this animal listing, and that
-                      Agchange does not take custody of animals.
-                    </div>
-                    {/* Category-specific disclosures */}
-                    {formData.category === 'sporting_working_dogs' && (
-                      <div className="mt-2 pt-2 border-t border-border/40">
-                        <div className="font-medium mb-1.5 text-xs md:text-sm">Required disclosures:</div>
-                        <div className="text-xs md:text-sm space-y-1">
-                          <div>• I have accurately disclosed identification details (if applicable).</div>
-                          <div>• I have disclosed any known health issues and represented the dog honestly.</div>
-                          <div>• I understand transfers are Texas-only on this platform.</div>
-                        </div>
-                      </div>
-                    )}
-                    {formData.category === 'wildlife_exotics' && (
-                      <div className="mt-2 pt-2 border-t border-border/40">
-                        <div className="font-medium mb-1.5 text-xs md:text-sm">Required disclosures:</div>
-                        <div className="text-xs md:text-sm space-y-1">
-                          <div>• I confirm that animals are properly identified/tagged as required by TAHC regulations.</div>
-                          <div>• I acknowledge health disclosure requirements for registered livestock.</div>
-                          <div>• I confirm that transfer is Texas-only unless otherwise permitted by regulations.</div>
-                        </div>
-                      </div>
-                    )}
-                    {formData.category === 'cattle_livestock' && (
-                      <div className="mt-2 pt-2 border-t border-border/40">
-                        <div className="font-medium mb-1.5 text-xs md:text-sm">Required disclosures:</div>
-                        <div className="text-xs md:text-sm space-y-1">
-                          <div>• I confirm that animals have proper ear tags/brand identification as required.</div>
-                          <div>• I acknowledge health disclosure requirements for cattle.</div>
-                        </div>
-                      </div>
-                    )}
-                    {formData.category === 'farm_animals' && (
-                      <div className="mt-2 pt-2 border-t border-border/40">
-                        <div className="font-medium mb-1.5 text-xs md:text-sm">Required disclosures:</div>
-                        <div className="text-xs md:text-sm space-y-1">
-                          <div>• I confirm that animals are properly identified (ear tags, tattoos, or other as required).</div>
-                          <div>• I acknowledge health disclosure requirements for farm animals.</div>
-                        </div>
-                      </div>
-                    )}
-                    {formData.category === 'horse_equestrian' && (
-                      <div className="mt-2 pt-2 border-t border-border/40">
-                        <div className="font-medium mb-1.5 text-xs md:text-sm">Required disclosures:</div>
-                        <div className="text-xs md:text-sm space-y-1">
-                          <div>• I have accurately disclosed identifying information (microchip/brand/tattoo/markings/registration).</div>
-                          <div>• I have disclosed any known health issues and represented the horse honestly.</div>
-                          <div>• I understand transfers are Texas-only on this platform.</div>
-                          <div>• I disclose any liens/encumbrances (or confirm there are none).</div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </Label>
-              </div>
-            </div>
+          const category = formData.category;
+          const updatedAttributes: any = { ...formData.attributes };
 
-            <div className="text-xs md:text-sm text-muted-foreground px-1">
-              After you publish, your listing will be submitted for review and approval.
-            </div>
-          </div>
+          if (category === 'sporting_working_dogs') {
+            updatedAttributes.identificationDisclosure = true;
+            updatedAttributes.healthDisclosure = true;
+            updatedAttributes.transportDisclosure = true;
+          } else if (category === 'wildlife_exotics') {
+            updatedAttributes.animalIdDisclosure = true;
+            updatedAttributes.healthDisclosure = true;
+            updatedAttributes.transportDisclosure = true;
+          } else if (category === 'cattle_livestock') {
+            updatedAttributes.identificationDisclosure = true;
+            updatedAttributes.healthDisclosure = true;
+          } else if (category === 'farm_animals') {
+            updatedAttributes.identificationDisclosure = true;
+            updatedAttributes.healthDisclosure = true;
+          } else if (category === 'horse_equestrian') {
+            updatedAttributes.disclosures = {
+              ...(updatedAttributes.disclosures || {}),
+              identificationDisclosure: true,
+              healthDisclosure: true,
+              transportDisclosure: true,
+              titleOrLienDisclosure: true,
+            };
+          }
 
-          <DialogFooter className="gap-2 sm:gap-0 flex-shrink-0">
-            <Button
-              type="button"
-              variant="outline"
-              className="min-h-[44px]"
-              onClick={() => {
-                setSellerAnimalAckModalOpen(false);
-                setSellerAnimalAckModalChecked(false);
-                pendingPublishPayloadRef.current = null;
-                submittingRef.current = false;
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              className="min-h-[44px]"
-              disabled={!Boolean(sellerAnimalAckModalChecked)}
-              onClick={() => {
-                sellerAnimalAckForceRef.current = true;
-                setSellerAnimalAttestationAccepted(true);
+          if (category === 'sporting_working_dogs' || category === 'wildlife_exotics' || category === 'cattle_livestock' || category === 'farm_animals' || category === 'horse_equestrian') {
+            setFormData({ ...formData, attributes: updatedAttributes });
+          }
 
-                const category = formData.category;
-                const updatedAttributes: any = { ...formData.attributes };
-
-                if (category === 'sporting_working_dogs') {
-                  updatedAttributes.identificationDisclosure = true;
-                  updatedAttributes.healthDisclosure = true;
-                  updatedAttributes.transportDisclosure = true;
-                } else if (category === 'wildlife_exotics') {
-                  updatedAttributes.animalIdDisclosure = true;
-                  updatedAttributes.healthDisclosure = true;
-                  updatedAttributes.transportDisclosure = true;
-                } else if (category === 'cattle_livestock') {
-                  updatedAttributes.identificationDisclosure = true;
-                  updatedAttributes.healthDisclosure = true;
-                } else if (category === 'farm_animals') {
-                  updatedAttributes.identificationDisclosure = true;
-                  updatedAttributes.healthDisclosure = true;
-                } else if (category === 'horse_equestrian') {
-                  updatedAttributes.disclosures = {
-                    ...(updatedAttributes.disclosures || {}),
-                    identificationDisclosure: true,
-                    healthDisclosure: true,
-                    transportDisclosure: true,
-                    titleOrLienDisclosure: true,
-                  };
-                }
-
-                if (category === 'sporting_working_dogs' || category === 'wildlife_exotics' || category === 'cattle_livestock' || category === 'farm_animals' || category === 'horse_equestrian') {
-                  setFormData({ ...formData, attributes: updatedAttributes });
-                }
-
-                pendingPublishPayloadRef.current = null;
-                setSellerAnimalAckModalChecked(false);
-                setSellerAnimalAckModalOpen(false);
-                // Auto-execute publish after modal closes (useEffect runs handleComplete with 50ms delay for mobile)
-                setPublishAfterAnimalAck(true);
-              }}
-            >
-              I agree &amp; continue to publish
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          pendingPublishPayloadRef.current = null;
+          setSellerAnimalAckModalChecked(false);
+          setSellerAnimalAckModalOpen(false);
+          setPublishAfterAnimalAck(true);
+        }}
+      />
 
       <LegalDocsModal
         open={legalTermsModalOpen}

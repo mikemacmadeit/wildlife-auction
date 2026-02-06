@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
@@ -28,7 +28,7 @@ import {
   MoreHorizontal,
   ArrowUpRight,
   ArrowRight,
-  ArrowDownLeft,
+  ChevronDown,
   RefreshCw,
   Search,
   TrendingUp,
@@ -70,6 +70,7 @@ type OfferRow = {
   sellerDisplayName?: string; // Hydrated by API for Offers tab "Seller" column
   status: string;
   currentAmount: number;
+  originalAmount?: number;
   acceptedAmount?: number;
   lastActorRole?: 'buyer' | 'seller' | 'system';
   expiresAt?: number | null;
@@ -103,6 +104,8 @@ type UnifiedRow =
 type StatusFilter = 'all' | 'winning' | 'outbid' | 'accepted' | 'expired';
 type TypeFilter = 'all' | 'bids' | 'offers';
 type SortKey = 'ending_soon' | 'newest' | 'highest_amount';
+type OfferStatusFilter = 'all' | 'sent' | 'received' | 'open' | 'countered' | 'accepted' | 'declined' | 'expired';
+type OfferSortKey = 'status' | 'newest' | 'ending_soon' | 'highest_amount';
 
 function formatMoney(n: number) {
   if (!Number.isFinite(n)) return '$0';
@@ -153,7 +156,33 @@ function offerStatusFromRow(o: OfferRow): UnifiedRow['status'] {
 function badgeVariantForUnifiedStatus(status: UnifiedRow['status']) {
   if (status === 'WINNING' || status === 'ACCEPTED' || status === 'WON') return 'default';
   if (status === 'OUTBID' || status === 'COUNTERED') return 'secondary';
+  if (status === 'LOST') return 'destructive';
   return 'outline';
+}
+
+function offerStatusBanner(status: UnifiedRow['status']): string {
+  if (status === 'EXPIRED') return 'OFFER EXPIRED';
+  if (status === 'DECLINED') return 'OFFER DECLINED';
+  if (status === 'ACCEPTED') return 'OFFER ACCEPTED';
+  if (status === 'COUNTERED') return 'COUNTER OFFER';
+  if (status === 'SENT') return 'OFFER SENT';
+  return status;
+}
+
+function formatOfferExpiry(timeLeftMs: number | null, expiresAtMs: number | null): string {
+  if (timeLeftMs !== null && timeLeftMs > 0) {
+    const mins = Math.floor(timeLeftMs / (60 * 1000));
+    const hrs = Math.floor(mins / 60);
+    const days = Math.floor(hrs / 24);
+    if (days > 0) return `Ends in ${days}d ${hrs % 24}h`;
+    if (hrs > 0) return `Ends in ${hrs}h ${mins % 60}m`;
+    return `Ends in ${mins}m`;
+  }
+  if (expiresAtMs) {
+    const d = new Date(expiresAtMs);
+    return `Ended ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}`;
+  }
+  return '';
 }
 
 const TAB_VALUES = ['needs_action', 'bids', 'offers', 'history'] as const;
@@ -166,12 +195,22 @@ function parseTabFromSearchParams(sp: URLSearchParams | null): TabValue {
 }
 
 export default function BidsOffersPage() {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
   const [tab, setTabState] = useState<TabValue>('needs_action');
-  const setTab = setTabState;
+  const setTab = useCallback(
+    (next: TabValue) => {
+      setTabState(next);
+      const params = new URLSearchParams(searchParams?.toString() ?? '');
+      params.set('tab', next);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
 
   // Sync tab from ?tab= when landing (e.g. Back from offer detail → ?tab=offers).
   useEffect(() => {
@@ -184,6 +223,8 @@ export default function BidsOffersPage() {
   const [unreadHistory, setUnreadHistory] = useState(0);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all'); // applies in Bids tab
   const [sortKey, setSortKey] = useState<SortKey>('ending_soon');
+  const [offerStatusFilter, setOfferStatusFilter] = useState<OfferStatusFilter>('all');
+  const [offerSortKey, setOfferSortKey] = useState<OfferSortKey>('status');
   const [query, setQuery] = useState('');
 
   const [loading, setLoading] = useState(false);
@@ -597,22 +638,48 @@ export default function BidsOffersPage() {
     if (normalizedQuery) {
       list = list.filter((o) => (o.listingTitle || '').toLowerCase().includes(normalizedQuery));
     }
-    // Most actionable first: accepted, countered, sent, then rest
-    const rank = (s: UnifiedRow['status']) => (s === 'ACCEPTED' ? 0 : s === 'COUNTERED' ? 1 : s === 'SENT' ? 2 : 3);
-    list.sort((a, b) => rank(a.status) - rank(b.status));
-    if (sortKey === 'ending_soon') {
+    // Offer status filter (eBay-style)
+    if (offerStatusFilter !== 'all') {
+      list = list.filter((o) => {
+        if (offerStatusFilter === 'sent') return o.direction === 'out';
+        if (offerStatusFilter === 'received') return o.direction === 'in';
+        if (offerStatusFilter === 'open' || offerStatusFilter === 'countered' || offerStatusFilter === 'accepted' || offerStatusFilter === 'declined' || offerStatusFilter === 'expired') {
+          return o.status === offerStatusFilter.toUpperCase() as any;
+        }
+        return true;
+      });
+    }
+    // Sort
+    if (offerSortKey === 'status') {
+      const rank = (s: UnifiedRow['status']) => (s === 'ACCEPTED' ? 0 : s === 'COUNTERED' ? 1 : s === 'SENT' ? 2 : 3);
+      list.sort((a, b) => rank(a.status) - rank(b.status));
+    } else if (offerSortKey === 'ending_soon') {
       list.sort((a, b) => {
         const aLeft = a.timeLeftMs === null ? Number.POSITIVE_INFINITY : a.timeLeftMs;
         const bLeft = b.timeLeftMs === null ? Number.POSITIVE_INFINITY : b.timeLeftMs;
         return aLeft - bLeft;
       });
-    } else if (sortKey === 'highest_amount') {
+    } else if (offerSortKey === 'highest_amount') {
       list.sort((a, b) => (b.yourAmount || 0) - (a.yourAmount || 0));
     } else {
       list.sort((a, b) => (b.sortUpdatedAt || 0) - (a.sortUpdatedAt || 0));
     }
     return list;
-  }, [normalizedQuery, rows, sortKey]);
+  }, [normalizedQuery, rows, offerStatusFilter, offerSortKey]);
+
+  const offerCountByStatus = useMemo(() => {
+    const all = rows.filter((r) => r.type === 'offer') as Extract<UnifiedRow, { type: 'offer' }>[];
+    return {
+      all: all.length,
+      sent: all.filter((o) => o.direction === 'out').length,
+      received: all.filter((o) => o.direction === 'in').length,
+      open: all.filter((o) => o.status === 'SENT').length,
+      countered: all.filter((o) => o.status === 'COUNTERED').length,
+      accepted: all.filter((o) => o.status === 'ACCEPTED').length,
+      declined: all.filter((o) => o.status === 'DECLINED').length,
+      expired: all.filter((o) => o.status === 'EXPIRED').length,
+    };
+  }, [rows]);
 
   const offerRowsSent = useMemo(() => offerRows.filter((r) => r.direction === 'out'), [offerRows]);
   const offerRowsReceived = useMemo(() => offerRows.filter((r) => r.direction === 'in'), [offerRows]);
@@ -694,13 +761,13 @@ export default function BidsOffersPage() {
               Auctions and offers in one place. Manage bids, sent and received offers.
             </p>
           </div>
-          <Button variant="outline" onClick={load} disabled={loading} className="min-h-9 h-9 shrink-0">
+          <Button variant="outline" onClick={load} disabled={loading} className="min-h-[44px] min-w-[44px] h-11 w-11 sm:h-9 sm:w-9 shrink-0">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </Button>
         </div>
 
-        {/* Top summary — compact 2x2 on mobile, 4 cols on desktop */}
-        <div className="grid grid-cols-4 gap-2 sm:gap-3 min-w-0">
+        {/* Top summary — 2x2 on mobile for touch-friendly tiles, 4 cols on desktop */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 min-w-0">
           <Card className="rounded-xl border border-border/50 bg-card min-w-0">
             <CardContent className="p-3 sm:p-4 flex flex-row items-center justify-between gap-2 min-w-0">
               <span className="text-[11px] sm:text-xs text-muted-foreground truncate">Winning</span>
@@ -749,12 +816,11 @@ export default function BidsOffersPage() {
                 void clearTabNotifs(next);
               }}
             >
-              <div className="flex flex-col xl:flex-row xl:items-center gap-3 justify-between">
-                {/* Tabs: full-width pill row (like watchlist / orders filters) */}
-                <TabsList className="w-full flex gap-1.5 sm:gap-2 p-0 h-auto bg-transparent">
+              {/* Row 1: Tabs only — scroll on very narrow screens */}
+              <TabsList className="w-full flex gap-1.5 sm:gap-2 p-0 h-auto bg-transparent mb-4 overflow-x-auto overflow-y-hidden -mx-1 px-1 sm:overflow-visible sm:mx-0 sm:px-0">
                   <TabsTrigger
                     value="needs_action"
-                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-full text-sm font-medium transition-colors bg-muted/40 text-muted-foreground hover:bg-muted/60 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none min-h-[44px] justify-center gap-1.5"
+                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-full text-sm font-medium transition-colors border-2 border-primary bg-transparent text-primary hover:bg-primary/10 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none min-h-[44px] justify-center gap-1.5"
                   >
                     Needs action
                     {unreadNeedsAction > 0 ? (
@@ -763,7 +829,7 @@ export default function BidsOffersPage() {
                   </TabsTrigger>
                   <TabsTrigger
                     value="bids"
-                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-full text-sm font-medium transition-colors bg-muted/40 text-muted-foreground hover:bg-muted/60 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none min-h-[44px] justify-center gap-1.5"
+                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-full text-sm font-medium transition-colors border-2 border-primary bg-transparent text-primary hover:bg-primary/10 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none min-h-[44px] justify-center gap-1.5"
                   >
                     Bids
                     {unreadBids > 0 ? (
@@ -772,7 +838,7 @@ export default function BidsOffersPage() {
                   </TabsTrigger>
                   <TabsTrigger
                     value="offers"
-                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-full text-sm font-medium transition-colors bg-muted/40 text-muted-foreground hover:bg-muted/60 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none min-h-[44px] justify-center gap-1.5"
+                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-full text-sm font-medium transition-colors border-2 border-primary bg-transparent text-primary hover:bg-primary/10 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none min-h-[44px] justify-center gap-1.5"
                   >
                     Offers
                     {unreadOffers > 0 ? (
@@ -781,116 +847,187 @@ export default function BidsOffersPage() {
                   </TabsTrigger>
                   <TabsTrigger
                     value="history"
-                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-full text-sm font-medium transition-colors bg-muted/40 text-muted-foreground hover:bg-muted/60 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none min-h-[44px] justify-center gap-1.5"
+                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-full text-sm font-medium transition-colors border-2 border-primary bg-transparent text-primary hover:bg-primary/10 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none min-h-[44px] justify-center gap-1.5"
                   >
                     History
                     {unreadHistory > 0 ? (
                       <Badge variant="secondary" className="h-5 min-w-[20px] px-1.5 text-xs">{unreadHistory}</Badge>
                     ) : null}
                   </TabsTrigger>
-                </TabsList>
+              </TabsList>
 
-                {/* Mobile: horizontal scroll of filters */}
-                <div className="sm:hidden overflow-x-auto overflow-y-hidden -mx-1 px-1 we-scrollbar-hover">
-                  <div className="flex items-center gap-2 flex-nowrap min-w-0 py-1">
-                    <div className="relative flex-shrink-0 w-[140px]">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                      <Input
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search…"
-                        className="pl-8 h-8 text-sm"
-                      />
-                    </div>
-                    <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
-                      <SelectTrigger className="h-8 rounded-lg min-w-0 w-auto px-3 text-xs font-medium border-border/60 flex-shrink-0 [&>span]:max-w-[90px] [&>span]:truncate">
-                        <SelectValue placeholder="Sort" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ending_soon">Ending soon</SelectItem>
-                        <SelectItem value="newest">Newest</SelectItem>
-                        <SelectItem value="highest_amount">Highest amount</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {tab === 'bids' ? (
-                      <>
-                        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-                          <SelectTrigger className="h-8 rounded-lg min-w-0 w-auto px-3 text-xs font-medium border-border/60 flex-shrink-0 [&>span]:max-w-[80px] [&>span]:truncate">
-                            <SelectValue placeholder="Status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All</SelectItem>
-                            <SelectItem value="winning">Winning</SelectItem>
-                            <SelectItem value="outbid">Outbid</SelectItem>
-                            <SelectItem value="accepted">Won</SelectItem>
-                            <SelectItem value="expired">Lost</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <button
-                          type="button"
-                          onClick={() => setHideRemovedListings(!hideRemovedListings)}
-                          className={cn(
-                            'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 h-8 text-xs font-medium flex-shrink-0 whitespace-nowrap',
-                            hideRemovedListings
-                              ? 'border-primary/40 bg-primary/10 text-primary'
-                              : 'border-border/60 bg-muted/40 text-foreground'
-                          )}
-                        >
-                          Hide removed
-                        </button>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-
-                {/* Desktop: filters row */}
-                <div className="hidden sm:flex flex-col xl:flex-row gap-2 w-full xl:w-auto xl:items-center">
-                  <div className="relative w-full xl:w-[320px]">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              {/* Row 2: Filters — mobile: search + combined Sort; desktop: search, sort, status, hide-removed */}
+              <div className="flex flex-col gap-2 sm:gap-3">
+                {/* Mobile: single row — search + combined Sort (sort + status in one dropdown) */}
+                <div className="flex gap-2 items-center min-h-[44px] sm:hidden">
+                  <div className="relative flex-1 min-w-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                     <Input
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       placeholder="Search by title…"
-                      className="pl-9"
+                      className="pl-9 min-h-[44px] h-11"
                     />
                   </div>
-                  <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
-                    <SelectTrigger className="min-w-[180px]">
+                  {tab === 'bids' ? (
+                    <Select
+                      value={`${sortKey}|${statusFilter}`}
+                      onValueChange={(v) => {
+                        const [s, f] = v.split('|');
+                        if (s) setSortKey(s as SortKey);
+                        if (f) setStatusFilter(f as StatusFilter);
+                      }}
+                    >
+                      <SelectTrigger className="min-h-[44px] h-11 w-[8.5rem] shrink-0">
+                        <SelectValue placeholder="Sort" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectLabel>Sort by</SelectLabel>
+                          <SelectItem value="ending_soon|all">Ending soon · All</SelectItem>
+                          <SelectItem value="newest|all">Newest · All</SelectItem>
+                          <SelectItem value="highest_amount|all">Highest · All</SelectItem>
+                        </SelectGroup>
+                        <SelectGroup>
+                          <SelectLabel>Status</SelectLabel>
+                          <SelectItem value={`${sortKey}|winning`}>Winning</SelectItem>
+                          <SelectItem value={`${sortKey}|outbid`}>Outbid</SelectItem>
+                          <SelectItem value={`${sortKey}|accepted`}>Won</SelectItem>
+                          <SelectItem value={`${sortKey}|expired`}>Lost</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  ) : tab === 'offers' ? (
+                    <Select
+                      value={`${offerSortKey}|${offerStatusFilter}`}
+                      onValueChange={(v) => {
+                        const [s, f] = v.split('|');
+                        if (s) setOfferSortKey(s as OfferSortKey);
+                        if (f) setOfferStatusFilter(f as OfferStatusFilter);
+                      }}
+                    >
+                      <SelectTrigger className="min-h-[44px] h-11 w-[8.5rem] shrink-0">
+                        <SelectValue placeholder="Sort" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectLabel>Sort by</SelectLabel>
+                          <SelectItem value="status|all">Status · All</SelectItem>
+                          <SelectItem value="newest|all">Newest · All</SelectItem>
+                          <SelectItem value="ending_soon|all">Ending soon · All</SelectItem>
+                          <SelectItem value="highest_amount|all">Highest · All</SelectItem>
+                        </SelectGroup>
+                        <SelectGroup>
+                          <SelectLabel>Status</SelectLabel>
+                          <SelectItem value={`${offerSortKey}|sent`}>You sent</SelectItem>
+                          <SelectItem value={`${offerSortKey}|received`}>You received</SelectItem>
+                          <SelectItem value={`${offerSortKey}|open`}>Open</SelectItem>
+                          <SelectItem value={`${offerSortKey}|countered`}>Countered</SelectItem>
+                          <SelectItem value={`${offerSortKey}|accepted`}>Accepted</SelectItem>
+                          <SelectItem value={`${offerSortKey}|declined`}>Declined</SelectItem>
+                          <SelectItem value={`${offerSortKey}|expired`}>Expired</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  ) : null}
+                </div>
+                {/* Desktop: full grid */}
+                <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto] xl:grid-cols-[320px_180px_180px_auto] gap-2 sm:gap-3 items-center min-h-[44px]">
+                  <div className="relative w-full min-w-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <Input
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Search by title…"
+                      className="pl-9 min-h-[44px] h-11 sm:h-10"
+                    />
+                  </div>
+                  <Select
+                    value={tab === 'offers' ? offerSortKey : sortKey}
+                    onValueChange={(v) => (tab === 'offers' ? setOfferSortKey(v as OfferSortKey) : setSortKey(v as SortKey))}
+                  >
+                    <SelectTrigger className="min-h-[44px] h-11 sm:h-10 w-full sm:w-auto sm:min-w-[180px]">
                       <SelectValue placeholder="Sort" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ending_soon">Sort: Ending Soon</SelectItem>
-                      <SelectItem value="newest">Sort: Newest</SelectItem>
-                      <SelectItem value="highest_amount">Sort: Highest Amount</SelectItem>
+                      {tab === 'offers' ? (
+                        <>
+                          <SelectItem value="status">Sort: Offer status</SelectItem>
+                          <SelectItem value="newest">Sort: Newest</SelectItem>
+                          <SelectItem value="ending_soon">Sort: Ending soon</SelectItem>
+                          <SelectItem value="highest_amount">Sort: Highest amount</SelectItem>
+                        </>
+                      ) : (
+                        <>
+                          <SelectItem value="ending_soon">Sort: Ending Soon</SelectItem>
+                          <SelectItem value="newest">Sort: Newest</SelectItem>
+                          <SelectItem value="highest_amount">Sort: Highest Amount</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
-                  {tab === 'bids' ? (
-                    <>
+                  <div className="w-full sm:min-w-[160px] sm:min-w-[180px] min-h-[44px] flex items-center">
+                    {tab === 'bids' ? (
                       <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-                        <SelectTrigger className="min-w-[180px]">
+                        <SelectTrigger className="min-h-[44px] h-11 sm:h-10 w-full min-w-0">
                           <SelectValue placeholder="Status" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">Status: All</SelectItem>
-                          <SelectItem value="winning">Winning</SelectItem>
-                          <SelectItem value="outbid">Outbid</SelectItem>
-                          <SelectItem value="accepted">Won</SelectItem>
-                          <SelectItem value="expired">Lost</SelectItem>
+                          <SelectItem value="winning">Status: Winning</SelectItem>
+                          <SelectItem value="outbid">Status: Outbid</SelectItem>
+                          <SelectItem value="accepted">Status: Won</SelectItem>
+                          <SelectItem value="expired">Status: Lost</SelectItem>
                         </SelectContent>
                       </Select>
-                      <div className="flex items-center gap-2 whitespace-nowrap">
+                    ) : tab === 'offers' ? (
+                      <Select value={offerStatusFilter} onValueChange={(v) => setOfferStatusFilter(v as OfferStatusFilter)}>
+                        <SelectTrigger className="min-h-[44px] h-11 sm:h-10 w-full min-w-0">
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Status: All ({offerCountByStatus.all})</SelectItem>
+                          <SelectItem value="sent">You sent ({offerCountByStatus.sent})</SelectItem>
+                          <SelectItem value="received">You received ({offerCountByStatus.received})</SelectItem>
+                          <SelectItem value="open">Open ({offerCountByStatus.open})</SelectItem>
+                          <SelectItem value="countered">Countered ({offerCountByStatus.countered})</SelectItem>
+                          <SelectItem value="accepted">Accepted ({offerCountByStatus.accepted})</SelectItem>
+                          <SelectItem value="declined">Declined ({offerCountByStatus.declined})</SelectItem>
+                          <SelectItem value="expired">Expired ({offerCountByStatus.expired})</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : null}
+                  </div>
+                  <div className="min-w-0 min-h-[44px] flex items-center py-1">
+                    {tab === 'bids' ? (
+                      <div className="flex items-center gap-2 whitespace-nowrap min-h-[44px] py-2 sm:py-0">
                         <Switch
                           id="hide-removed"
                           checked={hideRemovedListings}
                           onCheckedChange={setHideRemovedListings}
+                          className="data-[state=checked]:bg-primary"
                         />
-                        <Label htmlFor="hide-removed" className="text-sm font-medium cursor-pointer">
+                        <Label htmlFor="hide-removed" className="text-sm font-medium cursor-pointer select-none touch-manipulation">
                           Hide removed
                         </Label>
                       </div>
-                    </>
-                  ) : null}
+                    ) : null}
+                  </div>
                 </div>
+                {/* Mobile: Hide removed row for Bids tab */}
+                {tab === 'bids' ? (
+                  <div className="flex sm:hidden items-center gap-2 min-h-[44px] py-1">
+                    <Switch
+                      id="hide-removed-mobile"
+                      checked={hideRemovedListings}
+                      onCheckedChange={setHideRemovedListings}
+                      className="data-[state=checked]:bg-primary"
+                    />
+                    <Label htmlFor="hide-removed-mobile" className="text-sm font-medium cursor-pointer select-none touch-manipulation">
+                      Hide removed
+                    </Label>
+                  </div>
+                ) : null}
               </div>
 
               {loading ? (
@@ -899,7 +1036,7 @@ export default function BidsOffersPage() {
                 </div>
               ) : (
                 <>
-                  <TabsContent value="needs_action" className="mt-0">
+                  <TabsContent value="needs_action" className="mt-0 data-[state=inactive]:hidden" forceMount>
                   {needsAction.length === 0 ? (
                     <div className="py-10 text-center text-sm text-muted-foreground">You’re all caught up.</div>
                   ) : (
@@ -907,32 +1044,78 @@ export default function BidsOffersPage() {
                       <p className="text-sm text-muted-foreground">
                         Complete these steps to keep your deals on track—checkout or respond soon to move orders forward.
                       </p>
-                      <div className="space-y-3">
-                        {needsAction.map((r) => (
+                      <div className="space-y-4">
+                        {needsAction.map((r) =>
+                          r.type === 'offer' ? (
+                            /* Same simple offer card as Offers tab */
+                            (() => {
+                              const o = r as Extract<UnifiedRow, { type: 'offer' }>;
+                              const raw = o.raw as OfferRow;
+                              const sellerId = raw?.sellerId;
+                              return (
+                                <div key={r.id} className="rounded-xl border border-border/50 bg-card p-3 sm:p-4 transition-colors hover:bg-muted/20">
+                                  <div className="flex flex-row items-start gap-3 sm:gap-4">
+                                    <div className="flex flex-1 min-w-0 items-start gap-2.5 sm:gap-3">
+                                      <div className="h-20 w-20 sm:h-[5.5rem] sm:w-[5.5rem] rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+                                        {o.listingImage ? <Image src={o.listingImage} alt="" fill className="object-cover" sizes="88px" /> : <div className="absolute inset-0 flex items-center justify-center"><Handshake className="h-7 w-7 text-muted-foreground/40" /></div>}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0">{offerStatusBanner(o.status)}</Badge>
+                                          <span className="text-[10px] sm:text-xs text-muted-foreground">{o.direction === 'out' ? 'You sent' : 'Received'}</span>
+                                        </div>
+                                        <Link href={`/listing/${o.listingId}`} className="font-semibold text-sm sm:text-base leading-snug line-clamp-2 mt-0.5 hover:underline block text-foreground">{getDisplayTitle(o)}</Link>
+                                        <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
+                                          {formatMoney(o.yourAmount)}
+                                          {o.sellerName ? ` · ${o.sellerName}` : ` · ${getDisplaySeller(o) || '—'}`}
+                                          {o.timeLeftMs != null && o.timeLeftMs > 0 && (o.timeLeftMs <= 24 * 60 * 60 * 1000 ? ` · ${Math.floor(o.timeLeftMs / (60 * 60 * 1000))}h left` : '')}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      {o.status === 'ACCEPTED' && o.direction === 'out' ? (
+                                        <Button onClick={() => openOfferCheckout(o.raw)} variant="default" size="default" className="min-h-[44px] h-11 sm:h-10">Checkout<ArrowRight className="ml-1.5 h-4 w-4" /></Button>
+                                      ) : (
+                                        <Button asChild variant={o.status === 'COUNTERED' ? 'default' : 'outline'} size="default" className={cn('min-h-[44px] h-11 sm:h-10', o.status !== 'COUNTERED' && 'border-2 border-primary bg-transparent text-primary hover:bg-primary/10')}>
+                                          <Link href={`/dashboard/offers/${o.id}`}>{o.status === 'COUNTERED' ? 'Review' : 'View offer'}</Link>
+                                        </Button>
+                                      )}
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button variant="outline" size="icon" className="min-h-[44px] min-w-[44px] h-11 w-11 sm:h-10 sm:w-10 shrink-0">
+                                            <MoreHorizontal className="h-4 w-4" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-56">
+                                          <DropdownMenuLabel>Offer</DropdownMenuLabel>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem asChild><Link href={`/listing/${o.listingId}`}><ArrowUpRight className="h-4 w-4 mr-2" />View listing</Link></DropdownMenuItem>
+                                          <DropdownMenuItem asChild><Link href={`/dashboard/offers/${o.id}`}><Handshake className="h-4 w-4 mr-2" />Offer details</Link></DropdownMenuItem>
+                                          {sellerId ? <DropdownMenuItem asChild><Link href={`/sellers/${sellerId}`}>Seller&apos;s other items</Link></DropdownMenuItem> : null}
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()
+                          ) : (
                           <div
                             key={r.id}
-                            className={cn(
-                              'rounded-xl border border-border/50 bg-card p-3 sm:p-4 transition-colors hover:bg-muted/20',
-                              r.type === 'offer' && r.status === 'ACCEPTED' && 'border-emerald-400/40 dark:border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20'
-                            )}
+                            className="rounded-xl border border-border/50 bg-card p-3 sm:p-4 transition-colors hover:bg-muted/20"
                           >
-                          <div className="flex flex-col lg:flex-row lg:items-center gap-3 sm:gap-4 justify-between">
-                            <div className="flex items-start gap-2.5 sm:gap-3 min-w-0">
-                              <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
-                                {(r as any).listingImage ? <Image src={(r as any).listingImage} alt="" fill className="object-cover" /> : null}
+                          {/* Mobile: photo+info left, button+settings right */}
+                          <div className="flex flex-row sm:flex-col lg:flex-row lg:items-center gap-3 sm:gap-4 justify-between">
+                            <div className="flex flex-1 min-w-0 items-start gap-2.5 sm:gap-3">
+                              <div className="h-20 w-20 sm:h-24 sm:w-24 lg:h-[8.5rem] lg:w-[8.5rem] rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+                                {(r as any).listingImage ? <Image src={(r as any).listingImage} alt="" fill className="object-cover" sizes="136px" /> : null}
                               </div>
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                                  <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0">
-                                    {r.type === 'bid' ? 'Auction' : 'Offer'}
-                                  </Badge>
-                                  <Badge variant={badgeVariantForUnifiedStatus(r.status) as any} className="text-[10px] sm:text-xs px-1.5 py-0">
-                                    {r.status}
-                                  </Badge>
+                                  <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0">Auction</Badge>
+                                  <Badge variant={badgeVariantForUnifiedStatus(r.status) as any} className="text-[10px] sm:text-xs px-1.5 py-0">{r.status}</Badge>
                                   {r.timeLeftMs !== null ? (
-                                    <Badge variant="secondary" className={cn('text-[10px] sm:text-xs px-1.5 py-0', timeLeftTone(r.timeLeftMs))}>
-                                      {formatTimeLeftFromMs(r.timeLeftMs)}
-                                    </Badge>
+                                    <Badge variant="secondary" className={cn('text-[10px] sm:text-xs px-1.5 py-0', timeLeftTone(r.timeLeftMs))}>{formatTimeLeftFromMs(r.timeLeftMs)}</Badge>
                                   ) : null}
                                 </div>
                                 <div className="font-semibold text-sm sm:text-base leading-snug line-clamp-2 mt-0.5 sm:mt-1">{getDisplayTitle(r)}</div>
@@ -940,35 +1123,22 @@ export default function BidsOffersPage() {
                                   <div className="text-[11px] sm:text-xs text-amber-700 dark:text-amber-400 mt-0.5">Removed from catalog.</div>
                                 )}
                                 <div className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 truncate">Seller: {getDisplaySeller(r) || '—'}</div>
-                                {r.type === 'offer' && r.status === 'ACCEPTED' && (
-                                  <p className="text-[11px] sm:text-xs text-emerald-700 dark:text-emerald-400 mt-1 font-medium">
-                                    Complete checkout to secure your purchase.
-                                  </p>
-                                )}
-                                {r.type === 'offer' && r.status === 'COUNTERED' && (
-                                  <p className="text-[11px] sm:text-xs text-amber-700 dark:text-amber-400 mt-1 font-medium">
-                                    Review and respond before the counter expires.
-                                  </p>
-                                )}
-                                  {r.type === 'bid' && r.status === 'OUTBID' && (
-                                  <p className="text-[11px] sm:text-xs text-orange-700 dark:text-orange-400 mt-1 font-medium">
-                                    Raise your max bid to stay in the running.
-                                  </p>
+                                {r.status === 'OUTBID' && (
+                                  <p className="text-[11px] sm:text-xs text-orange-700 dark:text-orange-400 mt-1 font-medium">Raise your max bid to stay in the running.</p>
                                 )}
                               </div>
                             </div>
 
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-end flex-wrap mt-1 sm:mt-0">
-                              {r.type === 'bid' ? (
-                                isListingRemoved(r) ? (
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-end flex-wrap shrink-0 sm:mt-0">
+                                {isListingRemoved(r) ? (
                                   <>
-                                    <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
+                                    <Button variant="outline" size="default" asChild className="w-full sm:w-auto min-h-[44px] h-11 sm:h-10">
                                       <Link href={`/listing/${(r as any).listingId}`}>View listing</Link>
                                     </Button>
                                     <Button
                                       variant="ghost"
-                                      size="sm"
-                                      className="text-muted-foreground hover:text-foreground w-full sm:w-auto"
+                                      size="default"
+                                      className="text-muted-foreground hover:text-foreground w-full sm:w-auto min-h-[44px] h-11 sm:h-10"
                                       onClick={() => dismissRemovedListing((r as any).listingId)}
                                     >
                                       <X className="h-4 w-4 mr-1.5" />
@@ -979,7 +1149,7 @@ export default function BidsOffersPage() {
                                   <>
                                     <Button
                                       variant="default"
-                                      className="w-full sm:w-auto"
+                                      className="w-full sm:w-auto min-h-[44px] h-11 sm:h-10"
                                       onClick={() => {
                                         const b = r as any;
                                         setRaiseTarget({
@@ -1001,41 +1171,11 @@ export default function BidsOffersPage() {
                                     >
                                       Raise max bid
                                     </Button>
-                                    <Button variant="outline" asChild className="w-full sm:w-auto">
+                                    <Button variant="outline" size="default" asChild className="w-full sm:w-auto min-h-[44px] h-11 sm:h-10">
                                       <Link href={`/listing/${(r as any).listingId}`}>View</Link>
                                     </Button>
                                   </>
-                                )
-                              ) : (
-                                <>
-                                  {r.status === 'ACCEPTED' ? (
-                                    <Button
-                                      onClick={() => openOfferCheckout((r as any).raw)}
-                                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold w-full sm:w-auto"
-                                    >
-                                      Checkout now
-                                      <ArrowRight className="ml-2 h-4 w-4" />
-                                    </Button>
-                                  ) : (
-                                    <Button
-                                      asChild
-                                      className={
-                                        r.status === 'COUNTERED'
-                                          ? 'bg-amber-600 hover:bg-amber-700 text-white font-semibold w-full sm:w-auto'
-                                          : 'border-primary/40 text-primary hover:bg-primary/10 w-full sm:w-auto'
-                                      }
-                                      variant={r.status === 'COUNTERED' ? 'default' : 'outline'}
-                                    >
-                                      <Link href={`/dashboard/offers/${(r as any).id}`}>
-                                        {r.status === 'COUNTERED' ? 'Review counter' : 'View offer'}
-                                      </Link>
-                                    </Button>
-                                  )}
-                                  <Button variant="outline" asChild className="w-full sm:w-auto">
-                                    <Link href={`/listing/${(r as any).listingId}`}>View listing</Link>
-                                  </Button>
-                                </>
-                              )}
+                                )}
                             </div>
                           </div>
                         </div>
@@ -1045,36 +1185,44 @@ export default function BidsOffersPage() {
                   )}
                   </TabsContent>
 
-                  <TabsContent value="bids" className="mt-0">
+                  <TabsContent value="bids" className="mt-0 data-[state=inactive]:hidden" forceMount>
                   {bidRows.length === 0 ? (
                     <div className="py-10 text-center text-sm text-muted-foreground">No bids match your filters.</div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-3 lg:space-y-4">
                       {bidRows.map((r) => (
-                        <div key={r.id} className="rounded-xl border border-border/50 bg-card p-3 sm:p-4 transition-colors hover:bg-muted/20">
-                          <div className="flex flex-col lg:flex-row lg:items-center gap-3 sm:gap-4 lg:gap-6 w-full">
-                            {/* Thumb + title/seller — compact on mobile */}
-                            <div className="flex items-start gap-2.5 sm:gap-3 min-w-0 flex-1">
-                              <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
-                                {(r as any).listingImage ? <Image src={(r as any).listingImage} alt="" fill className="object-cover" /> : null}
+                        <div key={r.id} className="rounded-xl border border-border/50 bg-card p-3 sm:p-4 lg:p-6 transition-colors hover:bg-muted/20">
+                          {/* Mobile: photo+info left, button+settings right. Desktop: grid */}
+                          <div className="flex flex-row sm:flex-col lg:grid lg:grid-cols-[8.5rem_18rem_auto_auto] lg:items-center gap-3 sm:gap-4 lg:gap-8 w-full">
+                            {/* Left: thumb + title/seller (mobile row; lg grid cells) */}
+                            <div className="flex flex-1 min-w-0 items-start gap-2.5 sm:gap-3 lg:contents">
+                              <div className="h-20 w-20 sm:h-24 sm:w-24 lg:h-[8.5rem] lg:w-[8.5rem] rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+                                {(r as any).listingImage ? <Image src={(r as any).listingImage} alt="" fill className="object-cover" sizes="136px" /> : null}
                               </div>
-                              <div className="min-w-0 flex-1">
+                              <div className="min-w-0 flex-1 lg:min-w-0 lg:overflow-hidden">
                                 <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                                  <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0">Auction</Badge>
-                                  <Badge variant={badgeVariantForUnifiedStatus(r.status) as any} className="text-[10px] sm:text-xs px-1.5 py-0">
+                                  <Badge variant="outline" className="text-[10px] sm:text-xs lg:text-sm px-1.5 py-0 lg:px-2">Auction</Badge>
+                                  <Badge variant={badgeVariantForUnifiedStatus(r.status) as any} className="text-[10px] sm:text-xs lg:text-sm px-1.5 py-0 lg:px-2">
                                     {r.status}
                                   </Badge>
                                   {r.timeLeftMs !== null ? (
-                                    <Badge variant="secondary" className={cn('text-[10px] sm:text-xs px-1.5 py-0', timeLeftTone(r.timeLeftMs))}>
+                                    <Badge
+                                      variant="secondary"
+                                      className={cn(
+                                        'text-[10px] sm:text-xs lg:text-sm px-1.5 py-0 lg:px-2 font-medium',
+                                        r.status === 'LOST' && 'border border-amber-600/50 text-amber-800 dark:text-amber-300 dark:border-amber-500/50',
+                                        r.status !== 'LOST' && timeLeftTone(r.timeLeftMs)
+                                      )}
+                                    >
                                       {formatTimeLeftFromMs(r.timeLeftMs)}
                                     </Badge>
                                   ) : null}
                                 </div>
-                                <div className="font-semibold text-sm sm:text-base leading-snug line-clamp-2 mt-0.5 sm:mt-1" title={getDisplayTitle(r)}>{getDisplayTitle(r)}</div>
+                                <div className="font-semibold text-sm sm:text-base lg:text-lg leading-snug line-clamp-2 mt-0.5 sm:mt-1" title={getDisplayTitle(r)}>{getDisplayTitle(r)}</div>
                                 {getDisplayTitle(r) === 'Listing removed or deleted' && (
                                   <div className="text-[11px] sm:text-xs text-amber-700 dark:text-amber-400 mt-0.5">Removed from catalog.</div>
                                 )}
-                                <div className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 truncate">Seller: {getDisplaySeller(r) || '—'}</div>
+                                <div className="text-[11px] sm:text-xs lg:text-sm text-muted-foreground mt-0.5 truncate">Seller: {getDisplaySeller(r) || '—'}</div>
                                 {/* Mobile: single line for Current · Your max · Ends */}
                                 <div className="sm:hidden text-[11px] text-muted-foreground mt-1">
                                   {isListingRemoved(r) ? '—' : formatMoney(r.currentHighestBid)} · Your max {formatMoney(r.myMaxBid)}
@@ -1085,51 +1233,55 @@ export default function BidsOffersPage() {
                               </div>
                             </div>
 
-                            {/* Stats — desktop only; mobile shown inline above */}
-                            <div className="hidden sm:grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 shrink-0 w-full sm:w-auto sm:min-w-[fit-content] lg:order-2">
-                              <div className="min-w-[4.5rem]">
+                            {/* Stats — hidden on mobile (inline in left); visible sm+ */}
+                            <div className="hidden sm:grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1 shrink-0 w-full sm:w-auto sm:min-w-0 sm:pl-6 lg:pl-8 sm:border-l sm:border-border/60">
+                              <div className="min-w-[3.5rem]">
                                 <div className="text-xs text-muted-foreground uppercase tracking-wider">Current</div>
                                 <div className="font-semibold tabular-nums">{isListingRemoved(r) ? '—' : formatMoney(r.currentHighestBid)}</div>
                               </div>
-                              <div className="min-w-[4.5rem]">
+                              <div className="min-w-[3.5rem]">
                                 <div className="text-xs text-muted-foreground uppercase tracking-wider">Your max</div>
                                 <div className="font-semibold tabular-nums">{formatMoney(r.myMaxBid)}</div>
                               </div>
-                              <div className="min-w-[3.5rem] hidden sm:block">
+                              <div className="min-w-[2.5rem] hidden sm:block">
                                 <div className="text-xs text-muted-foreground uppercase tracking-wider">Bids</div>
                                 <div className="font-semibold tabular-nums">{r.myBidCount}</div>
                               </div>
-                              <div className="min-w-0 sm:min-w-[7rem]">
+                              <div className="min-w-[6.5rem]">
                                 <div className="text-xs text-muted-foreground uppercase tracking-wider">Ends</div>
-                                <div className="font-semibold text-sm tabular-nums truncate" title={r.endsAt ? new Date(r.endsAt).toLocaleString() : undefined}>
-                                  {isListingRemoved(r) ? '—' : (r.endsAt ? new Date(r.endsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—')}
+                                <div className="font-semibold text-sm tabular-nums" title={r.endsAt ? new Date(r.endsAt).toLocaleString() : undefined}>
+                                  {isListingRemoved(r) ? '—' : (r.endsAt ? new Date(r.endsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—')}
                                 </div>
                               </div>
                             </div>
 
-                            {/* Actions — full-width primary on mobile */}
-                            <div className="flex items-center gap-2 justify-end shrink-0 lg:order-3 flex-wrap sm:flex-nowrap">
+                            {/* Right on mobile: button + settings. Desktop: same */}
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-end shrink-0 min-w-0 sm:min-w-[8rem] lg:min-w-[10rem]">
                               {isListingRemoved(r) ? (
                                 <>
-                                  <Button variant="outline" size="sm" asChild className="flex-1 sm:flex-initial min-w-0">
+                                  <Button variant="outline" size="default" asChild className="flex-1 sm:flex-initial min-w-0 min-h-[44px] h-11 sm:h-10 border-2 border-primary bg-transparent text-primary hover:bg-primary/10 dark:bg-transparent dark:hover:bg-primary/10">
                                     <Link href={`/listing/${r.listingId}`}>View listing</Link>
                                   </Button>
                                   <Button
                                     variant="ghost"
-                                    size="sm"
-                                    className="text-muted-foreground hover:text-foreground flex-1 sm:flex-initial"
+                                    size="default"
+                                    className="text-muted-foreground hover:text-foreground flex-1 sm:flex-initial min-h-[44px] h-11 sm:h-10"
                                     onClick={() => dismissRemovedListing(r.listingId)}
                                   >
                                     <X className="h-4 w-4 mr-1.5" />
                                     Remove
                                   </Button>
                                 </>
+                              ) : r.status === 'LOST' || (r.timeLeftMs !== null && r.timeLeftMs <= 0) ? (
+                                <Button variant="outline" size="default" asChild className="flex-1 sm:flex-initial min-w-0 min-h-[44px] h-11 sm:h-10 border-2 border-primary bg-transparent text-primary hover:bg-primary/10 dark:bg-transparent dark:hover:bg-primary/10">
+                                  <Link href={`/listing/${r.listingId}`}>View listing</Link>
+                                </Button>
                               ) : (
                                 <>
                                   {r.status === 'OUTBID' ? (
                                     <Button
                                       variant="default"
-                                      className="flex-1 sm:flex-initial min-w-0"
+                                      className="flex-1 sm:flex-initial min-w-0 min-h-[44px] h-11 sm:h-10"
                                       onClick={() => {
                                         setRaiseTarget({
                                           listingId: r.listingId,
@@ -1153,7 +1305,7 @@ export default function BidsOffersPage() {
                                   ) : (
                                     <Button
                                       variant="default"
-                                      className="flex-1 sm:flex-initial min-w-0"
+                                      className="flex-1 sm:flex-initial min-w-0 min-h-[44px] h-11 sm:h-10"
                                       onClick={() => {
                                         setRaiseTarget({
                                           listingId: r.listingId,
@@ -1178,7 +1330,7 @@ export default function BidsOffersPage() {
 
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                      <Button variant="outline" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 shrink-0">
+                                      <Button variant="outline" size="icon" className="min-h-[44px] min-w-[44px] h-11 w-11 sm:h-10 sm:w-10 shrink-0">
                                         <MoreHorizontal className="h-4 w-4" />
                                       </Button>
                                     </DropdownMenuTrigger>
@@ -1203,148 +1355,115 @@ export default function BidsOffersPage() {
                   )}
                   </TabsContent>
 
-                  <TabsContent value="offers" className="mt-0">
+                  <TabsContent value="offers" className="mt-0 data-[state=inactive]:hidden" forceMount>
                   {offerRows.length === 0 ? (
-                    <div className="py-10 text-center text-sm text-muted-foreground">No offers match your search.</div>
+                    <div className="py-10 text-center text-sm text-muted-foreground">No offers match your filters.</div>
                   ) : (
-                    <div className="space-y-4 sm:space-y-6">
-                      <p className="text-xs sm:text-sm text-muted-foreground">
-                        <span className="font-medium text-foreground">Sent</span> = your offers. <span className="font-medium text-foreground">Received</span> = offers on your listings.
-                      </p>
-
-                      {[
-                        { title: 'Offers you sent', icon: ArrowRight, rows: offerRowsSent, emptyNote: 'You haven’t sent any offers.' },
-                        { title: 'Offers you received', icon: ArrowDownLeft, rows: offerRowsReceived, emptyNote: 'No one has made offers on your listings.' },
-                      ].map(({ title, icon: Icon, rows, emptyNote }) => (
-                        <section key={title} className="space-y-3">
-                          <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                            <Icon className="h-4 w-4 text-muted-foreground" />
-                            {title}
-                            <span className="text-muted-foreground font-normal">({rows.length})</span>
-                          </h3>
-                          {rows.length === 0 ? (
-                            <p className="text-sm text-muted-foreground py-4 pl-6">{emptyNote}</p>
-                          ) : (
-                            <div className="space-y-3">
-                              {rows.map((r) => (
-                                <div
-                                  key={r.id}
-                                  className={cn(
-                                    'rounded-xl border border-border/50 bg-card p-3 sm:p-4 transition-colors hover:bg-muted/20',
-                                    r.status === 'ACCEPTED' && 'border-emerald-400/40 dark:border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20'
+                    <div className="space-y-3">
+                      {offerRows.map((r) => {
+                        const raw = r.raw as OfferRow;
+                        const sellerId = raw?.sellerId;
+                        return (
+                          <div
+                            key={r.id}
+                            className="rounded-xl border border-border/50 bg-card p-3 sm:p-4 transition-colors hover:bg-muted/20"
+                          >
+                            <div className="flex flex-row items-start gap-3 sm:gap-4">
+                              {/* Left: image + title + meta (same pattern as bid cards) */}
+                              <div className="flex flex-1 min-w-0 items-start gap-2.5 sm:gap-3">
+                                <div className="h-20 w-20 sm:h-[5.5rem] sm:w-[5.5rem] rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+                                  {r.listingImage ? (
+                                    <Image src={r.listingImage} alt="" fill className="object-cover" sizes="88px" />
+                                  ) : (
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <Handshake className="h-7 w-7 text-muted-foreground/40" />
+                                    </div>
                                   )}
-                                >
-                                  <div className="flex flex-col lg:flex-row lg:items-center gap-3 sm:gap-4 lg:gap-6 w-full">
-                                    {/* Thumb + title/seller — compact on mobile */}
-                                    <div className="flex items-start gap-2.5 sm:gap-3 min-w-0 flex-1">
-                                      <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
-                                        {r.listingImage ? <Image src={r.listingImage} alt="" fill className="object-cover" /> : null}
-                                      </div>
-                                      <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                                          <Badge variant={badgeVariantForUnifiedStatus(r.status) as any} className="text-[10px] sm:text-xs px-1.5 py-0">
-                                            {r.status}
-                                          </Badge>
-                                          {r.timeLeftMs !== null ? (
-                                            <span className={cn('text-[10px] sm:text-xs', timeLeftTone(r.timeLeftMs))}>
-                                              Expires {formatTimeLeftFromMs(r.timeLeftMs)}
-                                            </span>
-                                          ) : null}
-                                        </div>
-                                        <p className="font-semibold text-sm sm:text-base leading-snug line-clamp-2 mt-0.5 sm:mt-1 truncate" title={r.listingTitle}>
-                                          {r.listingTitle}
-                                        </p>
-                                        {r.listingTitle === 'Listing removed or deleted' && (
-                                          <div className="text-[11px] sm:text-xs text-amber-700 dark:text-amber-400 mt-0.5">Removed from catalog</div>
-                                        )}
-                                        <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 truncate">Seller: {r.sellerName || '—'}</p>
-                                        {/* Mobile: single line Amount · Seller · Type */}
-                                        <div className="sm:hidden text-[11px] text-muted-foreground mt-1">
-                                          {formatMoney(r.yourAmount)} · {r.sellerName || '—'} · {r.listingType || '—'}
-                                        </div>
-                                        {r.status === 'ACCEPTED' && r.direction === 'out' && (
-                                          <p className="text-[11px] sm:text-xs text-emerald-700 dark:text-emerald-400 mt-1 font-medium">
-                                            Complete checkout to secure your purchase.
-                                          </p>
-                                        )}
-                                      </div>
-                                    </div>
-
-                                    {/* Amounts — desktop only; mobile shown inline above */}
-                                    <div className="hidden sm:grid grid-cols-[5.5rem_6.5rem_4.5rem] sm:grid-cols-[5.5rem_8rem_5rem] gap-x-4 gap-y-0 shrink-0 lg:order-2">
-                                      <div className="min-w-[5.5rem]">
-                                        <div className="text-xs text-muted-foreground uppercase tracking-wider">Amount</div>
-                                        <div className="font-semibold tabular-nums">{formatMoney(r.yourAmount)}</div>
-                                      </div>
-                                      <div className="min-w-0">
-                                        <div className="text-xs text-muted-foreground uppercase tracking-wider">Seller</div>
-                                        <div className="font-medium text-sm truncate" title={r.sellerName || undefined}>{r.sellerName || '—'}</div>
-                                      </div>
-                                      <div className="min-w-[4.5rem] sm:min-w-[5rem]">
-                                        <div className="text-xs text-muted-foreground uppercase tracking-wider">Listing</div>
-                                        <div className="font-medium capitalize truncate">{r.listingType || '—'}</div>
-                                      </div>
-                                    </div>
-
-                                    {/* Actions — full-width primary on mobile */}
-                                    <div className="flex items-center gap-2 justify-end shrink-0 lg:order-3 flex-wrap sm:flex-nowrap">
-                                      {r.status === 'ACCEPTED' && r.direction === 'out' ? (
-                                        <Button
-                                          onClick={() => openOfferCheckout(r.raw)}
-                                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex-1 sm:flex-initial min-w-0"
-                                        >
-                                          Checkout now
-                                          <ArrowRight className="ml-2 h-4 w-4" />
-                                        </Button>
-                                      ) : (
-                                        <Button
-                                          asChild
-                                          className={
-                                            r.status === 'COUNTERED'
-                                              ? 'bg-amber-600 hover:bg-amber-700 text-white flex-1 sm:flex-initial min-w-0'
-                                              : 'border-primary/40 text-primary hover:bg-primary/10 flex-1 sm:flex-initial min-w-0'
-                                          }
-                                          variant={r.status === 'COUNTERED' ? 'default' : 'outline'}
-                                        >
-                                          <Link href={`/dashboard/offers/${r.id}`}>{r.status === 'COUNTERED' ? 'Review counter' : 'View offer'}</Link>
-                                        </Button>
-                                      )}
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                          <Button variant="outline" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 shrink-0">
-                                            <MoreHorizontal className="h-4 w-4" />
-                                          </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="w-56">
-                                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                          <DropdownMenuSeparator />
-                                          <DropdownMenuItem asChild>
-                                            <Link href={`/listing/${r.listingId}`}>
-                                              <ArrowUpRight className="h-4 w-4 mr-2" />
-                                              View listing
-                                            </Link>
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem asChild>
-                                            <Link href={`/dashboard/offers/${r.id}`}>
-                                              <Handshake className="h-4 w-4 mr-2" />
-                                              Offer details
-                                            </Link>
-                                          </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
-                                    </div>
-                                  </div>
                                 </div>
-                              ))}
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0">
+                                      {offerStatusBanner(r.status)}
+                                    </Badge>
+                                    <span className="text-[10px] sm:text-xs text-muted-foreground">
+                                      {r.direction === 'out' ? 'You sent' : 'Received'}
+                                    </span>
+                                  </div>
+                                  <Link href={`/listing/${r.listingId}`} className="font-semibold text-sm sm:text-base leading-snug line-clamp-2 mt-0.5 hover:underline block text-foreground">
+                                    {r.listingTitle}
+                                  </Link>
+                                  <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
+                                    {formatMoney(r.yourAmount)}
+                                    {r.sellerName ? ` · ${r.sellerName}` : ''}
+                                    {r.timeLeftMs != null && r.timeLeftMs > 0 && (
+                                      r.timeLeftMs <= 24 * 60 * 60 * 1000
+                                        ? ` · ${Math.floor(r.timeLeftMs / (60 * 60 * 1000))}h left`
+                                        : ''
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+                              {/* Right: primary action + menu */}
+                              <div className="flex items-center gap-2 shrink-0">
+                                {r.status === 'ACCEPTED' && r.direction === 'out' ? (
+                                  <Button onClick={() => openOfferCheckout(r.raw)} variant="default" size="default" className="min-h-[44px] h-11 sm:h-10">
+                                    Checkout
+                                    <ArrowRight className="ml-1.5 h-4 w-4" />
+                                  </Button>
+                                ) : r.status === 'EXPIRED' || r.status === 'DECLINED' ? (
+                                  <Button asChild variant="outline" size="default" className="min-h-[44px] h-11 sm:h-10">
+                                    <Link href={`/listing/${r.listingId}`}>Make offer</Link>
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    asChild
+                                    variant={r.status === 'COUNTERED' ? 'default' : 'outline'}
+                                    size="default"
+                                    className={cn('min-h-[44px] h-11 sm:h-10', r.status !== 'COUNTERED' && 'border-2 border-primary bg-transparent text-primary hover:bg-primary/10')}
+                                  >
+                                    <Link href={`/dashboard/offers/${r.id}`}>
+                                      {r.status === 'COUNTERED' ? 'Review' : 'View offer'}
+                                    </Link>
+                                  </Button>
+                                )}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="icon" className="min-h-[44px] min-w-[44px] h-11 w-11 sm:h-10 sm:w-10 shrink-0">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-56">
+                                    <DropdownMenuLabel>Offer</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/listing/${r.listingId}`}>
+                                        <ArrowUpRight className="h-4 w-4 mr-2" />
+                                        View listing
+                                      </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/dashboard/offers/${r.id}`}>
+                                        <Handshake className="h-4 w-4 mr-2" />
+                                        Offer details
+                                      </Link>
+                                    </DropdownMenuItem>
+                                    {sellerId ? (
+                                      <DropdownMenuItem asChild>
+                                        <Link href={`/sellers/${sellerId}`}>Seller&apos;s other items</Link>
+                                      </DropdownMenuItem>
+                                    ) : null}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
                             </div>
-                          )}
-                        </section>
-                      ))}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                   </TabsContent>
 
-                  <TabsContent value="history" className="mt-0">
+                  <TabsContent value="history" className="mt-0 data-[state=inactive]:hidden" forceMount>
                   {filtered.length === 0 ? (
                     <div className="py-10 text-center text-sm text-muted-foreground">No history yet.</div>
                   ) : (
@@ -1359,7 +1478,7 @@ export default function BidsOffersPage() {
                               )}
                               <div className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">{r.type === 'bid' ? 'Auction' : 'Offer'} · {r.status}</div>
                             </div>
-                            <Button variant="outline" size="sm" asChild className="w-full sm:w-auto shrink-0">
+                            <Button variant="outline" size="default" asChild className="w-full sm:w-auto shrink-0 min-h-[44px] h-11 sm:h-10">
                               <Link href={`/listing/${(r as any).listingId}`}>View listing</Link>
                             </Button>
                           </div>

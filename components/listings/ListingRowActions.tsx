@@ -141,8 +141,7 @@ const ListingRowActions = memo(function ListingRowActions({
         <DropdownMenuSeparator />
 
         <DropdownMenuItem
-          onSelect={(e) => {
-            e.preventDefault();
+          onSelect={() => {
             onDelete?.();
           }}
           className={cn('flex items-center gap-2 font-semibold text-destructive focus:text-destructive')}

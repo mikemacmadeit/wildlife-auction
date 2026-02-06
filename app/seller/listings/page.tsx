@@ -1342,9 +1342,9 @@ function SellerListingsPageContent() {
           </Card>
         )}
 
-        {/* Delete Confirmation Dialog */}
+        {/* Delete Confirmation Dialog - z-[110] so it appears above the actions dropdown (z-[100]) */}
         <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <DialogContent>
+          <DialogContent className="z-[110]" overlayClassName="z-[110]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-destructive">
                 <AlertTriangle className="h-5 w-5" />

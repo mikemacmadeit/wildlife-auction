@@ -17,13 +17,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { FilterState, ListingType } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import {
@@ -103,8 +103,8 @@ export function MobileBrowseFilterSheet({ filters, onFiltersChange, listingState
   };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
         <Button
           type="button"
           variant="outline"
@@ -122,16 +122,17 @@ export function MobileBrowseFilterSheet({ filters, onFiltersChange, listingState
             </span>
           ) : null}
         </Button>
-      </SheetTrigger>
-      <SheetContent side="right" className="w-[75vw] sm:max-w-md p-0">
-        <div className="px-4 pt-5 pb-4 border-b border-border/50">
-          <SheetHeader>
-            <SheetTitle>Filter</SheetTitle>
-            <SheetDescription>Refine results like eBay: fast, clear, and focused.</SheetDescription>
-          </SheetHeader>
-        </div>
+      </DialogTrigger>
+      <DialogContent
+        className="flex flex-col p-0 gap-0 w-[calc(100%-2rem)] max-w-md max-h-[85vh] overflow-hidden z-[70] md:z-50 rounded-xl"
+        overlayClassName="z-[70] md:z-50"
+      >
+        <DialogHeader className="px-4 pt-5 pb-4 border-b border-border/50 shrink-0">
+          <DialogTitle>Filter</DialogTitle>
+          <DialogDescription>Refine results: category, location, price, and more.</DialogDescription>
+        </DialogHeader>
 
-        <div className="px-4 py-4 space-y-6">
+        <div className="overflow-y-auto overscroll-contain px-4 py-4 space-y-6 min-h-0">
           {/* Category */}
           <div className="space-y-3">
             <Label className="text-sm font-semibold">Category</Label>
@@ -406,7 +407,7 @@ export function MobileBrowseFilterSheet({ filters, onFiltersChange, listingState
           </div>
         </div>
 
-        <div className="sticky bottom-0 border-t bg-background px-4 py-4 flex gap-3">
+        <div className="shrink-0 border-t bg-background px-4 py-4 flex gap-3 pb-[max(env(safe-area-inset-bottom),0.5rem)]">
           <Button variant="outline" onClick={handleReset} className="flex-1 min-h-[48px]">
             Reset
           </Button>
@@ -414,8 +415,8 @@ export function MobileBrowseFilterSheet({ filters, onFiltersChange, listingState
             Apply
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 

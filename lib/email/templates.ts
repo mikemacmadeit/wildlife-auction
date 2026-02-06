@@ -2,6 +2,8 @@
  * Email Templates
  */
 
+import { getCanonicalSiteUrl } from '@/lib/site-url';
+
 export interface OrderConfirmationEmailData {
   buyerName: string;
   orderId: string;
@@ -342,6 +344,24 @@ function tryGetOrigin(url: string | undefined): string | null {
   }
 }
 
+/** Use for email links: never use localhost; use canonical site URL when origin would be localhost. */
+function canonicalOrigin(origin: string | null | undefined): string {
+  if (origin && !origin.includes('localhost')) return origin.replace(/\/$/, '');
+  return getCanonicalSiteUrl();
+}
+
+/** Rewrite any URL that points at localhost to the canonical site URL so email links never go to localhost. */
+function canonicalizeUrl(url: string | undefined): string {
+  if (!url) return '';
+  if (!url.includes('localhost')) return url;
+  try {
+    const u = new URL(url);
+    return getCanonicalSiteUrl() + u.pathname + u.search;
+  } catch {
+    return url;
+  }
+}
+
 function escapeHtml(s: string): string {
   return String(s)
     .replace(/&/g, '&amp;')
@@ -352,11 +372,12 @@ function escapeHtml(s: string): string {
 }
 
 function renderButton(href: string, label: string): string {
+  const canonicalHref = canonicalizeUrl(href) || href;
   return `
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto;">
     <tr>
       <td align="center" bgcolor="#7F8A73" style="border-radius: 12px;">
-        <a href="${href}"
+        <a href="${canonicalHref}"
            style="display:inline-block; padding: 12px 18px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
                   font-size: 14px; font-weight: 800; letter-spacing: 0.2px; color: #22251F; text-decoration: none; border-radius: 12px;">
           ${escapeHtml(label)}
@@ -368,11 +389,12 @@ function renderButton(href: string, label: string): string {
 }
 
 function renderSecondaryButton(href: string, label: string): string {
+  const canonicalHref = canonicalizeUrl(href) || href;
   return `
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto;">
     <tr>
       <td align="center" bgcolor="#E2D6C2" style="border-radius: 12px; border: 1px solid rgba(34,37,31,0.18);">
-        <a href="${href}"
+        <a href="${canonicalHref}"
            style="display:inline-block; padding: 12px 18px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
                   font-size: 14px; font-weight: 800; letter-spacing: 0.2px; color: #22251F; text-decoration: none; border-radius: 12px;">
           ${escapeHtml(label)}
@@ -391,9 +413,9 @@ function getEmailTemplate(params: {
 }): string {
   const year = new Date().getFullYear();
   // Always use production origin for images/assets to ensure they load correctly
-  // The origin param is used for links, but assets should always point to production
+  // The origin param is used for links; never use localhost in emails
   const productionOrigin = 'https://agchange.app';
-  const origin = params.origin || productionOrigin;
+  const origin = canonicalOrigin(params.origin || productionOrigin);
   const logoUrl = `${productionOrigin}/images/Kudu.png`;
   // Match homepage hero: the main wordmark uses Barletta Stamp.
   const fontBrand = `'BarlettaStamp','BarlettaInline','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif`;
@@ -585,7 +607,7 @@ function getEmailTemplate(params: {
 export function getOrderConfirmationEmail(data: OrderConfirmationEmailData): { subject: string; html: string } {
   const subject = `Order Confirmation - ${data.listingTitle}`;
   const preheader = `Order confirmed for ${data.listingTitle}. Payment received.`;
-  const origin = tryGetOrigin(data.orderUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.orderUrl));
   const contactUrl = `${origin || 'https://agchange.app'}/contact`;
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
@@ -650,7 +672,7 @@ export function getOrderConfirmationEmail(data: OrderConfirmationEmailData): { s
 export function getDeliveryConfirmationEmail(data: DeliveryConfirmationEmailData): { subject: string; html: string } {
   const subject = `Delivery Confirmed - ${data.listingTitle}`;
   const preheader = `Delivery confirmed for ${data.listingTitle}. Review and confirm receipt if everything looks good.`;
-  const origin = tryGetOrigin(data.orderUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.orderUrl));
   const contactUrl = `${origin || 'https://agchange.app'}/contact`;
   const checkInUrl = `${data.orderUrl}${data.orderUrl.includes('?') ? '&' : '?'}checkin=1`;
   const issueUrl = `${data.orderUrl}${data.orderUrl.includes('?') ? '&' : '?'}issue=1`;
@@ -690,7 +712,7 @@ export function getDeliveryConfirmationEmail(data: DeliveryConfirmationEmailData
     </div>
 
     <div style="margin: 14px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
-      Tip: Keep photos/notes if there’s an issue. You can also <a href="${data.orderUrl}" style="color:#7F8A73; text-decoration:none; font-weight:700;">view the order</a>.
+      Tip: Keep photos/notes if there’s an issue. You can also <a href="${canonicalizeUrl(data.orderUrl)}" style="color:#7F8A73; text-decoration:none; font-weight:700;">view the order</a>.
       Need help? <a href="${contactUrl}" style="color:#7F8A73; text-decoration:none; font-weight:700;">Contact us</a> with order ID <strong>${escapeHtml(data.orderId)}</strong>.
     </div>
   `;
@@ -700,7 +722,7 @@ export function getDeliveryConfirmationEmail(data: DeliveryConfirmationEmailData
 export function getOrderInTransitEmail(data: OrderInTransitEmailData): { subject: string; html: string } {
   const subject = `In transit — ${data.listingTitle}`;
   const preheader = `Your order is on the way. View the latest status and messages.`;
-  const origin = tryGetOrigin(data.orderUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.orderUrl));
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       In transit
@@ -738,7 +760,7 @@ export function getOrderInTransitEmail(data: OrderInTransitEmailData): { subject
 export function getOrderPreparingEmail(data: OrderPreparingEmailData): { subject: string; html: string } {
   const subject = `Preparing delivery — ${data.listingTitle}`;
   const preheader = `The seller is preparing your order. View the latest status and messages.`;
-  const origin = tryGetOrigin(data.orderUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.orderUrl));
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       Preparing delivery
@@ -812,7 +834,7 @@ export function getPayoutNotificationEmail(data: PayoutNotificationEmailData): {
 export function getAuctionWinnerEmail(data: AuctionWinnerEmailData): { subject: string; html: string } {
   const subject = `You Won the Auction - ${data.listingTitle}`;
   const preheader = `You won ${data.listingTitle}. Complete checkout to secure your purchase.`;
-  const origin = tryGetOrigin(data.orderUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.orderUrl));
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       You won the auction
@@ -865,7 +887,7 @@ export function getBidPlacedEmail(data: BidPlacedEmailData): { subject: string; 
   const preheader = data.isHighBidder
     ? `Your bid is currently the high bid.`
     : `Your bid has been placed successfully.`;
-  const origin = tryGetOrigin(data.listingUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.listingUrl));
 
   const endsAtLine = data.auctionEndsAt
     ? `<div style="margin-top: 6px;"><span style="color:#5B564A;">Ends:</span> <strong>${escapeHtml(
@@ -930,7 +952,7 @@ export function getBidPlacedEmail(data: BidPlacedEmailData): { subject: string; 
 export function getAuctionOutbidEmail(data: AuctionOutbidEmailData): { subject: string; html: string } {
   const subject = `You’ve been outbid — ${data.listingTitle}`;
   const preheader = `You’ve been outbid. Review the current high bid and decide your next move.`;
-  const origin = tryGetOrigin(data.listingUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.listingUrl));
 
   const endsAtLine = data.auctionEndsAt
     ? `<div style="margin-top: 6px;"><span style="color:#5B564A;">Ends:</span> <strong>${escapeHtml(
@@ -980,7 +1002,7 @@ export function getAuctionOutbidEmail(data: AuctionOutbidEmailData): { subject: 
 export function getWelcomeEmail(data: WelcomeEmailData): { subject: string; html: string } {
   const subject = `Welcome to Agchange`;
   const preheader = `Set up your account once, then bid/buy with confidence.`;
-  const origin = tryGetOrigin(data.dashboardUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.dashboardUrl));
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       Welcome aboard
@@ -1019,7 +1041,7 @@ export function getWelcomeEmail(data: WelcomeEmailData): { subject: string; html
 export function getAuctionHighBidderEmail(data: AuctionHighBidderEmailData): { subject: string; html: string } {
   const subject = `You’re the high bidder — ${data.listingTitle}`;
   const preheader = `You’re currently winning. Keep an eye on the ending time.`;
-  const origin = tryGetOrigin(data.listingUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.listingUrl));
 
   const endsAtLine = data.auctionEndsAt
     ? `<div style="margin-top: 6px;"><span style="color:#5B564A;">Ends:</span> <strong>${escapeHtml(
@@ -1069,7 +1091,7 @@ export function getAuctionHighBidderEmail(data: AuctionHighBidderEmailData): { s
 export function getAuctionEndingSoonEmail(data: AuctionEndingSoonEmailData): { subject: string; html: string } {
   const subject = `Ending soon (${data.threshold}) — ${data.listingTitle}`;
   const preheader = `Auction is ending soon. Check the ending time and current bid.`;
-  const origin = tryGetOrigin(data.listingUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.listingUrl));
 
   const currentBidLine =
     typeof data.currentBidAmount === 'number'
@@ -1117,7 +1139,7 @@ export function getAuctionEndingSoonEmail(data: AuctionEndingSoonEmailData): { s
 export function getAuctionLostEmail(data: AuctionLostEmailData): { subject: string; html: string } {
   const subject = `Auction ended — ${data.listingTitle}`;
   const preheader = `That one got away. Keep your watchlist tight—new inventory drops weekly.`;
-  const origin = tryGetOrigin(data.listingUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.listingUrl));
   const browseUrl = `${origin || 'https://agchange.app'}/browse`;
 
   const finalBidLine =
@@ -1156,7 +1178,7 @@ export function getAuctionLostEmail(data: AuctionLostEmailData): { subject: stri
     </div>
 
     <div style="margin: 12px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
-      Want to review the finished listing? <a href="${data.listingUrl}" style="color:#7F8A73; text-decoration:none; font-weight:700;">View auction</a>
+      Want to review the finished listing? <a href="${canonicalizeUrl(data.listingUrl)}" style="color:#7F8A73; text-decoration:none; font-weight:700;">View auction</a>
     </div>
   `;
 
@@ -1166,7 +1188,7 @@ export function getAuctionLostEmail(data: AuctionLostEmailData): { subject: stri
 export function getDeliveryCheckInEmail(data: DeliveryCheckInEmailData): { subject: string; html: string } {
   const subject = `Quick check-in — ${data.listingTitle}`;
   const preheader = `How did it go? Confirm receipt or report an issue.`;
-  const origin = tryGetOrigin(data.orderUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.orderUrl));
   const contactUrl = `${origin || 'https://agchange.app'}/contact`;
   const checkInUrl = `${data.orderUrl}${data.orderUrl.includes('?') ? '&' : '?'}checkin=1`;
   const issueUrl = `${data.orderUrl}${data.orderUrl.includes('?') ? '&' : '?'}issue=1`;
@@ -1214,7 +1236,7 @@ export function getProfileIncompleteReminderEmail(
 ): { subject: string; html: string } {
   const subject = `Finish your profile`;
   const preheader = `A few details now = smoother bidding and checkout later.`;
-  const origin = tryGetOrigin(data.settingsUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.settingsUrl));
 
   const missing =
     data.missingFields && data.missingFields.length
@@ -1252,7 +1274,7 @@ export function getWeeklyDigestEmail(data: WeeklyDigestEmailData): { subject: st
       const price = typeof l.price === 'number' ? ` — $${l.price.toLocaleString('en-US')}` : '';
       const ends = l.endsAt ? ` · ends ${escapeHtml(l.endsAt.toLocaleDateString())}` : '';
       return `<div style="margin-top: 10px;">
-        <a href="${l.url}" style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#22251F; text-decoration:none; font-weight: 700;">
+        <a href="${canonicalizeUrl(l.url)}" style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#22251F; text-decoration:none; font-weight: 700;">
           ${escapeHtml(l.title)}${escapeHtml(price)}${ends}
         </a>
       </div>`;
@@ -1261,7 +1283,7 @@ export function getWeeklyDigestEmail(data: WeeklyDigestEmailData): { subject: st
 
   const unsub = data.unsubscribeUrl
     ? `<div style="margin-top: 18px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
-        <a href="${data.unsubscribeUrl}" style="color:#7F8A73; text-decoration:none; font-weight:700;">Unsubscribe</a>
+        <a href="${canonicalizeUrl(data.unsubscribeUrl)}" style="color:#7F8A73; text-decoration:none; font-weight:700;">Unsubscribe</a>
       </div>`
     : '';
 
@@ -1294,12 +1316,12 @@ export function getWeeklyDigestEmail(data: WeeklyDigestEmailData): { subject: st
 export function getSavedSearchAlertEmail(data: SavedSearchAlertEmailData): { subject: string; html: string } {
   const subject = `Saved search alert — ${data.queryName}`;
   const preheader = `${data.resultsCount} new match${data.resultsCount === 1 ? '' : 'es'} for your search.`;
-  const origin = tryGetOrigin(data.searchUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.searchUrl));
   const manageUrl = `${origin || 'https://agchange.app'}/dashboard/saved-searches`;
 
   const unsub = data.unsubscribeUrl
     ? `<div style="margin-top: 18px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
-        <a href="${data.unsubscribeUrl}" style="color:#7F8A73; text-decoration:none; font-weight:700;">Unsubscribe</a>
+        <a href="${canonicalizeUrl(data.unsubscribeUrl)}" style="color:#7F8A73; text-decoration:none; font-weight:700;">Unsubscribe</a>
       </div>`
     : '';
 
@@ -1329,7 +1351,7 @@ export function getSavedSearchAlertEmail(data: SavedSearchAlertEmailData): { sub
 export function getMessageReceivedEmail(data: MessageReceivedEmailData): { subject: string; html: string } {
   const subject = `New message — ${data.listingTitle}`;
   const preheader = data.preview ? data.preview : `You received a new message about ${data.listingTitle}.`;
-  const origin = tryGetOrigin(data.threadUrl) || tryGetOrigin(data.listingUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.threadUrl) || tryGetOrigin(data.listingUrl));
   const roleLabel = data.senderRole === 'buyer' ? 'a buyer' : 'a seller';
 
   const content = `
@@ -1378,7 +1400,7 @@ export function getMessageReceivedEmail(data: MessageReceivedEmailData): { subje
 export function getReviewRequestEmail(data: ReviewRequestEmailData): { subject: string; html: string } {
   const subject = `Leave a review for ${data.sellerDisplayName}`;
   const preheader = `Tell us how your purchase went.`;
-  const origin = tryGetOrigin(data.reviewUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.reviewUrl));
 
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
@@ -1414,7 +1436,7 @@ export function getReviewRequestEmail(data: ReviewRequestEmailData): { subject: 
 export function getVerifyEmailEmail(data: VerifyEmailEmailData): { subject: string; html: string } {
   const subject = `Verify your email — Agchange`;
   const preheader = `Confirm your email to unlock messaging, publishing, and checkout.`;
-  const origin = tryGetOrigin(data.verifyUrl) || tryGetOrigin(data.dashboardUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.verifyUrl) || tryGetOrigin(data.dashboardUrl));
 
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
@@ -1430,7 +1452,7 @@ export function getVerifyEmailEmail(data: VerifyEmailEmailData): { subject: stri
 
     <div style="margin-top: 14px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
       After you verify, you can return to your dashboard:
-      <a href="${data.dashboardUrl}" style="color:#7F8A73; text-decoration:none; font-weight:700;">Open dashboard</a>
+      <a href="${canonicalizeUrl(data.dashboardUrl)}" style="color:#7F8A73; text-decoration:none; font-weight:700;">Open dashboard</a>
     </div>
     <div style="margin-top: 10px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
       Didn't get this email or link expired? You can request a new one from your account or seller overview until your email is verified. If you didn't create this account, you can ignore this email.
@@ -1443,7 +1465,7 @@ export function getVerifyEmailEmail(data: VerifyEmailEmailData): { subject: stri
 export function getOfferAcceptedEmail(data: OfferAcceptedEmailData): { subject: string; html: string } {
   const subject = `Offer accepted — ${data.listingTitle}`;
   const preheader = `An offer was accepted for $${Number(data.amount).toLocaleString()} — view next steps.`;
-  const origin = tryGetOrigin(data.offerUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.offerUrl));
 
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
@@ -1477,7 +1499,7 @@ export function getOfferAcceptedEmail(data: OfferAcceptedEmailData): { subject: 
 export function getOfferSubmittedEmail(data: OfferSubmittedEmailData): { subject: string; html: string } {
   const subject = `Offer submitted — ${data.listingTitle}`;
   const preheader = `Your offer of $${Number(data.amount).toLocaleString()} has been submitted to the seller.`;
-  const origin = tryGetOrigin(data.offerUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.offerUrl));
 
   const expires =
     data.expiresAt && data.expiresAt.trim()
@@ -1520,7 +1542,7 @@ export function getOfferSubmittedEmail(data: OfferSubmittedEmailData): { subject
 export function getOfferReceivedEmail(data: OfferReceivedEmailData): { subject: string; html: string } {
   const subject = `New offer — ${data.listingTitle}`;
   const preheader = `You received an offer for $${Number(data.amount).toLocaleString()} — review and respond.`;
-  const origin = tryGetOrigin(data.offerUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.offerUrl));
 
   const expires =
     data.expiresAt && data.expiresAt.trim()
@@ -1562,7 +1584,7 @@ export function getOfferReceivedEmail(data: OfferReceivedEmailData): { subject: 
 export function getOfferCounteredEmail(data: OfferCounteredEmailData): { subject: string; html: string } {
   const subject = `Counter offer — ${data.listingTitle}`;
   const preheader = `There’s a counter offer for $${Number(data.amount).toLocaleString()} — view and respond.`;
-  const origin = tryGetOrigin(data.offerUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.offerUrl));
 
   const expires =
     data.expiresAt && data.expiresAt.trim()
@@ -1600,7 +1622,7 @@ export function getOfferCounteredEmail(data: OfferCounteredEmailData): { subject
 export function getOfferDeclinedEmail(data: OfferDeclinedEmailData): { subject: string; html: string } {
   const subject = `Offer declined — ${data.listingTitle}`;
   const preheader = `Your offer was declined — you can view details or make another offer.`;
-  const origin = tryGetOrigin(data.offerUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.offerUrl));
 
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
@@ -1621,7 +1643,7 @@ export function getOfferDeclinedEmail(data: OfferDeclinedEmailData): { subject: 
 export function getOfferExpiredEmail(data: OfferExpiredEmailData): { subject: string; html: string } {
   const subject = `Offer expired — ${data.listingTitle}`;
   const preheader = `An offer expired — view details.`;
-  const origin = tryGetOrigin(data.offerUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.offerUrl));
 
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
@@ -1642,7 +1664,7 @@ export function getOfferExpiredEmail(data: OfferExpiredEmailData): { subject: st
 export function getSupportTicketReplyEmail(data: SupportTicketReplyEmailData): { subject: string; html: string } {
   const subject = `Support reply: ${data.subjectLine || 'Your ticket'} (${data.ticketId})`;
   const preheader = `Support replied to your ticket ${data.ticketId}.`;
-  const origin = tryGetOrigin(data.ticketUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.ticketUrl));
 
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
@@ -1673,7 +1695,7 @@ export function getAdminListingSubmittedEmail(data: AdminListingSubmittedEmailDa
       : data.pendingReason === 'admin_approval'
         ? 'A listing was submitted and needs admin approval.'
         : 'A listing was submitted and needs review.';
-  const origin = tryGetOrigin(data.adminQueueUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.adminQueueUrl));
 
   const reasonLabel =
     data.pendingReason === 'admin_approval' ? 'Admin approval' : data.pendingReason === 'compliance_review' ? 'Compliance review' : 'Review';
@@ -1722,7 +1744,7 @@ export function getAdminListingComplianceReviewEmail(
 ): { subject: string; html: string } {
   const subject = `Admin: compliance review — ${data.listingTitle}`;
   const preheader = `A listing is awaiting compliance review.`;
-  const origin = tryGetOrigin(data.adminComplianceUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.adminComplianceUrl));
 
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
@@ -1765,7 +1787,7 @@ export function getAdminListingAdminApprovalEmail(
 ): { subject: string; html: string } {
   const subject = `Admin: approval needed — ${data.listingTitle}`;
   const preheader = `A listing is awaiting admin approval.`;
-  const origin = tryGetOrigin(data.adminQueueUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.adminQueueUrl));
 
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
@@ -1788,7 +1810,7 @@ export function getAdminListingAdminApprovalEmail(
 export function getAdminListingApprovedEmail(data: AdminListingApprovedEmailData): { subject: string; html: string } {
   const subject = `Admin: listing approved — ${data.listingTitle}`;
   const preheader = `A listing was approved.`;
-  const origin = tryGetOrigin(data.listingUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.listingUrl));
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       Listing approved
@@ -1809,7 +1831,7 @@ export function getAdminListingApprovedEmail(data: AdminListingApprovedEmailData
 export function getAdminListingRejectedEmail(data: AdminListingRejectedEmailData): { subject: string; html: string } {
   const subject = `Admin: listing rejected — ${data.listingTitle}`;
   const preheader = `A listing was rejected.`;
-  const origin = tryGetOrigin(data.adminQueueUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.adminQueueUrl));
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       Listing rejected
@@ -1828,7 +1850,7 @@ export function getAdminListingRejectedEmail(data: AdminListingRejectedEmailData
 export function getListingApprovedEmail(data: ListingApprovedEmailData): { subject: string; html: string } {
   const subject = `Your listing is approved — ${data.listingTitle}`;
   const preheader = `Good news: your listing is now live.`;
-  const origin = tryGetOrigin(data.listingUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.listingUrl));
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       Listing approved
@@ -1846,7 +1868,7 @@ export function getListingApprovedEmail(data: ListingApprovedEmailData): { subje
 export function getListingRejectedEmail(data: ListingRejectedEmailData): { subject: string; html: string } {
   const subject = `Your listing needs changes — ${data.listingTitle}`;
   const preheader = `Update your listing and resubmit for review.`;
-  const origin = tryGetOrigin(data.editUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.editUrl));
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       Listing changes required
@@ -1868,7 +1890,7 @@ export function getOrderTransferComplianceRequiredEmail(
 ): { subject: string; html: string } {
   const subject = `TPWD Transfer Compliance Required — ${data.listingTitle}`;
   const preheader = `TPWD transfer permit compliance confirmation required before fulfillment can proceed.`;
-  const origin = tryGetOrigin(data.orderUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.orderUrl));
   const contactUrl = `${origin || 'https://agchange.app'}/contact`;
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
@@ -1904,7 +1926,7 @@ export function getOrderTransferComplianceRequiredEmail(
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 20px;">
       <tr>
         <td align="center">
-          <a href="${data.orderUrl}" style="display: inline-block; padding: 12px 24px; background: #22251F; color: #F5F5F0; text-decoration: none; border-radius: 8px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; font-weight: 700;">
+          <a href="${canonicalizeUrl(data.orderUrl)}" style="display: inline-block; padding: 12px 24px; background: #22251F; color: #F5F5F0; text-decoration: none; border-radius: 8px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; font-weight: 700;">
             Confirm Compliance
           </a>
         </td>
@@ -1919,7 +1941,7 @@ export function getOrderComplianceBuyerConfirmedEmail(
 ): { subject: string; html: string } {
   const subject = `Buyer Confirmed Compliance — ${data.listingTitle}`;
   const preheader = `The buyer has confirmed TPWD transfer permit compliance.`;
-  const origin = tryGetOrigin(data.orderUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.orderUrl));
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       Buyer Confirmed Compliance
@@ -1933,7 +1955,7 @@ export function getOrderComplianceBuyerConfirmedEmail(
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 20px;">
       <tr>
         <td align="center">
-          <a href="${data.orderUrl}" style="display: inline-block; padding: 12px 24px; background: #22251F; color: #F5F5F0; text-decoration: none; border-radius: 8px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; font-weight: 700;">
+          <a href="${canonicalizeUrl(data.orderUrl)}" style="display: inline-block; padding: 12px 24px; background: #22251F; color: #F5F5F0; text-decoration: none; border-radius: 8px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; font-weight: 700;">
             View Order
           </a>
         </td>
@@ -1948,7 +1970,7 @@ export function getOrderComplianceSellerConfirmedEmail(
 ): { subject: string; html: string } {
   const subject = `Seller Confirmed Compliance — ${data.listingTitle}`;
   const preheader = `The seller has confirmed TPWD transfer permit compliance.`;
-  const origin = tryGetOrigin(data.orderUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.orderUrl));
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       Seller Confirmed Compliance
@@ -1962,7 +1984,7 @@ export function getOrderComplianceSellerConfirmedEmail(
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 20px;">
       <tr>
         <td align="center">
-          <a href="${data.orderUrl}" style="display: inline-block; padding: 12px 24px; background: #22251F; color: #F5F5F0; text-decoration: none; border-radius: 8px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; font-weight: 700;">
+          <a href="${canonicalizeUrl(data.orderUrl)}" style="display: inline-block; padding: 12px 24px; background: #22251F; color: #F5F5F0; text-decoration: none; border-radius: 8px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; font-weight: 700;">
             View Order
           </a>
         </td>
@@ -1977,7 +1999,7 @@ export function getOrderComplianceUnlockedEmail(
 ): { subject: string; html: string } {
   const subject = `Fulfillment Unlocked — ${data.listingTitle}`;
   const preheader = `Both parties confirmed compliance. Fulfillment is now unlocked.`;
-  const origin = tryGetOrigin(data.orderUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.orderUrl));
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       Fulfillment Unlocked
@@ -1991,7 +2013,7 @@ export function getOrderComplianceUnlockedEmail(
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 20px;">
       <tr>
         <td align="center">
-          <a href="${data.orderUrl}" style="display: inline-block; padding: 12px 24px; background: #22251F; color: #F5F5F0; text-decoration: none; border-radius: 8px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; font-weight: 700;">
+          <a href="${canonicalizeUrl(data.orderUrl)}" style="display: inline-block; padding: 12px 24px; background: #22251F; color: #F5F5F0; text-decoration: none; border-radius: 8px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; font-weight: 700;">
             View Order
           </a>
         </td>
@@ -2004,7 +2026,7 @@ export function getOrderComplianceUnlockedEmail(
 export function getAdminDisputeOpenedEmail(data: AdminDisputeOpenedEmailData): { subject: string; html: string } {
   const subject = `Admin: dispute opened — ${data.orderId}`;
   const preheader = `A dispute was opened and requires review.`;
-  const origin = tryGetOrigin(data.adminOpsUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.adminOpsUrl));
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       Dispute opened
@@ -2041,7 +2063,7 @@ export function getAdminBreederPermitSubmittedEmail(
 ): { subject: string; html: string } {
   const subject = `Admin: breeder permit submitted — ${data.sellerName || data.sellerId}`;
   const preheader = `A new breeder permit document was submitted and needs review.`;
-  const origin = tryGetOrigin(data.adminComplianceUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.adminComplianceUrl));
 
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
@@ -2079,7 +2101,7 @@ export function getAdminBreederPermitSubmittedEmail(
 export function getOrderReceivedEmail(data: OrderReceivedEmailData): { subject: string; html: string } {
   const subject = `Receipt confirmed — ${data.listingTitle}`;
   const preheader = `The buyer confirmed receipt. Your transaction is moving toward payout release.`;
-  const origin = tryGetOrigin(data.orderUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.orderUrl));
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       Receipt confirmed
@@ -2113,7 +2135,7 @@ export function getOrderReceivedEmail(data: OrderReceivedEmailData): { subject: 
 export function getOrderDeliveredEmail(data: OrderDeliveredEmailData): { subject: string; html: string } {
   const subject = `Order delivered — ${data.listingTitle}`;
   const preheader = `The seller marked your order as delivered. Please confirm receipt.`;
-  const origin = tryGetOrigin(data.orderUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.orderUrl));
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       Order delivered
@@ -2147,7 +2169,7 @@ export function getOrderDeliveredEmail(data: OrderDeliveredEmailData): { subject
 export function getOrderAcceptedEmail(data: OrderAcceptedEmailData): { subject: string; html: string } {
   const subject = `Order accepted — ${data.listingTitle}`;
   const preheader = `The buyer accepted your order. You receive funds via Stripe when the buyer pays.`;
-  const origin = tryGetOrigin(data.orderUrl);
+  const origin = canonicalOrigin(tryGetOrigin(data.orderUrl));
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       Order accepted

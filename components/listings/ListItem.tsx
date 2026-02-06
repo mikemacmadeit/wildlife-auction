@@ -34,8 +34,6 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
   const { user } = useAuth();
   const sold = getSoldSummary(listing);
   const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
-  const sellerBadges = Array.isArray(listing.sellerSnapshot?.badges) ? listing.sellerSnapshot!.badges! : [];
-
   const isAuction = listing.type === 'auction';
   const isFixed = listing.type === 'fixed';
   const isClassified = listing.type === 'classified';
@@ -645,20 +643,9 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                     </button>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    {listing.sellerSnapshot?.verified ? (
-                      <Badge variant="secondary" className="text-[10px] font-semibold">
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        Verified
-                      </Badge>
-                    ) : null}
                     {sellerTxCount !== null && sellerTxCount > 0 ? (
                       <Badge variant="outline" className="text-[10px] font-semibold">
                         {sellerTxCount} tx
-                      </Badge>
-                    ) : null}
-                    {sellerBadges.includes('Identity verified') ? (
-                      <Badge variant="outline" className="text-[10px] font-semibold">
-                        ID verified
                       </Badge>
                     ) : null}
                   </div>

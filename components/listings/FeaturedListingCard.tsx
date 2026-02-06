@@ -34,7 +34,6 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
   const reducedMotion = useReducedMotion();
   const sold = getSoldSummary(listing);
   const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
-  const sellerBadges = Array.isArray(listing.sellerSnapshot?.badges) ? listing.sellerSnapshot!.badges! : [];
   const sellerName = listing.sellerSnapshot?.displayName || 'Seller';
   const sellerInitial = String(sellerName || 'S').trim().slice(0, 1).toUpperCase();
   const rawSellerPhoto = listing.sellerSnapshot?.photoURL ?? '';
@@ -288,20 +287,9 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                 </div>
                 <div className="flex flex-col items-end gap-1.5 min-w-0 flex-shrink overflow-hidden sm:max-w-[35%]">
                   <div className="hidden sm:flex items-center gap-2 flex-wrap justify-end max-w-full overflow-hidden">
-                    {listing.sellerSnapshot?.verified && (
-                      <Badge variant="secondary" className="text-[10px] font-semibold flex-shrink-0">
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        Verified
-                      </Badge>
-                    )}
                     {sellerTxCount !== null && sellerTxCount > 0 && (
                       <Badge variant="outline" className="text-[10px] font-semibold flex-shrink-0">
                         {sellerTxCount} tx
-                      </Badge>
-                    )}
-                    {sellerBadges.includes('Identity verified') && (
-                      <Badge variant="outline" className="text-[10px] font-semibold flex-shrink-0">
-                        ID verified
                       </Badge>
                     )}
                   </div>
