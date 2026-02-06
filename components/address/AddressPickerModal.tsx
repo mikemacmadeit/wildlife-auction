@@ -417,19 +417,14 @@ export function AddressPickerModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        overlayClassName="max-sm:top-0 max-sm:bottom-0 max-sm:left-0 max-sm:right-0"
+        overlayClassName="max-sm:z-[70] sm:z-50"
         className={cn(
-          'flex flex-col overflow-hidden border-2',
-          'gap-3 sm:gap-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pt-6 sm:pb-6',
-          'max-h-[90vh] sm:max-h-[85vh]',
-          // Desktop: centered
-          'sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%]',
-          'sm:w-full sm:max-w-xl sm:rounded-xl sm:px-6',
-          // Mobile: bottom sheet, full width, safe area
-          'max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:left-0 max-sm:right-0',
-          'max-sm:w-full max-sm:max-h-[92dvh] max-sm:translate-x-0 max-sm:translate-y-0',
-          'max-sm:rounded-t-2xl max-sm:rounded-b-none',
-          'max-sm:px-4 max-sm:pl-4 max-sm:pr-14'
+          'flex flex-col overflow-hidden border-2 bg-background shadow-lg',
+          'gap-3 sm:gap-4 pt-4 sm:pt-6 pb-4 sm:pb-6',
+          'max-h-[85dvh] sm:max-h-[85vh]',
+          'w-[calc(100%-2rem)] max-w-xl',
+          'rounded-xl px-4 sm:px-6',
+          'max-sm:z-[70] sm:z-50'
         )}
       >
         <DialogHeader className="flex-shrink-0 space-y-1.5 text-left pr-10 sm:pr-10">
@@ -441,7 +436,7 @@ export function AddressPickerModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-4 overscroll-contain touch-pan-y">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-4 overscroll-contain touch-pan-y pb-4 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
           {error && (
             <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">{error}</p>
           )}

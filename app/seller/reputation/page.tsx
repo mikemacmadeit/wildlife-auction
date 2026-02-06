@@ -17,6 +17,7 @@ import {
   Package,
   MessageSquare,
   ArrowRight,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
@@ -31,6 +32,10 @@ export default function SellerReputationPage() {
   const { user } = useAuth();
   const [tier, setTier] = useState<SubscriptionTier>('standard');
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [reviewStats, setReviewStats] = useState<{ reviewCount: number; avgRating: number } | null>(null);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,6 +51,30 @@ export default function SellerReputationPage() {
           setTier('standard');
           setProfile(null);
         }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    let cancelled = false;
+    setReviewsLoading(true);
+    setReviewsError(null);
+    fetch(`/api/reviews/seller?sellerId=${user.uid}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (!data?.ok) throw new Error(data?.error || 'Failed to load reviews');
+        setReviewStats(data.stats || null);
+        setReviews(Array.isArray(data.reviews) ? data.reviews : []);
+      })
+      .catch((e: any) => {
+        if (!cancelled) setReviewsError(e?.message || 'Failed to load reviews');
+      })
+      .finally(() => {
+        if (!cancelled) setReviewsLoading(false);
       });
     return () => {
       cancelled = true;
@@ -232,25 +261,66 @@ export default function SellerReputationPage() {
           </Card>
         </div>
 
-        {/* Buyer Feedback (Placeholder) */}
-        <Card className="border-2 border-border/50 bg-card">
+        {/* Buyer Feedback / Reviews */}
+        <Card id="seller-reviews" className="border-2 border-border/50 bg-card">
           <CardHeader>
             <div className="flex items-center gap-2">
               <Star className="h-5 w-5 text-primary" />
-              <CardTitle className="text-xl font-extrabold">Buyer Feedback</CardTitle>
+              <CardTitle className="text-xl font-extrabold">Buyer Reviews</CardTitle>
             </div>
             <CardDescription>
-              Reviews and ratings from buyers
+              Verified reviews from completed orders.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="py-12 text-center">
-              <Star className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">No feedback yet</h3>
-              <p className="text-sm text-muted-foreground">
-                Buyer feedback will appear here after completed sales
-              </p>
-            </div>
+            {reviewsLoading ? (
+              <div className="py-10 flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : reviewsError ? (
+              <div className="py-10 text-center">
+                <div className="font-semibold text-destructive">Couldn&apos;t load reviews</div>
+                <div className="text-sm text-muted-foreground mt-1">{reviewsError}</div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="inline-flex items-center gap-1 text-base font-extrabold">
+                    <Star className="h-5 w-5 text-amber-500 fill-amber-500" />
+                    {reviewStats?.avgRating ? reviewStats.avgRating.toFixed(1) : '—'}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {reviewStats?.reviewCount || 0} review{(reviewStats?.reviewCount ?? 0) === 1 ? '' : 's'}
+                  </div>
+                </div>
+
+                {reviews.length === 0 ? (
+                  <div className="rounded-xl border border-dashed p-8 text-center">
+                    <div className="font-semibold">No reviews yet</div>
+                    <div className="text-sm text-muted-foreground mt-1">Reviews appear after completed purchases.</div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {reviews.map((r) => (
+                      <div key={r.orderId} className="rounded-xl border border-border/60 p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-0.5">
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <Star key={n} className={n <= (r.rating || 0) ? 'h-4 w-4 text-amber-500 fill-amber-500' : 'h-4 w-4 text-muted-foreground/40'} />
+                            ))}
+                          </div>
+                          <span className="text-xs text-muted-foreground">Verified purchase</span>
+                        </div>
+                        {r.text ? <div className="mt-2 text-sm">{r.text}</div> : null}
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

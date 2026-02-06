@@ -271,7 +271,8 @@ export default function ListingDetailClient() {
   }, [listing, winningBidAmount, pendingCheckout?.amountUsd, buyQuantity]);
 
   const depositAmountUsd = useMemo(() => {
-    if (!listing || (listing.type !== 'fixed' && listing.type !== 'classified')) return 0;
+    if (!listing) return 0;
+    if (listing.type !== 'fixed' && listing.type !== 'classified' && listing.type !== 'auction') return 0;
     return Math.round(checkoutAmountUsd * CHECKOUT_DEPOSIT_PERCENT * 100) / 100;
   }, [listing, checkoutAmountUsd]);
 
@@ -1501,7 +1502,7 @@ export default function ListingDetailClient() {
                         <span>You&apos;re the highest bidder</span>
                       </div>
                     )}
-                    {(listing!.type === 'fixed' || listing!.type === 'classified') && checkoutAmountUsd > 0 ? (
+                    {(listing!.type === 'fixed' || listing!.type === 'classified' || listing!.type === 'auction') && checkoutAmountUsd > 0 ? (
                       <div className="text-xs text-muted-foreground space-y-0.5">
                         <div>20% deposit at checkout: ${depositAmountUsd.toLocaleString()}</div>
                         <div>Balance due before delivery.</div>
@@ -1690,7 +1691,7 @@ export default function ListingDetailClient() {
                             ) : (
                               <>
                                 <CreditCard className="mr-2 h-5 w-5" />
-                                Complete Purchase
+                                {depositAmountUsd > 0 ? `Complete Purchase — $${depositAmountUsd.toLocaleString()} deposit` : 'Complete Purchase'}
                               </>
                             )}
                           </Button>
@@ -2451,7 +2452,7 @@ export default function ListingDetailClient() {
           setPaymentDialogOpen(open);
           if (!open) setPendingCheckout(null);
         }}
-        amountUsd={(listing?.type === 'fixed' || listing?.type === 'classified') ? depositAmountUsd : checkoutAmountUsd}
+        amountUsd={(listing?.type === 'fixed' || listing?.type === 'classified' || listing?.type === 'auction') ? depositAmountUsd : checkoutAmountUsd}
         onSelect={handleSelectPaymentMethod}
         isAuthenticated={!!user}
         isEmailVerified={!!user?.emailVerified}
