@@ -41,10 +41,17 @@ export function PaymentMethodDialog(props: {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        overlayClassName="max-sm:top-0 max-sm:bottom-0 max-sm:left-0 max-sm:right-0"
-        className="flex flex-col overflow-hidden w-[calc(100%-1rem)] max-w-lg sm:max-w-3xl lg:max-w-4xl mx-auto px-4 sm:px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pt-6 sm:pb-6 gap-3 sm:gap-4 max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:left-0 max-sm:right-0 max-sm:w-full max-sm:max-h-[92dvh] max-sm:rounded-t-2xl max-sm:rounded-b-none max-sm:translate-x-0 max-sm:translate-y-0 sm:max-h-[90vh] border-2 bg-background shadow-premium"
+        overlayClassName="max-sm:z-[70] sm:z-50"
+        className={cn(
+          'flex flex-col overflow-hidden border-2 bg-background shadow-premium',
+          'w-[calc(100%-2rem)] max-w-lg sm:max-w-3xl lg:max-w-4xl',
+          'max-h-[85dvh] sm:max-h-[90vh]',
+          'p-4 sm:p-6 gap-3 sm:gap-4',
+          'max-sm:z-[70] sm:z-50',
+          'max-sm:rounded-xl'
+        )}
       >
-        <DialogHeader className="shrink-0 space-y-1.5 text-left pr-10 sm:pr-10">
+        <DialogHeader className="shrink-0 space-y-1.5 text-left pr-10">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div className="min-w-0 flex-1">
               <DialogTitle className="text-base sm:text-lg">Choose payment method</DialogTitle>
@@ -67,7 +74,7 @@ export function PaymentMethodDialog(props: {
         </DialogHeader>
 
         <TooltipProvider>
-          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain space-y-2 sm:space-y-4">
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain space-y-2 sm:space-y-4 pb-4 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
             {options.map((opt) => {
               const Icon = opt.icon;
               const isRec = opt.key === recommended;
