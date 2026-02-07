@@ -26,6 +26,8 @@ import {
   X,
   Bell,
   Mail,
+  ShoppingBag,
+  Minus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatUserFacingError } from '@/lib/format-user-facing-error';
@@ -44,6 +46,7 @@ import { resendVerificationEmail } from '@/lib/firebase/auth';
 import { createStripeAccount, createAccountLink } from '@/lib/stripe/api';
 import type { SellerDashboardData } from '@/lib/seller/getSellerDashboardData';
 import { NotificationSettingsDialog } from '@/components/settings/NotificationSettingsDialog';
+import { BusinessOverviewChart } from '@/components/seller/BusinessOverviewChart';
 
 // Helper functions outside component to prevent recreation
 const getAlertIcon = (type: string) => {
@@ -177,6 +180,7 @@ export default function SellerOverviewPage() {
   const uid = user?.uid || null;
   const [listings, setListings] = useState<Listing[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [buyerOrders, setBuyerOrders] = useState<Order[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [dashboardData, setDashboardData] = useState<SellerDashboardData | null>(null);
   const [dashboardLoading, setDashboardLoading] = useState(false);
@@ -238,9 +242,10 @@ export default function SellerOverviewPage() {
         setLoading(true);
         setError(null);
 
-        const [listingsRes, ordersRes, profileRes] = await Promise.allSettled([
+        const [listingsRes, sellerOrdersRes, buyerOrdersRes, profileRes] = await Promise.allSettled([
           listSellerListings(sellerId),
           getOrdersForUser(sellerId, 'seller'),
+          getOrdersForUser(sellerId, 'buyer'),
           getUserProfile(sellerId),
         ]);
 
@@ -253,11 +258,16 @@ export default function SellerOverviewPage() {
 
         setListings(listingsRes.value);
 
-        if (ordersRes.status === 'fulfilled') {
-          setOrders(filterSellerRelevantOrders(ordersRes.value));
+        if (sellerOrdersRes.status === 'fulfilled') {
+          setOrders(filterSellerRelevantOrders(sellerOrdersRes.value));
         } else {
-          // Non-fatal: keep page usable even if orders fail
           setOrders([]);
+        }
+
+        if (buyerOrdersRes.status === 'fulfilled') {
+          setBuyerOrders(buyerOrdersRes.value);
+        } else {
+          setBuyerOrders([]);
         }
 
         if (profileRes.status === 'fulfilled') {
@@ -453,6 +463,161 @@ export default function SellerOverviewPage() {
       },
     ];
   }, [listings, orders]);
+
+  // Seller financials for Business overview — what you're making (dollars first)
+  const sellerFinancialStats = useMemo(() => {
+    const completedOrders = orders.filter((o) => {
+      const status = o.status;
+      const hasPaidAt = !!(o as any).paidAt;
+      return (
+        status === 'paid' ||
+        status === 'completed' ||
+        status === 'paid_held' ||
+        status === 'buyer_confirmed' ||
+        hasPaidAt
+      );
+    });
+    const totalRevenue = completedOrders.reduce((sum, o) => sum + (o.sellerAmount ?? o.amount - (o.platformFee ?? 0)), 0);
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const revenue30Days = completedOrders
+      .filter((o) => {
+        const createdAt = toDateSafe((o as any).createdAt);
+        return createdAt ? createdAt >= thirtyDaysAgo : false;
+      })
+      .reduce((sum, o) => sum + (o.sellerAmount ?? o.amount - (o.platformFee ?? 0)), 0);
+    const activeListingsCount = listings.filter((l) => getEffectiveListingStatus(l) === 'active').length;
+
+    return [
+      {
+        label: 'Total revenue',
+        value: `$${totalRevenue.toLocaleString()}`,
+        subtext: 'All-time from sales',
+        icon: DollarSign,
+        color: 'text-primary',
+        bgColor: 'bg-primary/10',
+        borderColor: 'border-primary/20',
+      },
+      {
+        label: 'Revenue (30 days)',
+        value: `$${revenue30Days.toLocaleString()}`,
+        subtext: 'Last 30 days',
+        icon: TrendingUp,
+        color: 'text-primary',
+        bgColor: 'bg-primary/10',
+        borderColor: 'border-primary/20',
+      },
+      {
+        label: 'Completed sales',
+        value: completedOrders.length.toString(),
+        subtext: `$${totalRevenue.toLocaleString()} total`,
+        icon: CheckCircle2,
+        color: 'text-primary',
+        bgColor: 'bg-primary/10',
+        borderColor: 'border-primary/20',
+      },
+      {
+        label: 'Active listings',
+        value: activeListingsCount.toString(),
+        subtext: 'Currently for sale',
+        icon: Package,
+        color: 'text-primary',
+        bgColor: 'bg-primary/10',
+        borderColor: 'border-primary/20',
+      },
+    ];
+  }, [listings, orders]);
+
+  // Buyer-side financials for Business overview — what you're spending (dollars first)
+  const buyerStats = useMemo(() => {
+    const completedBuyerOrders = buyerOrders.filter((o) => {
+      const status = o.status;
+      const hasPaidAt = !!(o as any).paidAt;
+      return (
+        status === 'paid' ||
+        status === 'completed' ||
+        status === 'paid_held' ||
+        status === 'buyer_confirmed' ||
+        hasPaidAt
+      );
+    });
+    const totalSpent = completedBuyerOrders.reduce((sum, o) => sum + (o.amount ?? 0), 0);
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const ordersLast30Days = buyerOrders.filter((o) => {
+      const createdAt = toDateSafe((o as any).createdAt);
+      return createdAt ? createdAt >= thirtyDaysAgo : false;
+    });
+    const spentLast30Days = ordersLast30Days.reduce((sum, o) => sum + (o.amount ?? 0), 0);
+
+    const inProgress = buyerOrders.filter((o) => {
+      const status = o.status;
+      const hasPaidAt = !!(o as any).paidAt;
+      const delivered = !!(o as any).deliveredAt;
+      const completed = status === 'completed' || status === 'buyer_confirmed';
+      return (hasPaidAt || status === 'paid' || status === 'paid_held') && !delivered && !completed;
+    });
+
+    return [
+      {
+        label: 'Total spent',
+        value: `$${totalSpent.toLocaleString()}`,
+        subtext: 'All-time on purchases',
+        icon: DollarSign,
+        color: 'text-emerald-600 dark:text-emerald-400',
+        bgColor: 'bg-emerald-500/10',
+        borderColor: 'border-emerald-500/20',
+      },
+      {
+        label: 'Spent (30 days)',
+        value: `$${spentLast30Days.toLocaleString()}`,
+        subtext: 'Last 30 days',
+        icon: TrendingUp,
+        color: 'text-emerald-600 dark:text-emerald-400',
+        bgColor: 'bg-emerald-500/10',
+        borderColor: 'border-emerald-500/20',
+      },
+      {
+        label: 'Total orders',
+        value: buyerOrders.length.toString(),
+        subtext: `${completedBuyerOrders.length} completed · $${totalSpent.toLocaleString()} spent`,
+        icon: ShoppingBag,
+        color: 'text-emerald-600 dark:text-emerald-400',
+        bgColor: 'bg-emerald-500/10',
+        borderColor: 'border-emerald-500/20',
+      },
+      {
+        label: 'In progress',
+        value: inProgress.length.toString(),
+        subtext: inProgress.length === 0 ? 'All caught up' : inProgress.length === 1 ? '1 awaiting delivery' : `${inProgress.length} awaiting delivery`,
+        icon: Clock,
+        color: 'text-emerald-600 dark:text-emerald-400',
+        bgColor: 'bg-emerald-500/10',
+        borderColor: 'border-emerald-500/20',
+      },
+    ];
+  }, [buyerOrders]);
+
+  // P&L: revenue (sales) − costs (purchases) for Business overview
+  const businessPL = useMemo(() => {
+    const completedSeller = orders.filter((o) => {
+      const status = o.status;
+      const hasPaidAt = !!(o as any).paidAt;
+      return status === 'paid' || status === 'completed' || status === 'paid_held' || status === 'buyer_confirmed' || hasPaidAt;
+    });
+    const revenue = completedSeller.reduce((sum, o) => sum + (o.sellerAmount ?? o.amount - (o.platformFee ?? 0)), 0);
+
+    const completedBuyer = buyerOrders.filter((o) => {
+      const status = o.status;
+      const hasPaidAt = !!(o as any).paidAt;
+      return status === 'paid' || status === 'completed' || status === 'paid_held' || status === 'buyer_confirmed' || hasPaidAt;
+    });
+    const costs = completedBuyer.reduce((sum, o) => sum + (o.amount ?? 0), 0);
+
+    const net = revenue - costs;
+    return { revenue, costs, net };
+  }, [orders, buyerOrders]);
 
   const setupChecklist = useMemo(() => {
     const profileOk = !!userProfile && isProfileComplete(userProfile);
@@ -707,104 +872,102 @@ export default function SellerOverviewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-6">
-      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
-        {/* Header */}
+    <div className="min-h-screen bg-background pb-20 md:pb-6 overflow-x-hidden">
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 max-w-7xl space-y-4 sm:space-y-6 md:space-y-8">
+        {/* Header — mobile: stacked, touch-friendly buttons */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-foreground mb-2">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-foreground mb-1 sm:mb-2">
               Seller Overview
             </h1>
-            <p className="text-base md:text-lg text-muted-foreground">
+            <p className="text-sm sm:text-base md:text-lg text-muted-foreground">
               Daily briefing and action items for your listings
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap" data-tour="seller-create-listing">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto min-w-0" data-tour="seller-create-listing">
             <NotificationSettingsDialog
               triggerLabel="Notifications"
               triggerVariant="outline"
               triggerSize="default"
-              className="min-h-[44px] font-semibold"
+              className="min-h-[44px] font-semibold w-full sm:w-auto"
             />
-            <CreateListingGateButton href="/dashboard/listings/new" className="min-h-[44px] font-semibold gap-2">
+            <CreateListingGateButton href="/dashboard/listings/new" className="min-h-[44px] font-semibold gap-2 w-full sm:w-auto">
               <Package className="h-4 w-4" />
               Create Listing
             </CreateListingGateButton>
           </div>
         </div>
 
-        {/* KPI Snapshot */}
-        {/* Mobile: show KPIs as 2 rows of 2. Desktop unchanged. */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-4 lg:gap-6" data-tour="seller-stats">
+        {/* KPI Snapshot — mobile: 2x2, tighter gap, responsive value size */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 min-w-0" data-tour="seller-stats">
           {stats.map((stat) => {
             const Icon = stat.icon;
             return (
               <Card
                 key={stat.label}
                 className={cn(
-                  'rounded-xl border border-border/50 bg-card hover:border-border/70',
-                  'hover:shadow-sm cursor-pointer group transition-colors',
-                  'max-lg:min-h-[120px] max-lg:flex max-lg:flex-col max-lg:justify-between'
+                  'rounded-xl border border-border/50 bg-card hover:border-border/70 overflow-hidden',
+                  'hover:shadow-sm cursor-pointer group transition-colors active:scale-[0.99]',
+                  'max-lg:min-h-[100px] sm:min-h-[120px] max-lg:flex max-lg:flex-col max-lg:justify-between'
                 )}
               >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 max-lg:px-4 max-lg:pt-4 max-lg:pb-2">
-                  <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground max-lg:text-sm max-lg:leading-tight max-lg:flex-1 max-lg:pr-2">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 pt-3 sm:pb-3 sm:px-4 sm:pt-4">
+                  <CardTitle className="text-xs sm:text-sm font-bold uppercase tracking-wide text-muted-foreground leading-tight flex-1 min-w-0 pr-2 line-clamp-2">
                     {stat.label}
                   </CardTitle>
                   <div
                     className={cn(
-                      'w-10 h-10 rounded-lg border-2 flex items-center justify-center shrink-0',
-                      'max-lg:w-9 max-lg:h-9',
+                      'w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-lg border-2 flex items-center justify-center shrink-0',
                       stat.bgColor,
                       stat.borderColor,
                       'group-hover:bg-primary/20 group-hover:border-primary/30'
                     )}
                   >
-                    <Icon className={cn('h-5 w-5 max-lg:h-4 max-lg:w-4', stat.color)} />
+                    <Icon className={cn('h-4 w-4 sm:h-4 sm:w-4 lg:h-5 lg:w-5', stat.color)} />
                   </div>
                 </CardHeader>
-                <CardContent className="max-lg:px-4 max-lg:pb-4 max-lg:pt-0">
-                  <div className="text-2xl md:text-3xl font-extrabold text-foreground mb-1 max-lg:text-2xl max-lg:mb-1.5">{stat.value}</div>
-                  <p className="text-xs text-muted-foreground font-medium max-lg:leading-relaxed max-lg:line-clamp-2">{stat.subtext}</p>
+                <CardContent className="px-3 pb-3 pt-0 sm:px-4 sm:pb-4">
+                  <div className="text-xl max-sm:text-lg sm:text-2xl md:text-3xl font-extrabold text-foreground mb-0.5 tabular-nums break-words">{stat.value}</div>
+                  <p className="text-[11px] sm:text-xs text-muted-foreground font-medium leading-relaxed line-clamp-2">{stat.subtext}</p>
                 </CardContent>
               </Card>
             );
           })}
         </div>
 
-        {/* Seller command center (additive): most important operational signals for sellers */}
-        <Card className="rounded-xl border border-border/50 bg-card">
-          <CardHeader className="pb-4">
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div>
-                <CardTitle className="text-xl font-extrabold">Today</CardTitle>
-                <CardDescription>Fast links + the key things that can block payout.</CardDescription>
+        {/* Seller command center — mobile: stacked header, touch-friendly buttons */}
+        <Card className="rounded-xl border border-border/50 bg-card overflow-hidden">
+          <CardHeader className="pb-4 px-3 sm:px-6 pt-4 sm:pt-6">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+              <div className="min-w-0">
+                <CardTitle className="text-lg sm:text-xl font-extrabold">Today</CardTitle>
+                <CardDescription className="text-sm sm:text-base">Fast links + the key things that can block payout.</CardDescription>
               </div>
-              <div className="flex items-center gap-2">
-                <Button asChild variant="default" size="sm" className="font-semibold">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <Button asChild variant="default" size="sm" className="min-h-[44px] sm:min-h-9 font-semibold w-full sm:w-auto">
                   <Link href="/seller/sales">Open Sales</Link>
                 </Button>
-                <Button asChild variant="default" size="sm" className="font-semibold">
+                <Button asChild variant="default" size="sm" className="min-h-[44px] sm:min-h-9 font-semibold w-full sm:w-auto">
                   <Link href="/seller/payouts">Open Payouts</Link>
                 </Button>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <CardContent className="space-y-4 px-3 sm:px-6 pb-4 sm:pb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <Card className="rounded-xl border border-border/60 border-l-4 border-l-amber-500 bg-amber-500/5">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-xs font-semibold text-amber-800 dark:text-amber-200 uppercase tracking-wide">Sales needing action</div>
-                      <div className="text-2xl font-extrabold mt-1 text-foreground">{sellerQueues.ordersNeedingAnyActionCount}</div>
-                      <div className="text-xs text-muted-foreground mt-1">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2 sm:gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[10px] sm:text-xs font-semibold text-amber-800 dark:text-amber-200 uppercase tracking-wide">Sales needing action</div>
+                      <div className="text-xl sm:text-2xl font-extrabold mt-0.5 sm:mt-1 text-foreground tabular-nums">{sellerQueues.ordersNeedingAnyActionCount}</div>
+                      <div className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1 line-clamp-2">
                         {sellerQueues.ordersNeedingDocsCount} docs · {sellerQueues.ordersNeedingDeliveryUpdateCount} delivery · {sellerQueues.ordersWithIssuesCount} issues
                       </div>
                     </div>
-                    <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400 shrink-0" />
                   </div>
-                  <Button asChild variant="outline" className="w-full mt-3">
+                  <Button asChild variant="outline" className="w-full mt-2 sm:mt-3 min-h-[44px] sm:min-h-9 font-semibold">
                     <Link href="/seller/sales">
                       View sales
                       <ArrowRight className="h-4 w-4 ml-2" />
@@ -814,16 +977,16 @@ export default function SellerOverviewPage() {
               </Card>
 
               <Card className="rounded-xl border border-border/60 border-l-4 border-l-blue-500 bg-blue-500/5">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-xs font-semibold text-blue-800 dark:text-blue-200 uppercase tracking-wide">Listings pending review</div>
-                      <div className="text-2xl font-extrabold mt-1 text-foreground">{sellerQueues.pendingReviewListingsCount}</div>
-                      <div className="text-xs text-muted-foreground mt-1">Admin/compliance review queue</div>
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2 sm:gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[10px] sm:text-xs font-semibold text-blue-800 dark:text-blue-200 uppercase tracking-wide">Listings pending review</div>
+                      <div className="text-xl sm:text-2xl font-extrabold mt-0.5 sm:mt-1 text-foreground tabular-nums">{sellerQueues.pendingReviewListingsCount}</div>
+                      <div className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">Admin/compliance review queue</div>
                     </div>
-                    <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0" />
+                    <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400 shrink-0" />
                   </div>
-                  <Button asChild variant="outline" className="w-full mt-3">
+                  <Button asChild variant="outline" className="w-full mt-2 sm:mt-3 min-h-[44px] sm:min-h-9 font-semibold">
                     <Link href="/seller/listings">
                       View listings
                       <ArrowRight className="h-4 w-4 ml-2" />
@@ -833,20 +996,20 @@ export default function SellerOverviewPage() {
               </Card>
 
               <Card className="rounded-xl border border-border/60 border-l-4 border-l-violet-500 bg-violet-500/5">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-xs font-semibold text-violet-800 dark:text-violet-200 uppercase tracking-wide">Open offers</div>
-                      <div className="text-2xl font-extrabold mt-1 text-foreground">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2 sm:gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[10px] sm:text-xs font-semibold text-violet-800 dark:text-violet-200 uppercase tracking-wide">Open offers</div>
+                      <div className="text-xl sm:text-2xl font-extrabold mt-0.5 sm:mt-1 text-foreground tabular-nums">
                         {dashboardData?.totals?.offers?.open ?? '—'}
                       </div>
-                      <div className="text-xs text-muted-foreground mt-1">
+                      <div className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">
                         {dashboardLoading ? 'Loading…' : 'Review and respond quickly'}
                       </div>
                     </div>
-                    <MessageSquare className="h-5 w-5 text-violet-600 dark:text-violet-400 shrink-0" />
+                    <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5 text-violet-600 dark:text-violet-400 shrink-0" />
                   </div>
-                  <Button asChild variant="outline" className="w-full mt-3">
+                  <Button asChild variant="outline" className="w-full mt-2 sm:mt-3 min-h-[44px] sm:min-h-9 font-semibold">
                     <Link href="/dashboard/bids-offers">
                       View offers
                       <ArrowRight className="h-4 w-4 ml-2" />
@@ -856,20 +1019,20 @@ export default function SellerOverviewPage() {
               </Card>
 
               <Card className="rounded-xl border border-border/60 border-l-4 border-l-emerald-600 bg-emerald-500/5">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-xs font-semibold text-emerald-800 dark:text-emerald-200 uppercase tracking-wide">Revenue (gross)</div>
-                      <div className="text-2xl font-extrabold mt-1 text-foreground">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2 sm:gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[10px] sm:text-xs font-semibold text-emerald-800 dark:text-emerald-200 uppercase tracking-wide">Revenue (gross)</div>
+                      <div className="text-xl sm:text-2xl font-extrabold mt-0.5 sm:mt-1 text-foreground tabular-nums break-all">
                         {typeof dashboardData?.totals?.revenue?.held === 'number'
                           ? `$${dashboardData.totals.revenue.held.toLocaleString()}`
                           : '—'}
                       </div>
-                      <div className="text-xs text-muted-foreground mt-1">From sales via Stripe</div>
+                      <div className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">From sales via Stripe</div>
                     </div>
-                    <DollarSign className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   </div>
-                  <Button asChild variant="outline" className="w-full mt-3">
+                  <Button asChild variant="outline" className="w-full mt-2 sm:mt-3 min-h-[44px] sm:min-h-9 font-semibold">
                     <Link href="/seller/payouts">
                       View payouts
                       <ArrowRight className="h-4 w-4 ml-2" />
@@ -881,30 +1044,245 @@ export default function SellerOverviewPage() {
           </CardContent>
         </Card>
 
-        {/* Seller Setup Checklist (dual-role account: enables seller capability without splitting accounts) */}
+        {/* Business overview: what you sell and what you buy */}
+        <Card className="rounded-xl border border-border/50 bg-card overflow-hidden" data-tour="seller-business-overview">
+          <CardHeader className="pb-4 px-3 sm:px-6">
+            <CardTitle className="text-lg sm:text-xl font-extrabold">Business overview</CardTitle>
+            <CardDescription className="text-sm sm:text-base max-w-xl">
+              What you&apos;re making (selling) and what you&apos;re spending (buying) — business financials at a glance
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-3 sm:px-6 pb-4 sm:pb-8 overflow-x-hidden">
+            {/* P&L — one row: Earned | Spent | Margin | Net, same size, even spacing; mobile-friendly */}
+            <div
+              className={cn(
+                'rounded-xl border-2 p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8 relative overflow-hidden',
+                'bg-muted/40 dark:bg-muted/20',
+                businessPL.net > 0 && 'border-emerald-500/50 dark:border-emerald-400/40 shadow-[0_0_20px_-5px] shadow-emerald-500/10 dark:shadow-emerald-400/10',
+                businessPL.net < 0 && 'border-border/60',
+                businessPL.net === 0 && 'border-border/60'
+              )}
+              data-tour="seller-pl"
+            >
+              <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-muted-foreground/80">
+                  P&amp;L
+                </span>
+                <Badge
+                  variant="secondary"
+                  className={cn(
+                    'font-bold uppercase tracking-wide text-[10px] sm:text-xs',
+                    businessPL.net > 0 && 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
+                    businessPL.net < 0 && 'bg-muted text-muted-foreground border-border',
+                    businessPL.net === 0 && 'bg-muted text-muted-foreground'
+                  )}
+                >
+                  {businessPL.net > 0 ? 'Net gain' : businessPL.net < 0 ? 'Net position' : 'Even'}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
+                <div className="min-w-0">
+                  <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-muted-foreground/80 mb-0.5">
+                    Earned
+                  </p>
+                  <p className="text-sm sm:text-base md:text-lg font-extrabold text-foreground tabular-nums break-all">
+                    ${businessPL.revenue.toLocaleString()}
+                  </p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">From sales</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-muted-foreground/80 mb-0.5">
+                    Spent
+                  </p>
+                  <p className="text-sm sm:text-base md:text-lg font-extrabold text-foreground tabular-nums break-all">
+                    ${businessPL.costs.toLocaleString()}
+                  </p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">Purchases</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-muted-foreground/80 mb-0.5">
+                    Margin
+                  </p>
+                  <p
+                    className={cn(
+                      'text-sm sm:text-base md:text-lg font-extrabold tabular-nums break-all',
+                      businessPL.revenue > 0 && businessPL.net > 0 && 'text-emerald-600 dark:text-emerald-400',
+                      businessPL.revenue > 0 && businessPL.net <= 0 && 'text-foreground'
+                    )}
+                  >
+                    {businessPL.revenue > 0
+                      ? `${Math.round((businessPL.net / businessPL.revenue) * 100)}%`
+                      : '—'}
+                  </p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">Net ÷ revenue</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-muted-foreground/80 mb-0.5">
+                    Net
+                  </p>
+                  <p
+                    className={cn(
+                      'text-sm sm:text-base md:text-lg font-extrabold tabular-nums break-all',
+                      businessPL.net > 0 && 'text-emerald-600 dark:text-emerald-400',
+                      businessPL.net < 0 && 'text-foreground',
+                      businessPL.net === 0 && 'text-muted-foreground'
+                    )}
+                  >
+                    {businessPL.net > 0 && `$${businessPL.net.toLocaleString()}`}
+                    {businessPL.net < 0 && `−$${Math.abs(businessPL.net).toLocaleString()}`}
+                    {businessPL.net === 0 && '—'}
+                  </p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">Sales − purchases</p>
+                </div>
+              </div>
+
+              {/* Earned vs spent over time — interactive chart; mobile-friendly */}
+              <BusinessOverviewChart
+                sellerOrders={orders}
+                buyerOrders={buyerOrders}
+                className="mt-4 sm:mt-6 md:mt-8 pt-4 sm:pt-6 border-t border-border/50 min-w-0"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 min-w-0">
+              {/* Selling (outs) — what you're making: dollars first */}
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Package className="h-5 w-5 text-primary shrink-0" />
+                    <h3 className="font-semibold text-foreground truncate">What you&apos;re making</h3>
+                  </div>
+                  <div className="flex gap-2 w-full sm:w-auto shrink-0">
+                    <Button asChild variant="outline" size="sm" className="flex-1 sm:flex-initial min-h-[44px] sm:min-h-9 font-semibold">
+                      <Link href="/seller/listings">Listings</Link>
+                    </Button>
+                    <Button asChild variant="outline" size="sm" className="flex-1 sm:flex-initial min-h-[44px] sm:min-h-9 font-semibold">
+                      <Link href="/seller/sales">Sales</Link>
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:gap-4" data-tour="seller-business-overview-selling">
+                  {sellerFinancialStats.map((stat) => {
+                    const Icon = stat.icon;
+                    return (
+                      <Card
+                        key={stat.label}
+                        className={cn(
+                          'rounded-xl border border-border/50 bg-card hover:border-border/70',
+                          'hover:shadow-sm transition-colors active:scale-[0.98]',
+                          'min-h-[112px] sm:min-h-[108px] flex flex-col justify-between'
+                        )}
+                      >
+                        <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-1.5 px-3 pt-3 sm:pb-2 sm:px-4 sm:pt-4">
+                          <CardTitle className="text-[11px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground leading-tight line-clamp-2 min-w-0 pr-2">
+                            {stat.label}
+                          </CardTitle>
+                          <div
+                            className={cn(
+                              'w-8 h-8 sm:w-9 sm:h-9 rounded-lg border-2 flex items-center justify-center shrink-0',
+                              stat.bgColor,
+                              stat.borderColor
+                            )}
+                          >
+                            <Icon className={cn('h-3.5 w-3.5 sm:h-4 sm:w-4', stat.color)} />
+                          </div>
+                        </CardHeader>
+                        <CardContent className="px-3 pb-3 pt-0 sm:px-4 sm:pb-4">
+                          <div className="text-lg sm:text-xl md:text-2xl font-extrabold text-foreground mb-0.5 tabular-nums min-w-0 break-words">
+                            {stat.value}
+                          </div>
+                          <p className="text-[11px] sm:text-xs text-muted-foreground font-medium line-clamp-2 leading-snug">
+                            {stat.subtext}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Buying (ins) — KPI cards like seller stats; mobile: full-bleed border, padded content */}
+              <div className="space-y-4 pt-6 border-t border-border/60 lg:pt-0 lg:border-t-0 lg:border-l lg:border-border/50 lg:pl-6 lg:ml-0 -mx-3 px-3 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <ShoppingBag className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <h3 className="font-semibold text-foreground truncate">What you&apos;re spending</h3>
+                  </div>
+                  <Button asChild variant="outline" size="sm" className="w-full sm:w-auto min-h-[44px] sm:min-h-9 font-semibold shrink-0">
+                    <Link href="/dashboard/orders">
+                      My orders
+                      <ArrowRight className="h-3 w-3 ml-1" />
+                    </Link>
+                  </Button>
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:gap-4" data-tour="seller-business-overview-buying">
+                  {buyerStats.map((stat) => {
+                    const Icon = stat.icon;
+                    return (
+                      <Card
+                        key={stat.label}
+                        className={cn(
+                          'rounded-xl border border-border/50 bg-card hover:border-border/70',
+                          'hover:shadow-sm transition-colors active:scale-[0.98]',
+                          'min-h-[112px] sm:min-h-[108px] flex flex-col justify-between'
+                        )}
+                      >
+                        <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-1.5 px-3 pt-3 sm:pb-2 sm:px-4 sm:pt-4">
+                          <CardTitle className="text-[11px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground leading-tight line-clamp-2 min-w-0 pr-2">
+                            {stat.label}
+                          </CardTitle>
+                          <div
+                            className={cn(
+                              'w-8 h-8 sm:w-9 sm:h-9 rounded-lg border-2 flex items-center justify-center shrink-0',
+                              stat.bgColor,
+                              stat.borderColor
+                            )}
+                          >
+                            <Icon className={cn('h-3.5 w-3.5 sm:h-4 sm:w-4', stat.color)} />
+                          </div>
+                        </CardHeader>
+                        <CardContent className="px-3 pb-3 pt-0 sm:px-4 sm:pb-4">
+                          <div className="text-lg sm:text-xl md:text-2xl font-extrabold text-foreground mb-0.5 tabular-nums min-w-0 break-words">
+                            {stat.value}
+                          </div>
+                          <p className="text-[11px] sm:text-xs text-muted-foreground font-medium line-clamp-2 leading-snug">
+                            {stat.subtext}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Seller Setup Checklist — mobile: stacked, touch-friendly buttons */}
         {user && setupChecklist.isComplete !== true && (
-          <Card className="rounded-xl border border-border/50 bg-card" data-tour="seller-setup-checklist">
-            <CardHeader>
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <CardTitle className="text-xl font-extrabold">Seller Setup Checklist</CardTitle>
-                  <CardDescription>
+          <Card className="rounded-xl border border-border/50 bg-card overflow-hidden" data-tour="seller-setup-checklist">
+            <CardHeader className="px-3 sm:px-6">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+                <div className="min-w-0">
+                  <CardTitle className="text-lg sm:text-xl font-extrabold">Seller Setup Checklist</CardTitle>
+                  <CardDescription className="text-sm sm:text-base">
                     Complete these steps to publish listings and get paid. (Buyers can still browse and save listings anytime.)
                   </CardDescription>
                 </div>
-                <Badge variant="secondary" className="font-semibold">
+                <Badge variant="secondary" className="font-semibold shrink-0 w-fit">
                   {`${setupChecklist.done}/${setupChecklist.total} complete`}
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 px-3 sm:px-6 pb-4 sm:pb-6">
               {(() => {
                 const { profileOk, emailOk, payoutsOk } = setupChecklist;
 
                 return (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
                     {/* 1) Verify Email — matches top-of-page card and profile-completion flow */}
-                    <div className={cn('rounded-lg border-2 p-4', emailOk ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-background/40')}>
+                    <div className={cn('rounded-lg border-2 p-3 sm:p-4', emailOk ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-background/40')}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-bold text-foreground">1) Verify Email</p>
@@ -917,7 +1295,7 @@ export default function SellerOverviewPage() {
                       <div className="mt-3 space-y-2">
                         <Button
                           variant={emailOk ? 'outline' : 'default'}
-                          className="w-full min-h-[40px] font-semibold"
+                          className="w-full min-h-[44px] font-semibold touch-manipulation"
                           disabled={sendingVerificationEmail}
                           onClick={async () => {
                             if (emailOk) {
@@ -982,7 +1360,7 @@ export default function SellerOverviewPage() {
                       </div>
                     </div>
 
-                    <div className={cn('rounded-lg border-2 p-4', profileOk ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-background/40')}>
+                    <div className={cn('rounded-lg border-2 p-3 sm:p-4', profileOk ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-background/40')}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-bold text-foreground">2) Profile</p>
@@ -993,13 +1371,13 @@ export default function SellerOverviewPage() {
                         {profileOk ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Clock className="h-5 w-5 text-muted-foreground" />}
                       </div>
                       <div className="mt-3">
-                        <Button asChild variant={profileOk ? 'outline' : 'default'} className="w-full min-h-[40px] font-semibold">
+                        <Button asChild variant={profileOk ? 'outline' : 'default'} className="w-full min-h-[44px] font-semibold touch-manipulation">
                           <Link href="/dashboard/account">{profileOk ? 'View Profile' : 'Complete Profile'}</Link>
                         </Button>
                       </div>
                     </div>
 
-                    <div className={cn('rounded-lg border-2 p-4', payoutsOk ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-background/40')}>
+                    <div className={cn('rounded-lg border-2 p-3 sm:p-4', payoutsOk ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-background/40')}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-bold text-foreground">3) Payouts</p>
@@ -1011,14 +1389,14 @@ export default function SellerOverviewPage() {
                       </div>
                       <div className="mt-3">
                         {payoutsOk ? (
-                          <Button asChild variant="outline" className="w-full min-h-[40px] font-semibold">
+                          <Button asChild variant="outline" className="w-full min-h-[44px] font-semibold touch-manipulation">
                             <Link href="/seller/payouts">View Payouts</Link>
                           </Button>
                         ) : (
                           <Button
                             type="button"
                             variant="default"
-                            className="w-full min-h-[40px] font-semibold"
+                            className="w-full min-h-[44px] font-semibold touch-manipulation"
                             disabled={connectingStripe}
                             onClick={async () => {
                               if (!user) {
@@ -1066,9 +1444,9 @@ export default function SellerOverviewPage() {
           </Card>
         )}
 
-        {/* Payout Readiness */}
+        {/* Payout Readiness — mobile: full width, no overflow */}
         {user && userProfile && !hidePayoutReadinessOnOverview && (
-          <div className="grid grid-cols-1 gap-6 md:gap-8">
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 md:gap-8 min-w-0">
             <div data-tour="seller-payout-readiness">
               <div className="relative">
                 {uid && payoutsReady ? (
@@ -1077,7 +1455,7 @@ export default function SellerOverviewPage() {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-9 w-9"
+                      className="h-11 w-11 min-h-[44px] min-w-[44px] touch-manipulation"
                       aria-label="Hide payout readiness card"
                       onClick={() => {
                         setHidePayoutReadinessOnOverview(true);
@@ -1112,13 +1490,13 @@ export default function SellerOverviewPage() {
 
         {/* Seller-level compliance (whitetail breeders): TPWD breeder permit */}
         {uid && !hideBreederPermitOnOverview ? (
-          <div className="relative">
+          <div className="relative min-w-0">
             <div className="absolute right-2 top-2 z-10">
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9"
+                className="h-11 w-11 min-h-[44px] min-w-[44px] touch-manipulation"
                 aria-label="Hide breeder permit card"
                 onClick={() => {
                   setHideBreederPermitOnOverview(true);
@@ -1142,30 +1520,30 @@ export default function SellerOverviewPage() {
           </div>
         ) : null}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-          {/* Action Required Panel + Performance */}
-          <div className="space-y-4">
-            <Card className="rounded-xl border border-border/50 bg-card" data-tour="seller-action-required">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 text-primary" />
-                    <CardTitle className="text-xl font-extrabold">Action Required</CardTitle>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 min-w-0">
+          {/* Action Required Panel + Performance — mobile: padded, touch-friendly */}
+          <div className="space-y-4 min-w-0">
+            <Card className="rounded-xl border border-border/50 bg-card overflow-hidden" data-tour="seller-action-required">
+              <CardHeader className="px-3 sm:px-6">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" />
+                    <CardTitle className="text-lg sm:text-xl font-extrabold truncate">Action Required</CardTitle>
                   </div>
-                  <Badge variant="secondary" className="font-semibold">
+                  <Badge variant="secondary" className="font-semibold shrink-0">
                     {alerts.length} items
                   </Badge>
                 </div>
-                <CardDescription>
+                <CardDescription className="text-sm sm:text-base">
                   Items that need your attention
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-3 px-3 sm:px-6 pb-4 sm:pb-6">
                 {alerts.length === 0 ? (
-                  <div className="py-12 text-center">
-                    <CheckCircle2 className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-                    <p className="text-muted-foreground font-medium">No actions required</p>
-                    <p className="text-sm text-muted-foreground mt-1">You're all caught up!</p>
+                  <div className="py-8 sm:py-12 text-center">
+                    <CheckCircle2 className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4 opacity-50" />
+                    <p className="text-muted-foreground font-medium text-sm sm:text-base">No actions required</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">You're all caught up!</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -1183,7 +1561,7 @@ export default function SellerOverviewPage() {
                           key={alert.id}
                           href={alert.actionUrl}
                           className={cn(
-                            'flex flex-col sm:flex-row items-start gap-4 p-4 rounded-lg border-2 transition-shadow group',
+                            'flex flex-col sm:flex-row items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg border-2 transition-shadow group min-h-[44px] sm:min-h-0',
                             getAlertColor(alert.priority),
                             'hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2'
                           )}
@@ -1274,7 +1652,7 @@ export default function SellerOverviewPage() {
 
                           <span
                             className={cn(
-                              'inline-flex items-center justify-center min-h-[36px] px-3 rounded-md border border-input bg-background font-semibold text-sm flex-shrink-0 w-full sm:w-auto',
+                              'inline-flex items-center justify-center min-h-[44px] px-3 rounded-md border border-input bg-background font-semibold text-sm flex-shrink-0 w-full sm:w-auto touch-manipulation',
                               'group-hover:bg-accent group-hover:text-accent-foreground'
                             )}
                           >
@@ -1289,18 +1667,18 @@ export default function SellerOverviewPage() {
               </CardContent>
             </Card>
 
-            {/* Performance (Lightweight) */}
-            <Card className="rounded-xl border border-border/50 bg-card" data-tour="seller-performance">
-              <CardHeader>
+            {/* Performance (Lightweight) — mobile: padded, touch-friendly */}
+            <Card className="rounded-xl border border-border/50 bg-card overflow-hidden" data-tour="seller-performance">
+              <CardHeader className="px-3 sm:px-6">
                 <div className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-xl font-extrabold">Performance</CardTitle>
+                  <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" />
+                  <CardTitle className="text-lg sm:text-xl font-extrabold">Performance</CardTitle>
                 </div>
-                <CardDescription>
+                <CardDescription className="text-sm sm:text-base">
                   Quick metrics overview
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 px-3 sm:px-6 pb-4 sm:pb-6">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-muted-foreground">Completion Rate</span>
@@ -1319,7 +1697,7 @@ export default function SellerOverviewPage() {
                 <Button
                   asChild
                   variant="outline"
-                  className="w-full min-h-[44px] font-semibold"
+                  className="w-full min-h-[44px] font-semibold touch-manipulation"
                 >
                   <Link href="/seller/reputation">
                     View Full Stats
@@ -1330,23 +1708,23 @@ export default function SellerOverviewPage() {
             </Card>
           </div>
 
-          {/* Recent Activity & Performance */}
-          <div className="space-y-4">
-            <Card className="rounded-xl border border-border/50 bg-card" data-tour="seller-recent-activity">
-              <CardHeader>
+          {/* Recent Activity — mobile: padded, touch-friendly */}
+          <div className="space-y-4 min-w-0">
+            <Card className="rounded-xl border border-border/50 bg-card overflow-hidden" data-tour="seller-recent-activity">
+              <CardHeader className="px-3 sm:px-6">
                 <div className="flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-xl font-extrabold">Recent Activity</CardTitle>
+                  <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" />
+                  <CardTitle className="text-lg sm:text-xl font-extrabold">Recent Activity</CardTitle>
                 </div>
-                <CardDescription>
+                <CardDescription className="text-sm sm:text-base">
                   Latest updates on your listings
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 px-3 sm:px-6 pb-4 sm:pb-6">
                 {activities.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <Activity className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
-                    <p className="text-sm text-muted-foreground font-medium">No recent activity</p>
+                  <div className="py-6 sm:py-8 text-center">
+                    <Activity className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground mx-auto mb-2 sm:mb-3 opacity-50" />
+                    <p className="text-xs sm:text-sm text-muted-foreground font-medium">No recent activity</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
