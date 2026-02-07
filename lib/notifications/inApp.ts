@@ -58,7 +58,7 @@ export function buildInAppNotification(params: {
           ? `You were outbid on “${p.listingTitle}”. Your max bid was $${Number(p.yourMaxBidAmount).toLocaleString()}.`
           : `Someone placed a higher bid on “${p.listingTitle}”.`,
         deepLinkUrl: p.listingUrl,
-        linkLabel: 'Raise bid',
+        linkLabel: 'Place bid again',
         metadata: { newHighBidAmount: p.newHighBidAmount, yourMaxBidAmount: p.yourMaxBidAmount },
       };
     }
@@ -101,7 +101,7 @@ export function buildInAppNotification(params: {
         title: 'You won!',
         body: `You won “${p.listingTitle}”. Complete checkout to secure it.`,
         deepLinkUrl: p.checkoutUrl || p.listingUrl,
-        linkLabel: 'Complete checkout',
+        linkLabel: 'Pay now',
         metadata: { winningBidAmount: p.winningBidAmount },
       };
     }
@@ -172,9 +172,9 @@ export function buildInAppNotification(params: {
       return {
         ...base,
         type: 'order_created',
-        title: 'Order confirmed',
-        body: `Payment received for “${p.listingTitle}”. Set your delivery address so the seller can propose a delivery date.`,
-        deepLinkUrl: p.orderUrl,
+        title: 'Action: Set delivery address',
+        body: `Your order for "${p.listingTitle}" is confirmed. Set your delivery address so the seller can propose a delivery date.`,
+        deepLinkUrl: p.orderUrl + (p.orderUrl.includes('?') ? '&' : '?') + 'setAddress=1',
         linkLabel: 'Set delivery address',
         metadata: { listingId: p.listingId, orderId: p.orderId, amount: p.amount, paymentMethod: p.paymentMethod },
       };
@@ -183,9 +183,9 @@ export function buildInAppNotification(params: {
       const p = params.payload as Extract<NotificationEventPayload, { type: 'Order.Received' }>;
       return {
         ...base,
-        type: 'order_created', // Map to order_created for seller sales notifications (Order.Received = new sale for seller)
-        title: 'New sale!',
-        body: `Payment received for "${p.listingTitle}". Once the buyer sets their address, propose a delivery date.`,
+        type: 'order_created',
+        title: 'New sale – next: propose delivery date',
+        body: `You sold "${p.listingTitle}". Once the buyer sets their delivery address, propose one or more delivery times.`,
         deepLinkUrl: p.orderUrl,
         linkLabel: 'View order',
         metadata: { listingId: p.listingId, orderId: p.orderId, amount: p.amount },
@@ -196,22 +196,25 @@ export function buildInAppNotification(params: {
       return {
         ...base,
         type: 'order_preparing',
-        title: 'Seller is preparing delivery',
-        body: `The seller is preparing your order for “${p.listingTitle}”.`,
+        title: 'Seller is preparing your order',
+        body: `The seller is getting "${p.listingTitle}" ready. You'll get a notification when it's on the way.`,
         deepLinkUrl: p.orderUrl,
-        linkLabel: 'View sale',
+        linkLabel: 'View order',
         metadata: { listingId: p.listingId, orderId: p.orderId },
       };
     }
     case 'Order.InTransit': {
       const p = params.payload as Extract<NotificationEventPayload, { type: 'Order.InTransit' }>;
+      const hasFinalPayment = typeof p.finalPaymentAmount === 'number' && p.finalPaymentAmount > 0;
       return {
         ...base,
         type: 'order_in_transit',
-        title: 'In transit',
-        body: `Your order for “${p.listingTitle}” is in transit.`,
+        title: 'Your order is on the way',
+        body: hasFinalPayment
+          ? `"${p.listingTitle}" is in transit. When it arrives, pay your remaining balance and confirm receipt.`
+          : `"${p.listingTitle}" is on the way. When it arrives, confirm receipt to complete the transaction.`,
         deepLinkUrl: p.orderUrl,
-        linkLabel: 'View sale',
+        linkLabel: 'View order',
         metadata: { listingId: p.listingId, orderId: p.orderId },
       };
     }
@@ -221,7 +224,7 @@ export function buildInAppNotification(params: {
         ...base,
         type: 'order_delivered',
         title: 'Action: Confirm receipt',
-        body: `The seller marked your order for "${p.listingTitle}" as delivered. Confirm receipt to complete the transaction.`,
+        body: `"${p.listingTitle}" was marked delivered. Confirm you received it to complete the transaction.`,
         deepLinkUrl: p.orderUrl,
         linkLabel: 'Confirm receipt',
         metadata: { listingId: p.listingId, orderId: p.orderId },
@@ -232,10 +235,10 @@ export function buildInAppNotification(params: {
       return {
         ...base,
         type: 'order_accepted',
-        title: 'Order accepted',
-        body: `The buyer accepted your order for "${p.listingTitle}". You receive funds via Stripe when the buyer pays.`,
+        title: 'Buyer accepted order',
+        body: `The buyer accepted your order for "${p.listingTitle}". You receive funds when the buyer pays.`,
         deepLinkUrl: p.orderUrl,
-        linkLabel: 'View sale',
+        linkLabel: 'View order',
         metadata: { listingId: p.listingId, orderId: p.orderId, amount: p.amount },
       };
     }
@@ -244,10 +247,10 @@ export function buildInAppNotification(params: {
       return {
         ...base,
         type: 'order_completed',
-        title: 'Delivery confirmed',
+        title: 'Transaction complete',
         body: `Delivery confirmed for “${p.listingTitle}”.`,
         deepLinkUrl: p.orderUrl,
-        linkLabel: 'View sale',
+        linkLabel: 'View order',
         metadata: { listingId: p.listingId, orderId: p.orderId, deliveryDate: p.deliveryDate },
       };
     }
@@ -281,14 +284,14 @@ export function buildInAppNotification(params: {
       return {
         ...base,
         type: 'order_delivery_scheduled',
-        title: isProposed ? 'Action: Choose your delivery date' : 'Delivery scheduled',
+        title: isProposed ? 'Accept delivery date' : 'Delivery scheduled',
         body: isProposed
           ? `The seller offered delivery times for "${p.listingTitle}". Pick one that works for you.`
           : p.eta
             ? `Delivery scheduled for "${p.listingTitle}". ETA: ${new Date(p.eta).toLocaleString()}.`
             : `Delivery scheduled for "${p.listingTitle}".`,
         deepLinkUrl: p.orderUrl,
-        linkLabel: isProposed ? 'Choose date' : 'View order',
+        linkLabel: isProposed ? 'Accept delivery date' : 'View order',
         metadata: { listingId: p.listingId, orderId: p.orderId },
       };
     }
@@ -321,12 +324,36 @@ export function buildInAppNotification(params: {
       return {
         ...base,
         type: 'order_delivery_tracking_stopped',
-        title: p.delivered ? 'Delivery completed' : 'Tracking ended',
+        title: p.delivered ? 'Action: Confirm receipt' : 'Tracking ended',
         body: p.delivered
-          ? `Delivery completed for "${p.listingTitle}". Confirm receipt when ready.`
+          ? `Delivery completed for "${p.listingTitle}". Confirm you received it to complete the transaction.`
           : `Live tracking ended for "${p.listingTitle}".`,
         deepLinkUrl: p.orderUrl,
-        linkLabel: 'View order',
+        linkLabel: p.delivered ? 'Confirm receipt' : 'View order',
+        metadata: { listingId: p.listingId, orderId: p.orderId },
+      };
+    }
+    case 'Order.FinalPaymentDue': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Order.FinalPaymentDue' }>;
+      return {
+        ...base,
+        type: 'order_final_payment_due',
+        title: 'Action: Pay remaining balance',
+        body: `Pay your remaining balance for "${p.listingTitle}" to complete the transaction. Balance due: $${Number(p.amount).toFixed(2)}.`,
+        deepLinkUrl: p.orderUrl,
+        linkLabel: 'Pay now',
+        metadata: { listingId: p.listingId, orderId: p.orderId },
+      };
+    }
+    case 'Order.FinalPaymentConfirmed': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Order.FinalPaymentConfirmed' }>;
+      return {
+        ...base,
+        type: 'order_final_payment_confirmed',
+        title: 'Final payment received – next: mark delivered',
+        body: `Buyer paid the remaining $${Number(p.amount).toLocaleString()} for "${p.listingTitle}". Mark the order delivered when it’s complete.`,
+        deepLinkUrl: p.orderUrl,
+        linkLabel: 'Mark delivered',
         metadata: { listingId: p.listingId, orderId: p.orderId },
       };
     }
@@ -469,7 +496,7 @@ export function buildInAppNotification(params: {
         title: 'Offer updated',
         body: `Counter offer: $${Number(p.amount).toLocaleString()} for “${p.listingTitle}”.`,
         deepLinkUrl: p.offerUrl,
-        linkLabel: 'View offer',
+        linkLabel: 'Respond to offer',
         metadata: { listingId: p.listingId, offerId: p.offerId, amount: p.amount, expiresAt: p.expiresAt || null },
       };
     }
@@ -481,7 +508,7 @@ export function buildInAppNotification(params: {
         title: 'Offer accepted',
         body: `Offer accepted for “${p.listingTitle}” at $${Number(p.amount).toLocaleString()}.`,
         deepLinkUrl: p.offerUrl,
-        linkLabel: 'Next steps',
+        linkLabel: 'Pay now',
         metadata: { listingId: p.listingId, offerId: p.offerId, amount: p.amount },
       };
     }

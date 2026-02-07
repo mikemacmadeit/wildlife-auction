@@ -1272,6 +1272,58 @@ export async function handleFinalPaymentCompleted(
     now: nowTs,
   });
 
+  // Mark buyer's "Pay now" notification(s) as read – action completed.
+  try {
+    const notificationsRef = db.collection('users').doc(buyerId).collection('notifications');
+    const snap = await notificationsRef
+      .where('entityId', '==', orderId)
+      .where('type', '==', 'order_final_payment_due')
+      .get();
+    await Promise.all(
+      snap.docs.map((d) => d.ref.update({ read: true, readAt: nowTs }))
+    );
+  } catch (e) {
+    logWarn('handleFinalPaymentCompleted: failed to mark Pay now notification(s) read', { orderId, error: String(e) });
+  }
+
+  const sellerId = orderData.sellerId ? String(orderData.sellerId) : null;
+  const listingId = orderData.listingId ? String(orderData.listingId) : '';
+  const listingTitle = (orderData.listingSnapshot as any)?.title || 'Your order';
+  const finalAmount = typeof orderData.finalPaymentAmount === 'number' ? orderData.finalPaymentAmount : (session.amount_total ? session.amount_total / 100 : 0);
+  if (sellerId) {
+    try {
+      const ev = await emitAndProcessEventForUser({
+        type: 'Order.FinalPaymentConfirmed',
+        actorId: buyerId,
+        entityType: 'order',
+        entityId: orderId,
+        targetUserId: sellerId,
+        payload: {
+          type: 'Order.FinalPaymentConfirmed',
+          orderId,
+          listingId,
+          listingTitle,
+          orderUrl: `${getSiteUrl()}/seller/orders/${orderId}`,
+          amount: finalAmount,
+        },
+        optionalHash: `final_payment:${orderId}:${now.getTime()}`,
+      });
+      if (ev?.ok && ev.created) {
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch((err) => {
+          captureException(err instanceof Error ? err : new Error(String(err)), {
+            context: 'email-dispatch',
+            eventType: 'Order.FinalPaymentConfirmed',
+            jobId: ev.eventId,
+            orderId,
+            endpoint: '/api/stripe/webhook',
+          });
+        });
+      }
+    } catch (e) {
+      logWarn('Final payment: failed to emit Order.FinalPaymentConfirmed', { orderId, error: String(e) });
+    }
+  }
+
   let sessionId: string | null = null;
   const existingSession = await db
     .collection('deliverySessions')

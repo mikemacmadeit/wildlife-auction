@@ -20,11 +20,11 @@ function baseOrder(partial: Partial<Order>): Order {
   };
 }
 
-test('deriveOrderUIState: delivered -> confirm receipt', () => {
-  const s = deriveOrderUIState(baseOrder({ status: 'delivered' }));
+test('deriveOrderUIState: DELIVERED_PENDING_CONFIRMATION -> delivered, view order (completion via checklist)', () => {
+  const s = deriveOrderUIState(baseOrder({ status: 'delivered', transactionStatus: 'DELIVERED_PENDING_CONFIRMATION' } as any));
   assert.equal(s.statusKey, 'delivered');
-  assert.equal(s.needsAction, true);
-  assert.equal(s.primaryAction.kind, 'confirm_receipt');
+  assert.equal(s.needsAction, false);
+  assert.equal(s.primaryAction.kind, 'view_details');
 });
 
 test('deriveOrderUIState: paid_held no address -> action needed', () => {

@@ -29,6 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { SaveSellerButton } from '@/components/seller/SaveSellerButton';
 import { SellerTrustBadges } from '@/components/seller/SellerTrustBadges';
+import { StarRatingReviewCount } from '@/components/seller/StarRatingReviewCount';
 import type { PublicSellerTrust } from '@/lib/types';
 import { collection, getCountFromServer, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
@@ -68,6 +69,7 @@ export function EnhancedSellerProfile({
   const [sellerProfile, setSellerProfile] = useState<UserProfile | null>(null);
   const [publicTrust, setPublicTrust] = useState<PublicSellerTrust | null>(null);
   const [activeListingsCount, setActiveListingsCount] = useState<number | null>(null);
+  const [reviewStats, setReviewStats] = useState<{ avgRating: number; reviewCount: number } | null>(null);
 
   const sellerPhotoUrl =
     sellerProfile?.photoURL ||
@@ -160,6 +162,35 @@ export function EnhancedSellerProfile({
     };
   }, [sellerId]);
 
+  // Seller review stats (star rating + review count)
+  useEffect(() => {
+    let cancelled = false;
+    if (!sellerId) {
+      setReviewStats(null);
+      return;
+    }
+    fetch(`/api/reviews/seller?sellerId=${encodeURIComponent(sellerId)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.ok && data?.stats) {
+          const s = data.stats;
+          setReviewStats({
+            avgRating: Number(s.avgRating ?? 0),
+            reviewCount: Number(s.reviewCount ?? 0),
+          });
+        } else {
+          setReviewStats(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setReviewStats(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sellerId]);
+
   const reputation = getSellerReputation({ profile: sellerProfile });
   const publicTxCount = sellerProfile
     ? Math.max(Number(sellerProfile.verifiedTransactionsCount || 0), Number(sellerProfile.completedSalesCount || 0))
@@ -243,8 +274,13 @@ export function EnhancedSellerProfile({
               )}
             </div>
             
-            {/* Location + reputation (derived; no fake ratings) */}
+            {/* Star rating + review count, location + reputation */}
             <div className="flex items-center gap-3 flex-wrap">
+              <StarRatingReviewCount
+                avgRating={reviewStats?.avgRating ?? 0}
+                reviewCount={reviewStats?.reviewCount ?? 0}
+                size="sm"
+              />
               {publicTxCount !== null && (
                 <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                   <TrendingUp className="h-3 w-3" />

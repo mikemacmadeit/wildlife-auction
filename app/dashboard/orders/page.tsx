@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getOrderByCheckoutSessionId, getOrdersForUser } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
 import { Order, OrderStatus, TransactionStatus } from '@/lib/types';
-import { confirmReceipt, disputeOrder } from '@/lib/stripe/api';
+import { disputeOrder } from '@/lib/stripe/api';
 import { TransactionTimeline } from '@/components/orders/TransactionTimeline';
 import { deriveOrderUIState, type PurchasesStatusKey } from '@/lib/orders/deriveOrderUIState';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
@@ -669,29 +669,6 @@ export default function OrdersPage() {
     }
   }, [pendingCheckout?.sessionId]);
 
-  const handleConfirmReceipt = async (orderId: string) => {
-    if (!user) return;
-    
-    try {
-      setProcessingOrderId(orderId);
-      await confirmReceipt(orderId);
-      toast({
-        title: 'Receipt confirmed',
-        description: 'Transaction complete. Seller was paid immediately upon successful payment.',
-      });
-      // Refresh orders (fast path: uses snapshots; avoids N+1 listing reads)
-      await loadOrders({ silent: true });
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: formatUserFacingError(error, 'Failed to confirm receipt'),
-        variant: 'destructive',
-      });
-    } finally {
-      setProcessingOrderId(null);
-    }
-  };
-
   const handleOpenDispute = (orderId: string) => {
     setDisputeDialogOpen(orderId);
     setDisputeReason('');
@@ -772,7 +749,7 @@ export default function OrdersPage() {
       case 'COMPLETED':
         return <Badge variant="default" className="bg-accent text-accent-foreground">Completed</Badge>;
       case 'DELIVERED_PENDING_CONFIRMATION':
-        return <Badge variant="default" className="bg-blue-600 text-white">Delivered</Badge>;
+        return <Badge variant="default" className="bg-blue-600 text-white">Delivery</Badge>;
       case 'OUT_FOR_DELIVERY':
         return <Badge variant="default" className="bg-blue-500 text-white">Out for Delivery</Badge>;
       case 'DELIVERY_SCHEDULED':
@@ -848,7 +825,7 @@ export default function OrdersPage() {
       case 'buyer_confirmed':
         return <Badge variant="default" className="bg-green-600 text-white">Buyer Confirmed</Badge>;
       case 'delivered':
-        return <Badge variant="default" className="bg-blue-600 text-white">Delivered</Badge>;
+        return <Badge variant="default" className="bg-blue-600 text-white">Delivery</Badge>;
       case 'in_transit':
         return <Badge variant="default" className="bg-blue-500 text-white">In Transit</Badge>;
       case 'paid':
@@ -977,7 +954,7 @@ export default function OrdersPage() {
     { key: 'preparing', label: 'Preparing' },
     { key: 'awaiting_permit', label: 'Awaiting permit' },
     { key: 'scheduled', label: 'Scheduled' },
-    { key: 'delivered', label: 'Confirm receipt' },
+    { key: 'delivered', label: 'Delivery' },
     { key: 'completed', label: 'Completed' },
     { key: 'disputed', label: 'Disputed' },
   ];
@@ -993,7 +970,7 @@ export default function OrdersPage() {
       case 'scheduled':
         return <Badge className="bg-blue-500 text-white">Scheduled</Badge>;
       case 'delivered':
-        return <Badge className="bg-blue-700 text-white">Confirm receipt</Badge>;
+        return <Badge className="bg-blue-700 text-white">Delivery</Badge>;
       case 'completed':
         return <Badge className="bg-emerald-600 text-white">Completed</Badge>;
       case 'disputed':
@@ -1080,13 +1057,13 @@ export default function OrdersPage() {
             <DialogDescription id="congrats-desc" asChild>
               <div className="text-center space-y-4 pt-2">
                 <p className="text-base text-foreground font-medium">
-                  You’ve purchased <span className="font-semibold text-primary">{pendingCheckoutListingTitle || 'your item'}</span>.
+                  You’ve secured <span className="font-semibold text-primary">{pendingCheckoutListingTitle || 'your item'}</span> with your deposit.
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Your payment is confirmed. <strong>Next step:</strong> set your delivery address so the seller can propose a delivery date. Your purchase appears in <strong>My Purchases</strong> below.
+                  Your deposit is confirmed. The remaining balance will be due when you and the seller finalize delivery. <strong>Next step:</strong> set your delivery address so the seller can propose a delivery date. Your order appears in <strong>My Purchases</strong> below.
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  You can track progress and message the seller from your order at any time.
+                  Track progress and message the seller from your order at any time.
                 </p>
               </div>
             </DialogDescription>
@@ -1161,51 +1138,69 @@ export default function OrdersPage() {
           </p>
         </div>
 
-        {/* Controls (eBay-style): mobile = scrollable row of filters; desktop = stacked layout */}
+        {/* Controls: search + filters; desktop = single polished toolbar row */}
         <Card className="border-border/60 bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-background/50 sticky top-0 z-10">
-          <CardContent className="p-4 space-y-4">
-            {/* Search: full width on mobile, constrained on desktop */}
-            <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-              <div className="relative w-full md:max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <CardContent className="p-4 md:py-4 md:px-5 space-y-4">
+            {/* Search + desktop filters in one row */}
+            <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+              <div className="relative w-full md:max-w-sm md:flex-shrink-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
                   placeholder="Search title, seller, or order #…"
-                  className="pl-9"
+                  className="pl-9 h-10 md:h-10"
                 />
               </div>
 
-              {/* Desktop: Date, Category, Needs action */}
-              <div className="hidden md:flex items-center gap-2 flex-wrap justify-end">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground font-semibold">Needs action</span>
-                  <Switch checked={needsActionOnly} onCheckedChange={setNeedsActionOnly} />
+              {/* Desktop: filters in a clear row with labels */}
+              <div className="hidden md:flex md:items-center md:gap-5 md:flex-1 md:flex-wrap">
+                <div className="h-px md:h-6 md:w-px md:bg-border/80 md:flex-shrink-0" aria-hidden />
+                <div className="flex items-center gap-3">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                    Date
+                  </label>
+                  <Select value={dateRange} onValueChange={(v) => setDateRange(v as any)}>
+                    <SelectTrigger className="w-[160px] h-10 font-medium">
+                      <SelectValue placeholder="Date range" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="30">Last 30 days</SelectItem>
+                      <SelectItem value="90">Last 90 days</SelectItem>
+                      <SelectItem value="365">Last 365 days</SelectItem>
+                      <SelectItem value="all">All time</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Select value={dateRange} onValueChange={(v) => setDateRange(v as any)}>
-                  <SelectTrigger className="min-w-[150px]">
-                    <SelectValue placeholder="Date range" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="30">Last 30 days</SelectItem>
-                    <SelectItem value="90">Last 90 days</SelectItem>
-                    <SelectItem value="365">Last 365 days</SelectItem>
-                    <SelectItem value="all">All time</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="min-w-[180px]">
-                    <SelectValue placeholder="Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All categories</SelectItem>
-                    {uniqueCategories.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c.replaceAll('_', ' ')}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-3">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                    Category
+                  </label>
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger className="w-[180px] h-10 font-medium">
+                      <SelectValue placeholder="Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All categories</SelectItem>
+                      {uniqueCategories.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c.replaceAll('_', ' ')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-3 ml-auto">
+                  <label htmlFor="needs-action-toggle" className="text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap cursor-pointer">
+                    Needs action only
+                  </label>
+                  <Switch
+                    id="needs-action-toggle"
+                    checked={needsActionOnly}
+                    onCheckedChange={setNeedsActionOnly}
+                    className="data-[state=checked]:bg-primary"
+                  />
+                </div>
               </div>
             </div>
 
@@ -1402,15 +1397,11 @@ export default function OrdersPage() {
             const canAct = canAcceptOrDispute(order);
 
             const onPrimary = async () => {
-              if (ui.primaryAction.kind === 'confirm_receipt') {
-                await handleConfirmReceipt(order.id);
-                return;
-              }
               if (ui.primaryAction.kind === 'open_dispute') {
                 handleOpenDispute(order.id);
                 return;
               }
-              // complete_transfer / view_details / agree_delivery / set_address -> open drawer or detail
+              // complete_transfer / view_details / agree_delivery / set_address / delivered -> open drawer or detail
               setDrawerOrderId(order.id);
             };
 
@@ -1555,56 +1546,83 @@ export default function OrdersPage() {
                   <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
                     {(() => {
                       const nextAction = getNextRequiredAction(order, 'buyer');
-                      if (!nextAction) return null;
-                      
                       const txStatus = getEffectiveTransactionStatus(order);
-                      const canHandleDirectly = 
-                        txStatus === 'DELIVERED_PENDING_CONFIRMATION' && 
+                      const canHandleDirectly =
+                        nextAction &&
+                        txStatus === 'DELIVERED_PENDING_CONFIRMATION' &&
                         nextAction.ctaLabel.toLowerCase().includes('confirm');
-                      
-                      const isOutline = nextAction.severity !== 'danger' && nextAction.severity !== 'warning';
-                      return (
+                      const viewOnlyLabels = ['view details', 'view order', 'view dispute', 'open checklist'];
+                      const isViewOnlyAction =
+                        nextAction && viewOnlyLabels.some((l) => nextAction.ctaLabel.toLowerCase().includes(l));
+                      const showActionAndView =
+                        nextAction && !isViewOnlyAction;
+
+                      return showActionAndView ? (
+                        <>
+                          <Button
+                            size="sm"
+                            className={cn(
+                              'font-semibold w-full sm:w-auto',
+                              nextAction.severity !== 'danger' &&
+                                nextAction.severity !== 'warning' &&
+                                'border-primary text-primary hover:bg-primary/10 hover:text-primary'
+                            )}
+                            variant={
+                              nextAction.severity === 'danger'
+                                ? 'destructive'
+                                : nextAction.severity === 'warning'
+                                  ? 'default'
+                                  : 'outline'
+                            }
+                            disabled={
+                              processingOrderId === order.id ||
+                              (nextAction.ctaLabel.toLowerCase().includes('confirm') && !canAct)
+                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (nextAction.ctaAction.startsWith('/')) {
+                                window.location.href = nextAction.ctaAction;
+                              } else {
+                                window.location.href = `/dashboard/orders/${order.id}`;
+                              }
+                            }}
+                          >
+                            {processingOrderId === order.id ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin shrink-0" />
+                            ) : null}
+                            {nextAction.ctaLabel}
+                          </Button>
+                          <Button
+                            asChild
+                            size="sm"
+                            variant="outline"
+                            className="font-semibold shrink-0 border-primary text-primary hover:bg-primary/10 hover:text-primary"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Link
+                              href={`/dashboard/orders/${order.id}`}
+                              className="flex items-center justify-center gap-2"
+                            >
+                              View details
+                              <ArrowRight className="h-4 w-4 shrink-0" />
+                            </Link>
+                          </Button>
+                        </>
+                      ) : (
                         <Button
+                          asChild
                           size="sm"
-                          className={cn(
-                            'font-semibold w-full sm:w-auto',
-                            isOutline && 'border-primary text-primary hover:bg-primary/10 hover:text-primary'
-                          )}
-                          variant={nextAction.severity === 'danger' ? 'destructive' : nextAction.severity === 'warning' ? 'default' : 'outline'}
-                          disabled={processingOrderId === order.id || (nextAction.ctaLabel.toLowerCase().includes('confirm') && !canAct)}
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            if (canHandleDirectly && txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
-                              await handleConfirmReceipt(order.id);
-                              return;
-                            }
-                            if (nextAction.ctaAction.startsWith('/')) {
-                              window.location.href = nextAction.ctaAction;
-                            } else {
-                              window.location.href = `/dashboard/orders/${order.id}`;
-                            }
-                          }}
+                          variant="outline"
+                          className="font-semibold w-full sm:w-auto border-primary text-primary hover:bg-primary/10 hover:text-primary"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          {processingOrderId === order.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin shrink-0" /> : null}
-                          {nextAction.ctaLabel}
+                          <Link href={`/dashboard/orders/${order.id}`} className="flex items-center justify-center gap-2">
+                            View details
+                            <ArrowRight className="h-4 w-4 shrink-0" />
+                          </Link>
                         </Button>
                       );
                     })()}
-
-                    {!getNextRequiredAction(order, 'buyer') ? (
-                      <Button
-                        asChild
-                        size="sm"
-                        variant="outline"
-                        className="font-semibold w-full sm:w-auto border-primary text-primary hover:bg-primary/10 hover:text-primary"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Link href={`/dashboard/orders/${order.id}`} className="flex items-center justify-center gap-2">
-                          View order
-                          <ArrowRight className="h-4 w-4 shrink-0" />
-                        </Link>
-                      </Button>
-                    ) : null}
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -1621,15 +1639,6 @@ export default function OrdersPage() {
                           <Link href={`/sellers/${order.sellerId}`}>View seller</Link>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        {canAct ? (
-                          <DropdownMenuItem
-                            onClick={() => {
-                              void handleConfirmReceipt(order.id);
-                            }}
-                          >
-                            Confirm receipt
-                          </DropdownMenuItem>
-                        ) : null}
                         {canAct && !isDisputeDeadlinePassed(order) ? (
                           <DropdownMenuItem onClick={() => handleOpenDispute(order.id)}>Report an issue</DropdownMenuItem>
                         ) : null}

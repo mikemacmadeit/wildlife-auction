@@ -9,6 +9,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
+import { getOrderBalanceDue } from '@/lib/orders/progress';
 import { stripe, calculatePlatformFee, getAppUrl, isStripeConfigured } from '@/lib/stripe/config';
 import { logWarn } from '@/lib/monitoring/logger';
 
@@ -73,18 +74,19 @@ export async function POST(request: Request, { params }: { params: { orderId: st
       return json({ error: 'Final payment already completed' }, { status: 400 });
     }
 
-    const finalPaymentAmount = Number(order.finalPaymentAmount);
-    if (!Number.isFinite(finalPaymentAmount) || finalPaymentAmount <= 0) {
+    // Balance due = total − deposit (when deposit was paid); otherwise use stored finalPaymentAmount
+    const balanceDue = getOrderBalanceDue(order as any);
+    if (!Number.isFinite(balanceDue) || balanceDue <= 0) {
       return json({ error: 'No balance due for this order' }, { status: 400 });
     }
 
     const txStatus = getEffectiveTransactionStatus(order);
-    const allowedStatuses = ['OUT_FOR_DELIVERY', 'DELIVERY_SCHEDULED'];
+    const allowedStatuses = ['OUT_FOR_DELIVERY', 'DELIVERY_SCHEDULED', 'FULFILLMENT_REQUIRED'];
     if (!allowedStatuses.includes(txStatus)) {
       return json(
         {
           error: 'Final payment is not available yet',
-          details: `Order must be out for delivery or delivery scheduled. Current: ${txStatus}`,
+          details: `Order must be in delivery or fulfillment. Current: ${txStatus}`,
         },
         { status: 400 }
       );
@@ -96,7 +98,7 @@ export async function POST(request: Request, { params }: { params: { orderId: st
       return json({ error: 'Seller payment account not found' }, { status: 400 });
     }
 
-    const amountCents = Math.round(finalPaymentAmount * 100);
+    const amountCents = Math.round(balanceDue * 100);
     const platformFee = calculatePlatformFee(amountCents);
     const sellerAmount = amountCents - platformFee;
     const baseUrl = getAppUrl();

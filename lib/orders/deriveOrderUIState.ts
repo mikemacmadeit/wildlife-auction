@@ -1,5 +1,6 @@
 import type { Order } from '@/lib/types';
 import { getEffectiveTransactionStatus } from './status';
+import { getOrderBalanceDue } from './progress';
 
 export type PurchasesStatusKey =
   | 'processing'
@@ -65,14 +66,14 @@ export function deriveOrderUIState(order: Order): {
     }
   }
 
-  // Seller delivery workflow
+  // Seller delivery workflow — completion is via delivery checklist (PIN, sign, photo), not manual confirm receipt
   if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
     return {
       statusKey: 'delivered',
-      currentStepLabel: 'Delivered',
-      waitingOn: 'Waiting on you to confirm receipt',
-      needsAction: true,
-      primaryAction: { kind: 'confirm_receipt', label: 'Confirm receipt' },
+      currentStepLabel: 'Delivery',
+      waitingOn: 'Use your PIN when the seller arrives with the checklist',
+      needsAction: false,
+      primaryAction: { kind: 'view_details', label: 'View order' },
     };
   }
   if (txStatus === 'DELIVERY_PROPOSED') {
@@ -85,9 +86,9 @@ export function deriveOrderUIState(order: Order): {
     };
   }
   if (txStatus === 'OUT_FOR_DELIVERY' || txStatus === 'DELIVERY_SCHEDULED') {
-    const hasFinalPaymentDue = typeof (order as any).finalPaymentAmount === 'number' && (order as any).finalPaymentAmount > 0;
+    const balanceDue = getOrderBalanceDue(order);
     const finalPaid = !!(order as any).finalPaymentConfirmedAt;
-    if (txStatus === 'OUT_FOR_DELIVERY' && hasFinalPaymentDue && !finalPaid) {
+    if (balanceDue > 0 && !finalPaid) {
       return {
         statusKey: 'action_needed',
         currentStepLabel: 'Inspection and Final payment',

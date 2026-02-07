@@ -88,7 +88,7 @@ export async function POST(request: Request, { params }: { params: { orderId: st
     const txStatus = (orderData.transactionStatus as string) || '';
     const hasInTransit = currentStatus === 'in_transit' || !!orderData.inTransitAt;
     const hasDeliveredMarker = !!orderData.deliveredAt || !!orderData.deliveryConfirmedAt || currentStatus === 'delivered';
-    const deliveryScheduledOrOut = ['DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY'].includes(txStatus);
+    const deliveryScheduledOrOut = ['DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY', 'DELIVERED_PENDING_CONFIRMATION'].includes(txStatus);
     if (!hasInTransit && !hasDeliveredMarker && !deliveryScheduledOrOut) {
       return json(
         {

@@ -147,6 +147,10 @@ function buildSmsBody(params: { eventType: NotificationEventType; payload: Notif
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.ReceiptConfirmed' }>;
       return `Buyer confirmed receipt for "${p.listingTitle}". Transaction complete. ${p.orderUrl}`;
     }
+    case 'Order.FinalPaymentDue': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.FinalPaymentDue' }>;
+      return `Pay remaining balance for "${p.listingTitle}". Balance due: $${Number(p.amount).toFixed(2)}. ${p.orderUrl}`;
+    }
     case 'Review.Request': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Review.Request' }>;
       return `Review requested for "${p.listingTitle}". ${p.reviewUrl}`;
@@ -510,6 +514,32 @@ function buildEmailJobPayload(params: {
           orderId: p.orderId,
           listingTitle: p.listingTitle,
           orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.FinalPaymentDue': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.FinalPaymentDue' }>;
+      return {
+        template: 'order_in_transit',
+        templatePayload: {
+          buyerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+          amount: p.amount,
+        },
+      };
+    }
+    case 'Order.FinalPaymentConfirmed': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.FinalPaymentConfirmed' }>;
+      return {
+        template: 'order_received',
+        templatePayload: {
+          sellerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+          amount: p.amount,
         },
       };
     }

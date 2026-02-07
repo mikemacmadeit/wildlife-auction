@@ -7,17 +7,17 @@
  */
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { KeyRound, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
 interface BuyerDeliveryPinProps {
   orderId: string;
   getAuthToken: () => Promise<string>;
+  /** When true, component refetches PIN (e.g. after final payment is confirmed). */
+  finalPaymentConfirmed?: boolean;
   className?: string;
 }
 
-export function BuyerDeliveryPin({ orderId, getAuthToken, className }: BuyerDeliveryPinProps) {
+export function BuyerDeliveryPin({ orderId, getAuthToken, finalPaymentConfirmed, className }: BuyerDeliveryPinProps) {
   const [pin, setPin] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +55,7 @@ export function BuyerDeliveryPin({ orderId, getAuthToken, className }: BuyerDeli
       }
     })();
     return () => { cancelled = true; };
-  }, [orderId]);
+  }, [orderId, finalPaymentConfirmed]);
 
   if (loading) {
     return (
@@ -75,10 +75,9 @@ export function BuyerDeliveryPin({ orderId, getAuthToken, className }: BuyerDeli
     if (isFinalPaymentRequired) {
       return (
         <div className={className}>
-          <p className="text-sm text-muted-foreground">Complete your final payment to receive your delivery PIN.</p>
-          <Button asChild variant="default" size="sm" className="mt-2">
-            <Link href={`/dashboard/orders/${orderId}#pay-final`}>Pay now</Link>
-          </Button>
+          <p className="text-sm text-muted-foreground">
+            Complete your final payment to receive your delivery PIN. Use the <strong>Pay now</strong> button in the &quot;Inspection and Final payment&quot; section above.
+          </p>
         </div>
       );
     }

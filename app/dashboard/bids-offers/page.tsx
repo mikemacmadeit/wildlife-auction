@@ -20,6 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Loader2,
@@ -420,16 +421,16 @@ export default function BidsOffersPage() {
   const clearTabNotifs = useCallback(
     async (nextTab: 'needs_action' | 'bids' | 'offers' | 'history') => {
       if (!user?.uid) return;
+      // Do NOT mark "Needs action" notifications as read when user views the tab — they stay until action is completed or dismissed.
+      if (nextTab === 'needs_action') return;
       const bidTypes: NotificationType[] = ['bid_outbid', 'bid_received', 'bid_placed', 'auction_high_bidder'];
       const offerTypes: NotificationType[] = ['offer_received', 'offer_countered', 'offer_accepted', 'offer_declined', 'offer_expired'];
-      const needsActionTypes: NotificationType[] = ['bid_outbid', 'offer_countered', 'offer_accepted'];
       const historyTypes: NotificationType[] = ['offer_declined', 'offer_expired'];
 
       try {
-        if (nextTab === 'needs_action') await markNotificationsAsReadByTypes(user.uid, needsActionTypes);
-        else if (nextTab === 'bids') await markNotificationsAsReadByTypes(user.uid, bidTypes);
+        if (nextTab === 'bids') await markNotificationsAsReadByTypes(user.uid, bidTypes);
         else if (nextTab === 'offers') await markNotificationsAsReadByTypes(user.uid, offerTypes);
-        else await markNotificationsAsReadByTypes(user.uid, historyTypes);
+        else if (nextTab === 'history') await markNotificationsAsReadByTypes(user.uid, historyTypes);
       } catch {
         // best-effort
       }
@@ -437,9 +438,10 @@ export default function BidsOffersPage() {
     [user?.uid]
   );
 
-  // On initial visit to this page, clear the current tab's notifications so the sidebar Bids & Offers badge updates
+  // On initial visit, clear the current tab's notifications so sidebar badge updates (except Needs action — persistence: stay until done).
   useEffect(() => {
     if (!user?.uid) return;
+    if (tab === 'needs_action') return;
     void clearTabNotifs(tab);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount with initial tab
   }, [user?.uid]);
@@ -823,119 +825,129 @@ export default function BidsOffersPage() {
                 void clearTabNotifs(next);
               }}
             >
-              {/* Row 1: Tabs only — scroll on very narrow screens */}
-              <TabsList className="w-full flex gap-1.5 sm:gap-2 p-0 h-auto bg-transparent mb-4 overflow-x-auto overflow-y-hidden -mx-1 px-1 sm:overflow-visible sm:mx-0 sm:px-0">
+              {/* Row 1: Tabs — neutral style, only active tab uses primary (design-system consistent) */}
+              <TabsList className="w-full flex gap-2 p-1 h-auto rounded-lg bg-muted/40 border border-border/60 mb-4 overflow-x-auto overflow-y-hidden -mx-1 px-1 sm:overflow-visible sm:mx-0 sm:px-0">
                   <TabsTrigger
                     value="needs_action"
-                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-full text-sm font-medium transition-colors border-2 border-primary bg-transparent text-primary hover:bg-primary/10 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none min-h-[44px] justify-center gap-1.5"
+                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-md text-sm font-medium transition-colors border border-transparent bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm min-h-[44px] justify-center gap-1.5"
                   >
                     Needs action
                     {unreadNeedsAction > 0 ? (
-                      <Badge variant="secondary" className="h-5 min-w-[20px] px-1.5 text-xs">{unreadNeedsAction}</Badge>
+                      <Badge variant="secondary" className="h-5 min-w-[20px] px-1.5 text-xs bg-background/80 text-foreground border-0">{unreadNeedsAction}</Badge>
                     ) : null}
                   </TabsTrigger>
                   <TabsTrigger
                     value="bids"
-                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-full text-sm font-medium transition-colors border-2 border-primary bg-transparent text-primary hover:bg-primary/10 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none min-h-[44px] justify-center gap-1.5"
+                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-md text-sm font-medium transition-colors border border-transparent bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm min-h-[44px] justify-center gap-1.5"
                   >
                     Bids
                     {unreadBids > 0 ? (
-                      <Badge variant="secondary" className="h-5 min-w-[20px] px-1.5 text-xs">{unreadBids}</Badge>
+                      <Badge variant="secondary" className="h-5 min-w-[20px] px-1.5 text-xs bg-background/80 text-foreground border-0">{unreadBids}</Badge>
                     ) : null}
                   </TabsTrigger>
                   <TabsTrigger
                     value="offers"
-                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-full text-sm font-medium transition-colors border-2 border-primary bg-transparent text-primary hover:bg-primary/10 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none min-h-[44px] justify-center gap-1.5"
+                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-md text-sm font-medium transition-colors border border-transparent bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm min-h-[44px] justify-center gap-1.5"
                   >
                     Offers
                     {unreadOffers > 0 ? (
-                      <Badge variant="secondary" className="h-5 min-w-[20px] px-1.5 text-xs">{unreadOffers}</Badge>
+                      <Badge variant="secondary" className="h-5 min-w-[20px] px-1.5 text-xs bg-background/80 text-foreground border-0">{unreadOffers}</Badge>
                     ) : null}
                   </TabsTrigger>
                   <TabsTrigger
                     value="history"
-                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-full text-sm font-medium transition-colors border-2 border-primary bg-transparent text-primary hover:bg-primary/10 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none min-h-[44px] justify-center gap-1.5"
+                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-md text-sm font-medium transition-colors border border-transparent bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm min-h-[44px] justify-center gap-1.5"
                   >
                     History
                     {unreadHistory > 0 ? (
-                      <Badge variant="secondary" className="h-5 min-w-[20px] px-1.5 text-xs">{unreadHistory}</Badge>
+                      <Badge variant="secondary" className="h-5 min-w-[20px] px-1.5 text-xs bg-background/80 text-foreground border-0">{unreadHistory}</Badge>
                     ) : null}
                   </TabsTrigger>
               </TabsList>
 
-              {/* Row 2: Filters — mobile: search + combined Sort; desktop: search, sort, status, hide-removed */}
+              {/* Row 2: Filters — mobile: full-width search + Filters popover; desktop: search, sort, status, hide-removed */}
               <div className="flex flex-col gap-2 sm:gap-3">
-                {/* Mobile: single row — search + combined Sort (sort + status in one dropdown) */}
-                <div className="flex gap-2 items-center min-h-[44px] sm:hidden">
-                  <div className="relative flex-1 min-w-0">
+                {/* Mobile: search full width, then Filters popover when Bids or Offers */}
+                <div className="flex flex-col gap-2 sm:hidden">
+                  <div className="relative w-full min-w-0">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                     <Input
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       placeholder="Search by title…"
-                      className="pl-9 min-h-[44px] h-11"
+                      className="pl-9 min-h-[44px] h-11 w-full"
                     />
                   </div>
                   {tab === 'bids' ? (
-                    <Select
-                      value={`${sortKey}|${statusFilter}`}
-                      onValueChange={(v) => {
-                        const [s, f] = v.split('|');
-                        if (s) setSortKey(s as SortKey);
-                        if (f) setStatusFilter(f as StatusFilter);
-                      }}
-                    >
-                      <SelectTrigger className="min-h-[44px] h-11 w-[8.5rem] shrink-0">
-                        <SelectValue placeholder="Sort" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectLabel>Sort by</SelectLabel>
-                          <SelectItem value="ending_soon|all">Ending soon · All</SelectItem>
-                          <SelectItem value="newest|all">Newest · All</SelectItem>
-                          <SelectItem value="highest_amount|all">Highest · All</SelectItem>
-                        </SelectGroup>
-                        <SelectGroup>
-                          <SelectLabel>Status</SelectLabel>
-                          <SelectItem value={`${sortKey}|winning`}>Winning</SelectItem>
-                          <SelectItem value={`${sortKey}|outbid`}>Outbid</SelectItem>
-                          <SelectItem value={`${sortKey}|accepted`}>Won</SelectItem>
-                          <SelectItem value={`${sortKey}|expired`}>Lost</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full min-h-[44px] h-11 justify-between font-medium">
+                          {sortKey === 'ending_soon' ? 'Ending soon' : sortKey === 'newest' ? 'Newest' : 'Highest'} · {statusFilter === 'all' ? 'All' : statusFilter === 'winning' ? 'Winning' : statusFilter === 'outbid' ? 'Outbid' : statusFilter === 'accepted' ? 'Won' : 'Lost'}
+                          <ChevronDown className="h-4 w-4 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                        <div className="p-3 space-y-3">
+                          <div>
+                            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sort by</Label>
+                            <div className="mt-1.5 flex flex-wrap gap-2">
+                              {(['ending_soon', 'newest', 'highest_amount'] as const).map((s) => (
+                                <Button key={s} variant={sortKey === s ? 'default' : 'outline'} size="sm" onClick={() => setSortKey(s)}>
+                                  {s === 'ending_soon' ? 'Ending soon' : s === 'newest' ? 'Newest' : 'Highest'}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</Label>
+                            <div className="mt-1.5 flex flex-wrap gap-2">
+                              {(['all', 'winning', 'outbid', 'accepted', 'expired'] as const).map((f) => (
+                                <Button key={f} variant={statusFilter === f ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter(f)}>
+                                  {f === 'all' ? 'All' : f === 'winning' ? 'Winning' : f === 'outbid' ? 'Outbid' : f === 'accepted' ? 'Won' : 'Lost'}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 pt-2 border-t">
+                            <Label htmlFor="hide-removed-popover" className="text-sm font-medium">Hide removed listings</Label>
+                            <Switch id="hide-removed-popover" checked={hideRemovedListings} onCheckedChange={setHideRemovedListings} className="data-[state=checked]:bg-primary" />
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   ) : tab === 'offers' ? (
-                    <Select
-                      value={`${offerSortKey}|${offerStatusFilter}`}
-                      onValueChange={(v) => {
-                        const [s, f] = v.split('|');
-                        if (s) setOfferSortKey(s as OfferSortKey);
-                        if (f) setOfferStatusFilter(f as OfferStatusFilter);
-                      }}
-                    >
-                      <SelectTrigger className="min-h-[44px] h-11 w-[8.5rem] shrink-0">
-                        <SelectValue placeholder="Sort" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectLabel>Sort by</SelectLabel>
-                          <SelectItem value="status|all">Status · All</SelectItem>
-                          <SelectItem value="newest|all">Newest · All</SelectItem>
-                          <SelectItem value="ending_soon|all">Ending soon · All</SelectItem>
-                          <SelectItem value="highest_amount|all">Highest · All</SelectItem>
-                        </SelectGroup>
-                        <SelectGroup>
-                          <SelectLabel>Status</SelectLabel>
-                          <SelectItem value={`${offerSortKey}|sent`}>You sent</SelectItem>
-                          <SelectItem value={`${offerSortKey}|received`}>You received</SelectItem>
-                          <SelectItem value={`${offerSortKey}|open`}>Open</SelectItem>
-                          <SelectItem value={`${offerSortKey}|countered`}>Countered</SelectItem>
-                          <SelectItem value={`${offerSortKey}|accepted`}>Accepted</SelectItem>
-                          <SelectItem value={`${offerSortKey}|declined`}>Declined</SelectItem>
-                          <SelectItem value={`${offerSortKey}|expired`}>Expired</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full min-h-[44px] h-11 justify-between font-medium">
+                          {offerSortKey === 'status' ? 'Status' : offerSortKey === 'newest' ? 'Newest' : offerSortKey === 'ending_soon' ? 'Ending soon' : 'Highest'} · {offerStatusFilter === 'all' ? 'All' : offerStatusFilter === 'sent' ? 'You sent' : offerStatusFilter === 'received' ? 'Received' : offerStatusFilter === 'open' ? 'Open' : offerStatusFilter === 'countered' ? 'Countered' : offerStatusFilter === 'accepted' ? 'Accepted' : offerStatusFilter === 'declined' ? 'Declined' : 'Expired'}
+                          <ChevronDown className="h-4 w-4 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                        <div className="p-3 space-y-3">
+                          <div>
+                            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sort by</Label>
+                            <div className="mt-1.5 flex flex-wrap gap-2">
+                              {(['status', 'newest', 'ending_soon', 'highest_amount'] as const).map((s) => (
+                                <Button key={s} variant={offerSortKey === s ? 'default' : 'outline'} size="sm" onClick={() => setOfferSortKey(s)}>
+                                  {s === 'status' ? 'Status' : s === 'newest' ? 'Newest' : s === 'ending_soon' ? 'Ending soon' : 'Highest'}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</Label>
+                            <div className="mt-1.5 flex flex-wrap gap-2">
+                              {(['all', 'sent', 'received', 'open', 'countered', 'accepted', 'declined', 'expired'] as const).map((f) => (
+                                <Button key={f} variant={offerStatusFilter === f ? 'default' : 'outline'} size="sm" onClick={() => setOfferStatusFilter(f)}>
+                                  {f === 'all' ? 'All' : f === 'sent' ? 'You sent' : f === 'received' ? 'Received' : f === 'open' ? 'Open' : f === 'countered' ? 'Countered' : f === 'accepted' ? 'Accepted' : f === 'declined' ? 'Declined' : 'Expired'}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   ) : null}
                 </div>
                 {/* Desktop: full grid */}
@@ -973,7 +985,7 @@ export default function BidsOffersPage() {
                       )}
                     </SelectContent>
                   </Select>
-                  <div className="w-full sm:min-w-[160px] sm:min-w-[180px] min-h-[44px] flex items-center">
+                  <div className="w-full sm:min-w-[180px] min-h-[44px] flex items-center">
                     {tab === 'bids' ? (
                       <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
                         <SelectTrigger className="min-h-[44px] h-11 sm:h-10 w-full min-w-0">
@@ -1021,20 +1033,6 @@ export default function BidsOffersPage() {
                     ) : null}
                   </div>
                 </div>
-                {/* Mobile: Hide removed row for Bids tab */}
-                {tab === 'bids' ? (
-                  <div className="flex sm:hidden items-center gap-2 min-h-[44px] py-1">
-                    <Switch
-                      id="hide-removed-mobile"
-                      checked={hideRemovedListings}
-                      onCheckedChange={setHideRemovedListings}
-                      className="data-[state=checked]:bg-primary"
-                    />
-                    <Label htmlFor="hide-removed-mobile" className="text-sm font-medium cursor-pointer select-none touch-manipulation">
-                      Hide removed
-                    </Label>
-                  </div>
-                ) : null}
               </div>
 
               {loading ? (
@@ -1061,7 +1059,7 @@ export default function BidsOffersPage() {
                               const sellerId = raw?.sellerId;
                               return (
                                 <div key={r.id} className="rounded-xl border border-border/50 bg-card p-3 sm:p-4 transition-colors hover:bg-muted/20">
-                                  <div className="flex flex-row items-start gap-3 sm:gap-4">
+                                  <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
                                     <div className="flex flex-1 min-w-0 items-start gap-2.5 sm:gap-3">
                                       <div className="h-20 w-20 sm:h-[5.5rem] sm:w-[5.5rem] rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
                                         {o.listingImage ? <Image src={o.listingImage} alt="" fill className="object-cover" sizes="88px" /> : <div className="absolute inset-0 flex items-center justify-center"><Handshake className="h-7 w-7 text-muted-foreground/40" /></div>}
@@ -1079,28 +1077,33 @@ export default function BidsOffersPage() {
                                         </p>
                                       </div>
                                     </div>
-                                    <div className="flex items-center gap-2 shrink-0">
+                                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:shrink-0 w-full sm:w-auto">
                                       {o.status === 'ACCEPTED' && o.direction === 'out' ? (
-                                        <Button onClick={() => openOfferCheckout(o.raw)} variant="default" size="default" className="min-h-[44px] h-11 sm:h-10">Checkout<ArrowRight className="ml-1.5 h-4 w-4" /></Button>
+                                        <Button onClick={() => openOfferCheckout(o.raw)} variant="default" size="default" className="w-full sm:w-auto min-h-[44px] h-11 sm:h-10">Pay now<ArrowRight className="ml-1.5 h-4 w-4" /></Button>
                                       ) : (
-                                        <Button asChild variant={o.status === 'COUNTERED' ? 'default' : 'outline'} size="default" className={cn('min-h-[44px] h-11 sm:h-10', o.status !== 'COUNTERED' && 'border-2 border-primary bg-transparent text-primary hover:bg-primary/10')}>
-                                          <Link href={`/dashboard/offers/${o.id}`}>{o.status === 'COUNTERED' ? 'Review' : 'View offer'}</Link>
+                                        <Button asChild variant={o.status === 'COUNTERED' ? 'default' : 'outline'} size="default" className={cn('w-full sm:w-auto min-h-[44px] h-11 sm:h-10', o.status !== 'COUNTERED' && 'border-2 border-primary bg-transparent text-primary hover:bg-primary/10')}>
+                                          <Link href={`/dashboard/offers/${o.id}`}>{o.status === 'COUNTERED' ? 'Respond to offer' : 'View offer'}</Link>
                                         </Button>
                                       )}
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                          <Button variant="outline" size="icon" className="min-h-[44px] min-w-[44px] h-11 w-11 sm:h-10 sm:w-10 shrink-0">
-                                            <MoreHorizontal className="h-4 w-4" />
-                                          </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="w-56">
-                                          <DropdownMenuLabel>Offer</DropdownMenuLabel>
-                                          <DropdownMenuSeparator />
-                                          <DropdownMenuItem asChild><Link href={`/listing/${o.listingId}`}><ArrowUpRight className="h-4 w-4 mr-2" />View listing</Link></DropdownMenuItem>
-                                          <DropdownMenuItem asChild><Link href={`/dashboard/offers/${o.id}`}><Handshake className="h-4 w-4 mr-2" />Offer details</Link></DropdownMenuItem>
-                                          {sellerId ? <DropdownMenuItem asChild><Link href={`/sellers/${sellerId}`}>Seller&apos;s other items</Link></DropdownMenuItem> : null}
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
+                                      <div className="flex gap-2 w-full sm:w-auto">
+                                        <Button asChild variant="outline" size="default" className="flex-1 sm:flex-initial min-h-[44px] h-11 sm:h-10 sm:hidden">
+                                          <Link href={`/listing/${o.listingId}`}>View listing</Link>
+                                        </Button>
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button variant="outline" size="icon" className="min-h-[44px] min-w-[44px] h-11 w-11 sm:h-10 sm:w-10 shrink-0">
+                                              <MoreHorizontal className="h-4 w-4" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end" className="w-56">
+                                            <DropdownMenuLabel>Offer</DropdownMenuLabel>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem asChild><Link href={`/listing/${o.listingId}`}><ArrowUpRight className="h-4 w-4 mr-2" />View listing</Link></DropdownMenuItem>
+                                            <DropdownMenuItem asChild><Link href={`/dashboard/offers/${o.id}`}><Handshake className="h-4 w-4 mr-2" />Offer details</Link></DropdownMenuItem>
+                                            {sellerId ? <DropdownMenuItem asChild><Link href={`/sellers/${sellerId}`}>Seller&apos;s other items</Link></DropdownMenuItem> : null}
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -1111,8 +1114,7 @@ export default function BidsOffersPage() {
                             key={r.id}
                             className="rounded-xl border border-border/50 bg-card p-3 sm:p-4 transition-colors hover:bg-muted/20"
                           >
-                          {/* Mobile: photo+info left, button+settings right */}
-                          <div className="flex flex-row sm:flex-col lg:flex-row lg:items-center gap-3 sm:gap-4 justify-between">
+                          <div className="flex flex-col sm:flex-row lg:items-center gap-3 sm:gap-4 justify-between">
                             <div className="flex flex-1 min-w-0 items-start gap-2.5 sm:gap-3">
                               <div className="h-20 w-20 sm:h-24 sm:w-24 lg:h-[8.5rem] lg:w-[8.5rem] rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
                                 {(r as any).listingImage ? <Image src={(r as any).listingImage} alt="" fill className="object-cover" sizes="136px" /> : null}
@@ -1136,7 +1138,7 @@ export default function BidsOffersPage() {
                               </div>
                             </div>
 
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-end flex-wrap shrink-0 sm:mt-0">
+                            <div className="flex flex-col sm:flex-row gap-2 sm:items-center shrink-0 w-full sm:w-auto">
                                 {isListingRemoved(r) ? (
                                   <>
                                     <Button variant="outline" size="default" asChild className="w-full sm:w-auto min-h-[44px] h-11 sm:h-10">
@@ -1176,10 +1178,10 @@ export default function BidsOffersPage() {
                                         setRaiseDialogOpen(true);
                                       }}
                                     >
-                                      Raise max bid
+                                      Place bid again
                                     </Button>
                                     <Button variant="outline" size="default" asChild className="w-full sm:w-auto min-h-[44px] h-11 sm:h-10">
-                                      <Link href={`/listing/${(r as any).listingId}`}>View</Link>
+                                      <Link href={`/listing/${(r as any).listingId}`}>View listing</Link>
                                     </Button>
                                   </>
                                 )}
@@ -1199,10 +1201,10 @@ export default function BidsOffersPage() {
                     <div className="space-y-3 lg:space-y-4">
                       {bidRows.map((r) => (
                         <div key={r.id} className="rounded-xl border border-border/50 bg-card p-3 sm:p-4 lg:p-6 transition-colors hover:bg-muted/20">
-                          {/* Mobile: photo+info left, button+settings right. Desktop: grid */}
-                          <div className="flex flex-row sm:flex-col lg:grid lg:grid-cols-[8.5rem_18rem_auto_auto] lg:items-center gap-3 sm:gap-4 lg:gap-8 w-full">
+                          {/* Mobile: stacked (content then buttons). sm: flex col. lg: grid */}
+                          <div className="flex flex-col sm:flex-col lg:grid lg:grid-cols-[8.5rem_18rem_auto_auto] lg:items-center gap-3 sm:gap-4 lg:gap-8 w-full">
                             {/* Left: thumb + title/seller (mobile row; lg grid cells) */}
-                            <div className="flex flex-1 min-w-0 items-start gap-2.5 sm:gap-3 lg:contents">
+                            <div className="flex min-w-0 items-start gap-2.5 sm:gap-3 lg:contents">
                               <div className="h-20 w-20 sm:h-24 sm:w-24 lg:h-[8.5rem] lg:w-[8.5rem] rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
                                 {(r as any).listingImage ? <Image src={(r as any).listingImage} alt="" fill className="object-cover" sizes="136px" /> : null}
                               </div>
@@ -1262,17 +1264,17 @@ export default function BidsOffersPage() {
                               </div>
                             </div>
 
-                            {/* Right on mobile: button + settings. Desktop: same */}
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-end shrink-0 min-w-0 sm:min-w-[8rem] lg:min-w-[10rem]">
+                            {/* Right: full-width stacked on mobile, row on desktop */}
+                            <div className="flex flex-col sm:flex-row gap-2 sm:items-center shrink-0 w-full sm:w-auto sm:min-w-[8rem] lg:min-w-[10rem]">
                               {isListingRemoved(r) ? (
                                 <>
-                                  <Button variant="outline" size="default" asChild className="flex-1 sm:flex-initial min-w-0 min-h-[44px] h-11 sm:h-10 border-2 border-primary bg-transparent text-primary hover:bg-primary/10 dark:bg-transparent dark:hover:bg-primary/10">
+                                  <Button variant="outline" size="default" asChild className="w-full sm:w-auto min-h-[44px] h-11 sm:h-10 border-2 border-primary bg-transparent text-primary hover:bg-primary/10 dark:bg-transparent dark:hover:bg-primary/10">
                                     <Link href={`/listing/${r.listingId}`}>View listing</Link>
                                   </Button>
                                   <Button
                                     variant="ghost"
                                     size="default"
-                                    className="text-muted-foreground hover:text-foreground flex-1 sm:flex-initial min-h-[44px] h-11 sm:h-10"
+                                    className="text-muted-foreground hover:text-foreground w-full sm:w-auto min-h-[44px] h-11 sm:h-10"
                                     onClick={() => dismissRemovedListing(r.listingId)}
                                   >
                                     <X className="h-4 w-4 mr-1.5" />
@@ -1280,61 +1282,65 @@ export default function BidsOffersPage() {
                                   </Button>
                                 </>
                               ) : r.status === 'LOST' || (r.timeLeftMs !== null && r.timeLeftMs <= 0) ? (
-                                <Button variant="outline" size="default" asChild className="flex-1 sm:flex-initial min-w-0 min-h-[44px] h-11 sm:h-10 border-2 border-primary bg-transparent text-primary hover:bg-primary/10 dark:bg-transparent dark:hover:bg-primary/10">
+                                <Button variant="outline" size="default" asChild className="w-full sm:w-auto min-h-[44px] h-11 sm:h-10 border-2 border-primary bg-transparent text-primary hover:bg-primary/10 dark:bg-transparent dark:hover:bg-primary/10">
                                   <Link href={`/listing/${r.listingId}`}>View listing</Link>
                                 </Button>
                               ) : (
                                 <>
-                                  {r.status === 'OUTBID' ? (
-                                    <Button
-                                      variant="default"
-                                      className="flex-1 sm:flex-initial min-w-0 min-h-[44px] h-11 sm:h-10"
-                                      onClick={() => {
-                                        setRaiseTarget({
-                                          listingId: r.listingId,
-                                          listingTitle: getDisplayTitle(r),
-                                          currentHighestBid: Number(r.currentHighestBid || 0) || 0,
-                                          myMaxBid: Number(r.myMaxBid || 0) || 0,
-                                        });
-                                        setRaiseInput(
-                                          String(
-                                            suggestNextMaxUsd({
-                                              currentHighestBid: Number(r.currentHighestBid || 0) || 0,
-                                              myMaxBid: Number(r.myMaxBid || 0) || 0,
-                                            })
-                                          )
-                                        );
-                                        setRaiseDialogOpen(true);
-                                      }}
-                                    >
-                                      Raise max
+                                  <div className="flex gap-2 w-full sm:w-auto">
+                                    {r.status === 'OUTBID' ? (
+                                      <Button
+                                        variant="default"
+                                        className="flex-1 sm:flex-initial min-h-[44px] h-11 sm:h-10"
+                                        onClick={() => {
+                                          setRaiseTarget({
+                                            listingId: r.listingId,
+                                            listingTitle: getDisplayTitle(r),
+                                            currentHighestBid: Number(r.currentHighestBid || 0) || 0,
+                                            myMaxBid: Number(r.myMaxBid || 0) || 0,
+                                          });
+                                          setRaiseInput(
+                                            String(
+                                              suggestNextMaxUsd({
+                                                currentHighestBid: Number(r.currentHighestBid || 0) || 0,
+                                                myMaxBid: Number(r.myMaxBid || 0) || 0,
+                                              })
+                                            )
+                                          );
+                                          setRaiseDialogOpen(true);
+                                        }}
+                                      >
+                                        Raise max
+                                      </Button>
+                                    ) : (
+                                      <Button
+                                        variant="default"
+                                        className="flex-1 sm:flex-initial min-h-[44px] h-11 sm:h-10"
+                                        onClick={() => {
+                                          setRaiseTarget({
+                                            listingId: r.listingId,
+                                            listingTitle: getDisplayTitle(r),
+                                            currentHighestBid: Number(r.currentHighestBid || 0) || 0,
+                                            myMaxBid: Number(r.myMaxBid || 0) || 0,
+                                          });
+                                          setRaiseInput(
+                                            String(
+                                              suggestNextMaxUsd({
+                                                currentHighestBid: Number(r.currentHighestBid || 0) || 0,
+                                                myMaxBid: Number(r.myMaxBid || 0) || 0,
+                                              })
+                                            )
+                                          );
+                                          setRaiseDialogOpen(true);
+                                        }}
+                                      >
+                                        Increase max
+                                      </Button>
+                                    )}
+                                    <Button variant="outline" size="default" asChild className="sm:hidden min-h-[44px] h-11 flex-shrink-0">
+                                      <Link href={`/listing/${r.listingId}`}>View</Link>
                                     </Button>
-                                  ) : (
-                                    <Button
-                                      variant="default"
-                                      className="flex-1 sm:flex-initial min-w-0 min-h-[44px] h-11 sm:h-10"
-                                      onClick={() => {
-                                        setRaiseTarget({
-                                          listingId: r.listingId,
-                                          listingTitle: getDisplayTitle(r),
-                                          currentHighestBid: Number(r.currentHighestBid || 0) || 0,
-                                          myMaxBid: Number(r.myMaxBid || 0) || 0,
-                                        });
-                                        setRaiseInput(
-                                          String(
-                                            suggestNextMaxUsd({
-                                              currentHighestBid: Number(r.currentHighestBid || 0) || 0,
-                                              myMaxBid: Number(r.myMaxBid || 0) || 0,
-                                            })
-                                          )
-                                        );
-                                        setRaiseDialogOpen(true);
-                                      }}
-                                    >
-                                      Increase max
-                                    </Button>
-                                  )}
-
+                                  </div>
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                       <Button variant="outline" size="icon" className="min-h-[44px] min-w-[44px] h-11 w-11 sm:h-10 sm:w-10 shrink-0">
@@ -1375,8 +1381,8 @@ export default function BidsOffersPage() {
                             key={r.id}
                             className="rounded-xl border border-border/50 bg-card p-3 sm:p-4 transition-colors hover:bg-muted/20"
                           >
-                            <div className="flex flex-row items-start gap-3 sm:gap-4">
-                              {/* Left: image + title + meta (same pattern as bid cards) */}
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-start gap-3 sm:gap-4">
+                              {/* Left: image + title + meta */}
                               <div className="flex flex-1 min-w-0 items-start gap-2.5 sm:gap-3">
                                 <div className="h-20 w-20 sm:h-[5.5rem] sm:w-[5.5rem] rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
                                   {r.listingImage ? (
@@ -1410,15 +1416,15 @@ export default function BidsOffersPage() {
                                   </p>
                                 </div>
                               </div>
-                              {/* Right: primary action + menu */}
-                              <div className="flex items-center gap-2 shrink-0">
+                              {/* Right: primary action + menu — full width stacked on mobile */}
+                              <div className="flex flex-col sm:flex-row gap-2 sm:items-center shrink-0 w-full sm:w-auto">
                                 {r.status === 'ACCEPTED' && r.direction === 'out' ? (
-                                  <Button onClick={() => openOfferCheckout(r.raw)} variant="default" size="default" className="min-h-[44px] h-11 sm:h-10">
-                                    Checkout
+                                  <Button onClick={() => openOfferCheckout(r.raw)} variant="default" size="default" className="w-full sm:w-auto min-h-[44px] h-11 sm:h-10">
+                                    Pay now
                                     <ArrowRight className="ml-1.5 h-4 w-4" />
                                   </Button>
                                 ) : r.status === 'EXPIRED' || r.status === 'DECLINED' ? (
-                                  <Button asChild variant="outline" size="default" className="min-h-[44px] h-11 sm:h-10">
+                                  <Button asChild variant="outline" size="default" className="w-full sm:w-auto min-h-[44px] h-11 sm:h-10">
                                     <Link href={`/listing/${r.listingId}`}>Make offer</Link>
                                   </Button>
                                 ) : (
@@ -1426,41 +1432,46 @@ export default function BidsOffersPage() {
                                     asChild
                                     variant={r.status === 'COUNTERED' ? 'default' : 'outline'}
                                     size="default"
-                                    className={cn('min-h-[44px] h-11 sm:h-10', r.status !== 'COUNTERED' && 'border-2 border-primary bg-transparent text-primary hover:bg-primary/10')}
+                                    className={cn('w-full sm:w-auto min-h-[44px] h-11 sm:h-10', r.status !== 'COUNTERED' && 'border-2 border-primary bg-transparent text-primary hover:bg-primary/10')}
                                   >
                                     <Link href={`/dashboard/offers/${r.id}`}>
-                                      {r.status === 'COUNTERED' ? 'Review' : 'View offer'}
+                                      {r.status === 'COUNTERED' ? 'Respond to offer' : 'View offer'}
                                     </Link>
                                   </Button>
                                 )}
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="icon" className="min-h-[44px] min-w-[44px] h-11 w-11 sm:h-10 sm:w-10 shrink-0">
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-56">
-                                    <DropdownMenuLabel>Offer</DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem asChild>
-                                      <Link href={`/listing/${r.listingId}`}>
-                                        <ArrowUpRight className="h-4 w-4 mr-2" />
-                                        View listing
-                                      </Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem asChild>
-                                      <Link href={`/dashboard/offers/${r.id}`}>
-                                        <Handshake className="h-4 w-4 mr-2" />
-                                        Offer details
-                                      </Link>
-                                    </DropdownMenuItem>
-                                    {sellerId ? (
+                                <div className="flex gap-2 w-full sm:w-auto">
+                                  <Button asChild variant="outline" size="default" className="flex-1 sm:hidden min-h-[44px] h-11">
+                                    <Link href={`/listing/${r.listingId}`}>View listing</Link>
+                                  </Button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="outline" size="icon" className="min-h-[44px] min-w-[44px] h-11 w-11 sm:h-10 sm:w-10 shrink-0">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-56">
+                                      <DropdownMenuLabel>Offer</DropdownMenuLabel>
+                                      <DropdownMenuSeparator />
                                       <DropdownMenuItem asChild>
-                                        <Link href={`/sellers/${sellerId}`}>Seller&apos;s other items</Link>
+                                        <Link href={`/listing/${r.listingId}`}>
+                                          <ArrowUpRight className="h-4 w-4 mr-2" />
+                                          View listing
+                                        </Link>
                                       </DropdownMenuItem>
-                                    ) : null}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                                      <DropdownMenuItem asChild>
+                                        <Link href={`/dashboard/offers/${r.id}`}>
+                                          <Handshake className="h-4 w-4 mr-2" />
+                                          Offer details
+                                        </Link>
+                                      </DropdownMenuItem>
+                                      {sellerId ? (
+                                        <DropdownMenuItem asChild>
+                                          <Link href={`/sellers/${sellerId}`}>Seller&apos;s other items</Link>
+                                        </DropdownMenuItem>
+                                      ) : null}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
                               </div>
                             </div>
                           </div>

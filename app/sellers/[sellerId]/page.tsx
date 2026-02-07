@@ -29,6 +29,7 @@ import type { Listing } from '@/lib/types';
 import { listSellerListings } from '@/lib/firebase/listings';
 import { SellerTrustBadges } from '@/components/seller/SellerTrustBadges';
 import { SaveSellerButton } from '@/components/seller/SaveSellerButton';
+import { StarRatingReviewCount } from '@/components/seller/StarRatingReviewCount';
 import { useToast } from '@/hooks/use-toast';
 import { getOrCreateThread } from '@/lib/firebase/messages';
 
@@ -442,6 +443,11 @@ export default function SellerProfilePage() {
                 </div>
 
                 <div className="flex items-center gap-4 flex-wrap text-sm text-muted-foreground">
+                  <StarRatingReviewCount
+                    avgRating={reviewStats?.avgRating ?? 0}
+                    reviewCount={reviewStats?.reviewCount ?? 0}
+                    size="md"
+                  />
                   {locationLabel && (
                     <div className="flex items-center gap-1.5">
                       <MapPin className="h-4 w-4" />

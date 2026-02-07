@@ -263,6 +263,9 @@ function toOrder(docId: string, data: OrderDoc): Order {
     fulfillmentSlaStartedAt: (data as any).fulfillmentSlaStartedAt ? toDateSafe((data as any).fulfillmentSlaStartedAt) : undefined,
     transportOption: (data as any).transportOption,
     transactionStatus: (data as any).transactionStatus,
+    depositAmount: typeof (data as any).depositAmount === 'number' ? (data as any).depositAmount : undefined,
+    finalPaymentAmount: typeof (data as any).finalPaymentAmount === 'number' ? (data as any).finalPaymentAmount : undefined,
+    finalPaymentConfirmedAt: (data as any).finalPaymentConfirmedAt ? toDateSafe((data as any).finalPaymentConfirmedAt) : undefined,
     delivery: (data as any).delivery ? (() => {
       const d = (data as any).delivery;
       const mapWindow = (w: any) => ({

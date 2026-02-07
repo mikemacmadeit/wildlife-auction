@@ -126,6 +126,9 @@ export async function POST(request: Request, { params }: { params: { orderId: st
           listingId: orderData.listingId,
           listingTitle,
           orderUrl: `${getSiteUrl()}/dashboard/orders/${orderId}`,
+          ...(typeof orderData.finalPaymentAmount === 'number' && orderData.finalPaymentAmount > 0
+            ? { finalPaymentAmount: orderData.finalPaymentAmount }
+            : {}),
         },
         optionalHash: `in_transit:${now.toISOString()}`,
       });
@@ -139,6 +142,35 @@ export async function POST(request: Request, { params }: { params: { orderId: st
             endpoint: '/api/orders/[orderId]/mark-in-transit',
           });
         });
+      }
+      if (typeof orderData.finalPaymentAmount === 'number' && orderData.finalPaymentAmount > 0) {
+        const payEv = await emitAndProcessEventForUser({
+          type: 'Order.FinalPaymentDue',
+          actorId: sellerId,
+          entityType: 'order',
+          entityId: orderId,
+          targetUserId: orderData.buyerId,
+          payload: {
+            type: 'Order.FinalPaymentDue',
+            orderId,
+            listingId: orderData.listingId,
+            listingTitle,
+            orderUrl: `${getSiteUrl()}/dashboard/orders/${orderId}`,
+            amount: orderData.finalPaymentAmount,
+          },
+          optionalHash: `final_payment_due:${now.toISOString()}`,
+        });
+        if (payEv?.ok && payEv.created) {
+          void tryDispatchEmailJobNow({ db: db as any, jobId: payEv.eventId, waitForJob: true }).catch((err) => {
+            captureException(err instanceof Error ? err : new Error(String(err)), {
+              context: 'email-dispatch',
+              eventType: 'Order.FinalPaymentDue',
+              jobId: payEv.eventId,
+              orderId: params.orderId,
+              endpoint: '/api/orders/[orderId]/mark-in-transit',
+            });
+          });
+        }
       }
     } catch (e) {
       console.error('Error emitting Order.InTransit notification event:', e);

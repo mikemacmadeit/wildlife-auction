@@ -5,7 +5,7 @@
  * Transitions: DELIVERY_PROPOSED → DELIVERY_SCHEDULED.
  */
 
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp, serverTimestamp } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { TransactionStatus } from '@/lib/types';
 import { z } from 'zod';
@@ -198,6 +198,23 @@ export async function POST(
       }
     } catch (e) {
       console.error('Error emitting Order.DeliveryAgreed notification event:', e);
+    }
+
+    // Mark buyer's "Accept delivery date" notification(s) as read – action completed.
+    try {
+      const notificationsRef = db.collection('users').doc(buyerId).collection('notifications');
+      const snap = await notificationsRef
+        .where('entityId', '==', orderId)
+        .where('type', '==', 'order_delivery_scheduled')
+        .get();
+      await Promise.all(
+        snap.docs.map((d) =>
+          d.ref.update({ read: true, readAt: serverTimestamp() })
+        )
+      );
+    } catch (e) {
+      // best-effort; don't fail the request
+      console.warn('agree-delivery: failed to mark Accept delivery date notification(s) read', { orderId, error: String(e) });
     }
 
     return json({

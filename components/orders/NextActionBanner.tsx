@@ -144,10 +144,10 @@ export function NextActionBanner({
       }
       if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
         return {
-          title: 'Action required: Confirm receipt',
-          description: 'Confirm you received the order to complete the transaction.',
+          title: 'Complete delivery',
+          description: 'Use your delivery PIN when the seller arrives with the checklist. They’ll have you enter it, sign, and take a photo to complete the transaction.',
           urgency: 'normal',
-          ctaLabel: 'Confirm Receipt',
+          ctaLabel: 'View order',
           icon: <CheckCircle2 className="h-5 w-5" />,
         };
       }

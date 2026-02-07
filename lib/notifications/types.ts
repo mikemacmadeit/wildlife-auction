@@ -45,6 +45,8 @@ export const NOTIFICATION_EVENT_TYPES = [
   'Order.PickupWindowAgreed', // Seller agreed to pickup window (BUYER_TRANSPORT)
   'Order.PickupConfirmed', // Buyer confirmed pickup
   'Order.ReceiptConfirmed', // Buyer confirmed receipt (SELLER_TRANSPORT)
+  'Order.FinalPaymentDue', // Buyer has balance due on delivery – show "Pay now" in To Do
+  'Order.FinalPaymentConfirmed', // Buyer paid final balance (deposit flow); notify seller
   'Order.SlaApproaching', // NEW: SLA deadline approaching reminder
   'Order.SlaOverdue', // NEW: SLA deadline passed
   'Order.TransferComplianceRequired', // NEW: Regulated whitetail - compliance gate activated
@@ -231,6 +233,8 @@ export type NotificationEventPayload =
       listingId: string;
       listingTitle: string;
       orderUrl: string;
+      /** Optional: when set, in-app copy can mention paying remaining balance on delivery */
+      finalPaymentAmount?: number;
     }
   | {
       type: 'Order.Delivered';
@@ -343,6 +347,22 @@ export type NotificationEventPayload =
       listingId: string;
       listingTitle: string;
       orderUrl: string;
+    }
+  | {
+      type: 'Order.FinalPaymentDue';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
+      amount: number;
+    }
+  | {
+      type: 'Order.FinalPaymentConfirmed';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
+      amount: number;
     }
   | {
       type: 'Review.Request';

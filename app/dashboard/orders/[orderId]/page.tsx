@@ -35,10 +35,11 @@ import { OrderMilestoneTimeline } from '@/components/orders/OrderMilestoneTimeli
 import { DeliveryTrackingCard } from '@/components/orders/DeliveryTrackingCard';
 import { DeliveryProofTimelineBlock } from '@/components/delivery/DeliveryProofTimelineBlock';
 import { BuyerDeliveryPin } from '@/components/delivery/BuyerDeliveryPin';
-import { confirmReceipt, disputeOrder } from '@/lib/stripe/api';
+import { disputeOrder } from '@/lib/stripe/api';
 import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
 import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
+import { getOrderBalanceDue } from '@/lib/orders/progress';
 import { ORDER_COPY, getStatusLabel } from '@/lib/orders/copy';
 import { cn, formatDate, isValidNonEpochDate } from '@/lib/utils';
 import { formatUserFacingError } from '@/lib/format-user-facing-error';
@@ -102,10 +103,8 @@ export default function BuyerOrderDetailPage() {
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [processing, setProcessing] = useState<'confirm' | 'dispute' | 'pay-final' | null>(null);
+  const [processing, setProcessing] = useState<'dispute' | 'pay-final' | null>(null);
   const [setAddressModalOpen, setSetAddressModalOpen] = useState(false);
-  const [confirmReceivedChecked, setConfirmReceivedChecked] = useState(false);
-  const [checkinDialogConfirmReceived, setCheckinDialogConfirmReceived] = useState(false);
   const [sendPhotosPromptOpen, setSendPhotosPromptOpen] = useState(false);
   const [sendPhotosModalOpen, setSendPhotosModalOpen] = useState(false);
   const [outForDeliveryExpanded, setOutForDeliveryExpanded] = useState(true);
@@ -119,23 +118,6 @@ export default function BuyerOrderDetailPage() {
   const [addressMapAddress, setAddressMapAddress] = useState<{ line1: string; line2?: string; city: string; state: string; zip: string; lat: number; lng: number; deliveryInstructions?: string } | null>(null);
 
   const SEND_PHOTOS_PROMPT_KEY = 'we:send-photos-prompted:v1';
-
-  const handleConfirmReceiptSuccess = useCallback((ordId: string, fromCheckin?: boolean) => {
-    toast({
-      title: 'Receipt confirmed',
-      description: order?.protectedTransactionDaysSnapshot ? 'Delivery confirmed. Your post-delivery review window is now active.' : 'This sale is final.',
-    });
-    getOrderById(ordId).then((o) => { if (o) setOrder(o); });
-    if (fromCheckin) {
-      setCheckinDialogConfirmReceived(false);
-      router.replace(`/dashboard/orders/${ordId}`);
-    }
-    try {
-      if (!localStorage.getItem(`${SEND_PHOTOS_PROMPT_KEY}:${ordId}`)) {
-        setSendPhotosPromptOpen(true);
-      }
-    } catch { /* ignore */ }
-  }, [toast, router, order?.protectedTransactionDaysSnapshot]);
 
   const loadOrder = useCallback(async (cancelledRef?: { current: boolean }) => {
     // Allow calling without cancelledRef for manual reloads
@@ -208,6 +190,39 @@ export default function BuyerOrderDetailPage() {
     }
   }, [reviewEligible, searchParams]);
 
+  const finalPaymentReturnHandledRef = useRef(false);
+  useEffect(() => {
+    const sessionId = searchParams?.get('session_id')?.trim();
+    if (!sessionId || !orderId || !user?.uid || finalPaymentReturnHandledRef.current) return;
+    finalPaymentReturnHandledRef.current = true;
+    toast({ title: 'Payment received', description: 'Confirming and updating your order…' });
+    (async () => {
+      try {
+        const { auth } = await import('@/lib/firebase/config');
+        const u = auth.currentUser;
+        if (!u) return;
+        const token = await u.getIdToken();
+        const res = await fetch(`/api/orders/${orderId}/confirm-final-payment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ session_id: sessionId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && (data.applied === true || data.alreadyConfirmed === true)) {
+          await loadOrder();
+          toast({ title: 'Final payment confirmed', description: 'Your order is updated.' });
+        } else if (!res.ok) {
+          toast({ title: 'Update delayed', description: data.error || 'Your payment succeeded. The page will update shortly.', variant: 'default' });
+          await loadOrder();
+        }
+      } catch {
+        await loadOrder();
+      } finally {
+        router.replace(`/dashboard/orders/${orderId}`, { scroll: false });
+      }
+    })();
+  }, [searchParams?.get('session_id'), orderId, user?.uid, loadOrder, router, toast]);
+
   const setAddressParamHandledRef = useRef(false);
   // When arriving with ?setAddress=1 (e.g. from congrats modal "Set delivery address"), open the modal once order is ready
   useEffect(() => {
@@ -258,14 +273,6 @@ export default function BuyerOrderDetailPage() {
 
   // Use transactionStatus - seller already paid immediately, no transfer ID check needed
   const txStatus: TransactionStatus | null = order ? getEffectiveTransactionStatus(order) : null;
-  const canConfirmReceipt =
-    !!order &&
-    (txStatus === 'DELIVERED_PENDING_CONFIRMATION' ||
-     txStatus === 'OUT_FOR_DELIVERY' ||
-     txStatus === 'DELIVERY_SCHEDULED' ||
-     !!order.deliveredAt ||
-     !!order.deliveryConfirmedAt);
-     
   const canDispute =
     !!order &&
     (txStatus === 'DELIVERED_PENDING_CONFIRMATION' ||
@@ -462,7 +469,6 @@ export default function BuyerOrderDetailPage() {
           onOpenChange={(open) => {
             if (!open) {
               router.replace(`/dashboard/orders/${order.id}`);
-              setCheckinDialogConfirmReceived(false);
             }
           }}
         >
@@ -470,33 +476,16 @@ export default function BuyerOrderDetailPage() {
             <DialogHeader>
               <DialogTitle>Delivery check-in</DialogTitle>
               <DialogDescription id="checkin-desc">
-                If delivery arrived, confirm receipt to complete the transaction. If something isn’t right, report an issue so we can review.
+                When the seller or driver arrives, use your delivery PIN so they can complete the checklist (sign, photo). That completes the transaction. If something isn’t right, report an issue so we can review.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
-              <div className="flex items-start space-x-3">
-                <Checkbox
-                  id="checkin-confirm-received"
-                  checked={checkinDialogConfirmReceived}
-                  onCheckedChange={(c) => setCheckinDialogConfirmReceived(!!c)}
-                />
-                <Label htmlFor="checkin-confirm-received" className="cursor-pointer text-sm font-medium leading-tight">
-                  I confirm the animal was received.
-                </Label>
-              </div>
-              {!order.protectedTransactionDaysSnapshot && (
-                <p className="text-xs text-muted-foreground">
-                  This listing does not include a post-delivery review window. Confirming delivery makes the sale final.
-                </p>
-              )}
-            </div>
             <DialogFooter className="gap-2 sm:gap-0">
               <Button
                 variant="outline"
                 onClick={() => router.replace(`/dashboard/orders/${order.id}`)}
                 disabled={processing !== null}
               >
-                Not now
+                View order
               </Button>
               <Button
                 variant="outline"
@@ -504,23 +493,6 @@ export default function BuyerOrderDetailPage() {
                 onClick={() => router.replace(`/dashboard/orders/${order.id}?issue=1`)}
               >
                 I have an issue
-              </Button>
-              <Button
-                disabled={!canConfirmReceipt || !checkinDialogConfirmReceived || processing !== null}
-                onClick={async () => {
-                  try {
-                    setProcessing('confirm');
-                    await confirmReceipt(order.id);
-                    handleConfirmReceiptSuccess(order.id, true);
-                  } catch (e: any) {
-                    toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to confirm receipt'), variant: 'destructive' });
-                  } finally {
-                    setProcessing(null);
-                  }
-                }}
-              >
-                {processing === 'confirm' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-                Confirm receipt
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -807,21 +779,14 @@ export default function BuyerOrderDetailPage() {
               }
             }
             if (milestone.key === 'out_for_delivery') {
-              if (milestone.isCurrent && txStatus === 'DELIVERY_SCHEDULED') {
+              const outPhaseBalanceDue = getOrderBalanceDue(o as any) > 0 && !(o as any).finalPaymentConfirmedAt;
+              const outPhaseCurrent = milestone.isCurrent && (txStatus === 'DELIVERY_SCHEDULED' || (txStatus === 'OUT_FOR_DELIVERY' && outPhaseBalanceDue));
+              if (outPhaseCurrent) {
                 return (
                   <div className="mt-3 space-y-3">
                     <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
-                      The seller or driver will deliver during the scheduled window. When they arrive, they&apos;ll hand you their phone and ask for your PIN — enter it to unlock the signature and photo steps, then sign and they&apos;ll snap a photo. That completes the delivery.
+                      The seller or driver will deliver during the scheduled window. Complete your final payment in the step below to get your delivery PIN. When they arrive, use the PIN in the <strong>Delivery</strong> step — enter it on their phone, sign, and they&apos;ll take a photo to complete the delivery.
                     </div>
-                    <BuyerDeliveryPin
-                      orderId={o.id}
-                      getAuthToken={async () => {
-                        const { auth } = await import('@/lib/firebase/config');
-                        const u = auth.currentUser;
-                        if (!u) throw new Error('Auth required');
-                        return u.getIdToken();
-                      }}
-                    />
                   </div>
                 );
               }
@@ -834,15 +799,6 @@ export default function BuyerOrderDetailPage() {
                       {outForDeliveryExpanded ? 'Hide' : 'Show'} live tracking & delivery info
                     </CollapsibleTrigger>
                     <CollapsibleContent className="pt-2 space-y-3">
-                      <BuyerDeliveryPin
-                        orderId={o.id}
-                        getAuthToken={async () => {
-                          const { auth } = await import('@/lib/firebase/config');
-                          const u = auth.currentUser;
-                          if (!u) throw new Error('Auth required');
-                          return u.getIdToken();
-                        }}
-                      />
                       <DeliveryTrackingCard order={o} role="buyer" currentUserUid={user?.uid ?? null} onStartTracking={async () => {}} onStopTracking={async () => {}} onMarkDelivered={async () => {}} />
                       {!order?.deliveryTracking?.enabled && (
                         <p className="text-sm text-muted-foreground">
@@ -877,22 +833,30 @@ export default function BuyerOrderDetailPage() {
               }
             }
             if (milestone.key === 'inspection_final_payment') {
-              const finalAmount = typeof (o as any).finalPaymentAmount === 'number' && (o as any).finalPaymentAmount > 0;
-              if (milestone.isCurrent && finalAmount && !(o as any).finalPaymentConfirmedAt) {
+              const balanceDue = getOrderBalanceDue(o as any);
+              const hasBalanceDue = balanceDue > 0 && !(o as any).finalPaymentConfirmedAt;
+              if (milestone.isCurrent && hasBalanceDue) {
+                const deposit = typeof (o as any).depositAmount === 'number' ? (o as any).depositAmount : 0;
                 return (
                   <div id="pay-final" className="mt-3 scroll-mt-24 rounded-lg border-2 border-primary/30 bg-primary/5 p-4 sm:p-5">
                     <p className="text-sm text-muted-foreground leading-relaxed">
                       Complete your final payment (balance due) to receive your delivery PIN and finish the transaction.
                     </p>
-                    <p className="mt-2 text-lg font-semibold text-foreground">
-                      Balance due: ${Number((o as any).finalPaymentAmount).toFixed(2)}
-                    </p>
+                    {deposit > 0 ? (
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Total ${Number((o as any).amount).toFixed(2)} − Deposit ${deposit.toFixed(2)} = <span className="font-semibold text-foreground">Balance due ${balanceDue.toFixed(2)}</span>
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-lg font-semibold text-foreground">
+                        Balance due: ${balanceDue.toFixed(2)}
+                      </p>
+                    )}
                     <Button
                       className="mt-3 w-full sm:w-auto min-h-[44px] touch-manipulation"
                       disabled={!!processing}
                       onClick={async () => {
+                        setProcessing('pay-final');
                         try {
-                          setProcessing('pay-final');
                           const { auth } = await import('@/lib/firebase/config');
                           const u = auth.currentUser;
                           if (!u) throw new Error('Auth required');
@@ -903,14 +867,22 @@ export default function BuyerOrderDetailPage() {
                             body: JSON.stringify({}),
                           });
                           const data = await res.json().catch(() => ({}));
-                          if (!res.ok) throw new Error(data.error || 'Failed to create payment session');
+                          if (!res.ok) {
+                            const msg = data.error || data.details || 'Failed to start payment';
+                            throw new Error(msg);
+                          }
                           if (data.url) {
                             window.location.href = data.url;
                             return;
                           }
                           throw new Error('No payment URL returned');
                         } catch (e: any) {
-                          toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to start payment'), variant: 'destructive' });
+                          toast({
+                            title: 'Payment could not start',
+                            description: formatUserFacingError(e, 'Failed to start payment'),
+                            variant: 'destructive',
+                          });
+                        } finally {
                           setProcessing(null);
                         }
                       }}
@@ -924,14 +896,34 @@ export default function BuyerOrderDetailPage() {
               if (milestone.isComplete && (o as any).finalPaymentConfirmedAt) {
                 return (
                   <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
-                    Final payment received. Your delivery PIN is available below when the seller sets up the delivery link.
+                    Final payment received. Your delivery PIN is in the <strong>Delivery</strong> step below — use it when the seller or driver arrives.
                   </div>
                 );
               }
             }
-            if (milestone.key === 'confirm_receipt') {
-              const hasDeliveryProofFromChecklist = (o.delivery as any)?.confirmedMethod === 'qr_public' && (o.delivery as any)?.confirmedAt && ((o.delivery as any)?.signatureUrl || (o.delivery as any)?.deliveryPhotoUrl);
-              if (hasDeliveryProofFromChecklist) {
+            if (milestone.key === 'delivered') {
+              const deliveredQrSignedAt = (o.delivery as any)?.confirmedMethod === 'qr_public' && (o.delivery as any)?.confirmedAt && ((o.delivery as any)?.signatureUrl || (o.delivery as any)?.deliveryPhotoUrl);
+              const deliveredPhase =
+                txStatus === 'DELIVERED_PENDING_CONFIRMATION' ||
+                (txStatus === 'OUT_FOR_DELIVERY' && (!!(o as any).finalPaymentConfirmedAt || getOrderBalanceDue(o as any) <= 0));
+              if (milestone.isCurrent && deliveredPhase) {
+                return (
+                  <div id="delivered-section" className="mt-3 space-y-3 scroll-mt-24">
+                    <p className="text-sm text-muted-foreground">Use your delivery PIN when the seller or driver arrives with the delivery checklist. They&apos;ll have you enter it, sign, and take a photo — that completes the transaction.</p>
+                    <BuyerDeliveryPin
+                      orderId={o.id}
+                      finalPaymentConfirmed={!!(o as any).finalPaymentConfirmedAt}
+                      getAuthToken={async () => {
+                        const { auth } = await import('@/lib/firebase/config');
+                        const u = auth.currentUser;
+                        if (!u) throw new Error('Auth required');
+                        return u.getIdToken();
+                      }}
+                    />
+                  </div>
+                );
+              }
+              if (deliveredQrSignedAt && (milestone.isCurrent || milestone.isComplete)) {
                 return (
                   <div className="mt-3 space-y-3">
                     <p className="text-sm font-semibold text-primary">Complete</p>
@@ -942,31 +934,6 @@ export default function BuyerOrderDetailPage() {
                       signatureUrl={(o.delivery as any)?.signatureUrl}
                       deliveryPhotoUrl={(o.delivery as any)?.deliveryPhotoUrl}
                     />
-                  </div>
-                );
-              }
-              if (milestone.isCurrent && (txStatus === 'DELIVERED_PENDING_CONFIRMATION' || txStatus === 'OUT_FOR_DELIVERY')) {
-                return (
-                  <div id="confirm-receipt-section" className="mt-3 rounded-lg border-2 border-primary/30 bg-primary/5 p-4 sm:p-5 scroll-mt-24">
-                    <p className="text-sm text-muted-foreground leading-relaxed">Only you can complete the transaction. The seller does not mark delivery.</p>
-                    <div className="mt-3 flex items-start gap-3 min-h-[44px]">
-                      <Checkbox id="confirm-received" checked={confirmReceivedChecked} onCheckedChange={(c) => setConfirmReceivedChecked(!!c)} className="mt-0.5 shrink-0" />
-                      <Label htmlFor="confirm-received" className="cursor-pointer text-sm font-medium leading-tight flex-1 py-2 touch-manipulation">I confirm the animal was received.</Label>
-                    </div>
-                    {!o.protectedTransactionDaysSnapshot && <p className="text-xs text-muted-foreground mt-2">Confirming makes the sale final.</p>}
-                    <Button className="mt-3 w-full sm:w-auto min-h-[44px] touch-manipulation" disabled={!canConfirmReceipt || !confirmReceivedChecked || !!processing} onClick={async () => {
-                      try {
-                        setProcessing('confirm');
-                        await confirmReceipt(o.id);
-                        handleConfirmReceiptSuccess(o.id);
-                      } catch (e: any) {
-                        toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to confirm receipt'), variant: 'destructive' });
-                      } finally {
-                        setProcessing(null);
-                      }
-                    }}>
-                      {processing === 'confirm' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />} Confirm receipt
-                    </Button>
                   </div>
                 );
               }

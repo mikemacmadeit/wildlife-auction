@@ -23,7 +23,7 @@ export const ORDER_COPY = {
     deliveryScheduled: 'Delivery scheduled',
     outForDelivery: 'Out for delivery',
     delivered: 'Delivered',
-    deliveredPendingConfirmation: 'Delivered — confirm receipt',
+    deliveredPendingConfirmation: 'Delivery',
     readyForPickup: 'Ready for pickup',
     pickupScheduled: 'Pickup scheduled',
     pickupConfirmed: 'Pickup confirmed',

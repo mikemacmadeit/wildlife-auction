@@ -22,7 +22,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { Filter, Grid3x3, List as ListIcon, Loader2, MessageCircle, Search, Star, Store, Trash2 } from 'lucide-react';
+import { Filter, Grid3x3, List as ListIcon, Loader2, MessageCircle, Search, Store, Trash2 } from 'lucide-react';
+import { StarRatingReviewCount } from '@/components/seller/StarRatingReviewCount';
 import { unfollowSeller } from '@/lib/firebase/following';
 
 type SortKey = 'recent' | 'highest_rated' | 'most_sales';
@@ -53,9 +54,6 @@ interface SellerCardProps {
 
 function SellerListCard({ s, activeCount, removing, messaging, onRemove, onMessage }: SellerCardProps) {
   const usernameLabel = s.sellerUsername ? `${s.sellerUsername}` : `${s.sellerId.slice(0, 8)}`;
-  const hasRating = s.ratingCount > 0;
-  const ratingLabel = hasRating ? s.ratingAverage.toFixed(1) : '—';
-  const positiveLabel = s.itemsSold > 0 && s.positivePercent > 0 ? `${Math.round(s.positivePercent)}%` : '—';
   const shopHref = `/sellers/${s.sellerId}`;
 
   return (
@@ -77,10 +75,11 @@ function SellerListCard({ s, activeCount, removing, messaging, onRemove, onMessa
               <div className="font-semibold md:font-extrabold text-sm md:text-base truncate">{s.sellerDisplayName}</div>
               <div className="text-xs text-muted-foreground truncate">{usernameLabel}</div>
               <div className="mt-0.5 md:mt-2 flex items-center gap-1.5 md:gap-2 flex-wrap">
-                <span className="text-xs text-muted-foreground inline-flex items-center gap-0.5">
-                  <Star className="h-3 w-3" />
-                  {ratingLabel}
-                </span>
+                <StarRatingReviewCount
+                  avgRating={s.ratingAverage}
+                  reviewCount={s.ratingCount}
+                  size="sm"
+                />
                 <span className="text-xs text-muted-foreground">·</span>
                 <span className="text-xs text-muted-foreground">Sold {s.itemsSold || 0}</span>
                 <span className="text-xs text-muted-foreground">·</span>
@@ -122,8 +121,6 @@ function SellerListCard({ s, activeCount, removing, messaging, onRemove, onMessa
 
 function SellerGridCard({ s, activeCount, removing, messaging, onRemove, onMessage }: SellerCardProps) {
   const usernameLabel = s.sellerUsername ? `${s.sellerUsername}` : `${s.sellerId.slice(0, 8)}`;
-  const hasRating = s.ratingCount > 0;
-  const ratingLabel = hasRating ? s.ratingAverage.toFixed(1) : '—';
   const shopHref = `/sellers/${s.sellerId}`;
 
   return (
@@ -157,12 +154,16 @@ function SellerGridCard({ s, activeCount, removing, messaging, onRemove, onMessa
           </div>
           <div className="font-semibold md:font-extrabold text-sm md:text-base truncate w-full">{s.sellerDisplayName}</div>
           <div className="text-[11px] md:text-xs text-muted-foreground truncate w-full">{usernameLabel}</div>
-          <div className="mt-1 md:mt-1.5 flex items-center justify-center gap-1 flex-wrap text-[11px] md:text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-0.5"><Star className="h-2.5 w-2.5 md:h-3 md:w-3" />{ratingLabel}</span>
-            <span>·</span>
-            <span>Sold {s.itemsSold || 0}</span>
-            <span>·</span>
-            <span>Active {activeCount ?? 0}</span>
+          <div className="mt-1 md:mt-1.5 flex items-center justify-center gap-1 flex-wrap text-[11px] md:text-xs">
+            <StarRatingReviewCount
+              avgRating={s.ratingAverage}
+              reviewCount={s.ratingCount}
+              size="sm"
+            />
+            <span className="text-muted-foreground">·</span>
+            <span className="text-muted-foreground">Sold {s.itemsSold || 0}</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-muted-foreground">Active {activeCount ?? 0}</span>
           </div>
         </div>
         <div className="mt-auto flex flex-row gap-1.5 md:gap-2">

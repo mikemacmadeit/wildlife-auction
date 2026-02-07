@@ -162,6 +162,9 @@ export async function POST(
           listingId: orderData.listingId,
           listingTitle,
           orderUrl: `${getSiteUrl()}/dashboard/orders/${orderId}`,
+          ...(typeof orderData.finalPaymentAmount === 'number' && orderData.finalPaymentAmount > 0
+            ? { finalPaymentAmount: orderData.finalPaymentAmount }
+            : {}),
         },
         optionalHash: `out_for_delivery:${now.toISOString()}`,
       });
@@ -175,6 +178,36 @@ export async function POST(
             endpoint: '/api/orders/[orderId]/fulfillment/mark-out-for-delivery',
           });
         });
+      }
+      // When buyer has a remaining balance due, emit a dedicated "Pay now" notification so it appears in To Do.
+      if (typeof orderData.finalPaymentAmount === 'number' && orderData.finalPaymentAmount > 0) {
+        const payEv = await emitAndProcessEventForUser({
+          type: 'Order.FinalPaymentDue',
+          actorId: sellerId,
+          entityType: 'order',
+          entityId: orderId,
+          targetUserId: orderData.buyerId,
+          payload: {
+            type: 'Order.FinalPaymentDue',
+            orderId,
+            listingId: orderData.listingId,
+            listingTitle,
+            orderUrl: `${getSiteUrl()}/dashboard/orders/${orderId}`,
+            amount: orderData.finalPaymentAmount,
+          },
+          optionalHash: `final_payment_due:${now.toISOString()}`,
+        });
+        if (payEv?.ok && payEv.created) {
+          void tryDispatchEmailJobNow({ db: db as any, jobId: payEv.eventId, waitForJob: true }).catch((err) => {
+            captureException(err instanceof Error ? err : new Error(String(err)), {
+              context: 'email-dispatch',
+              eventType: 'Order.FinalPaymentDue',
+              jobId: payEv.eventId,
+              orderId: params.orderId,
+              endpoint: '/api/orders/[orderId]/fulfillment/mark-out-for-delivery',
+            });
+          });
+        }
       }
     } catch (e) {
       console.error('Error emitting Order.InTransit notification event:', e);

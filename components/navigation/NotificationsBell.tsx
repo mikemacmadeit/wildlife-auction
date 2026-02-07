@@ -30,6 +30,27 @@ type UserNotification = {
   metadata?: Record<string, any>;
 };
 
+const ACTION_REQUIRED_TYPES = new Set(['bid_outbid', 'offer_countered', 'offer_accepted']);
+
+function normalizeType(n: UserNotification): string {
+  const t = String(n.type || '').trim().toLowerCase();
+  if (t) return t.replaceAll('.', '_');
+  return '';
+}
+
+function sortActionFirst(list: UserNotification[]): UserNotification[] {
+  return [...list].sort((a, b) => {
+    const ta = normalizeType(a);
+    const tb = normalizeType(b);
+    const aAction = ACTION_REQUIRED_TYPES.has(ta) ? 1 : 0;
+    const bAction = ACTION_REQUIRED_TYPES.has(tb) ? 1 : 0;
+    if (bAction !== aAction) return bAction - aAction;
+    const at = typeof a.createdAt?.toDate === 'function' ? a.createdAt.toDate().getTime() : (a.createdAt?.seconds ?? 0) * 1000;
+    const bt = typeof b.createdAt?.toDate === 'function' ? b.createdAt.toDate().getTime() : (b.createdAt?.seconds ?? 0) * 1000;
+    return bt - at;
+  });
+}
+
 function toAppPath(url: string): string | null {
   const raw = String(url || '').trim();
   if (!raw) return null;
@@ -111,15 +132,18 @@ export function NotificationsBell(props: {
   const badgeCount = Math.max(0, unreadCount + adminPendingApprovalsCount);
   const hasUnread = badgeCount > 0;
 
-  // When opening the dropdown, mark the visible notifications as read (best-effort).
-  // This ensures the bell badge clears promptly and matches user expectation.
+  // When opening the dropdown, mark only non–action-required visible notifications as read.
+  // Action-required (bid_outbid, offer_countered, offer_accepted) stay unread until user completes the action or dismisses.
   useEffect(() => {
     const wasOpen = prevOpenRef.current;
     prevOpenRef.current = open;
     if (!open || wasOpen) return;
     if (!userId) return;
 
-    const unreadVisible = items.filter((n) => n.read !== true).slice(0, 8);
+    const unreadVisible = items
+      .filter((n) => n.read !== true)
+      .filter((n) => !ACTION_REQUIRED_TYPES.has(normalizeType(n)))
+      .slice(0, 8);
     if (!unreadVisible.length) return;
 
     void Promise.all(
@@ -207,29 +231,46 @@ export function NotificationsBell(props: {
           <div className="px-3 py-6 text-sm text-muted-foreground">No notifications yet.</div>
         ) : (
           <>
-            {items.slice(0, 6).map((n) => (
-              <DropdownMenuItem
-                key={n.id}
-                className={cn('flex items-start gap-3 py-2.5', n.read !== true && 'bg-primary/5')}
-                onSelect={(e) => {
-                  e.preventDefault();
-                  void handleClickNotif(n);
-                }}
-              >
-                <div className={cn('mt-0.5')}>
-                  {String(n.type || '') === 'message_received' || String(n.category || '') === 'messages' ? (
-                    <MessageSquare className="h-4 w-4 text-primary" />
-                  ) : (
-                    <Bell className="h-4 w-4 text-muted-foreground" />
+            {sortActionFirst(items).slice(0, 8).map((n) => {
+              const isActionRequired = ACTION_REQUIRED_TYPES.has(normalizeType(n));
+              const actionLabel = n.linkLabel || 'View';
+              return (
+                <DropdownMenuItem
+                  key={n.id}
+                  className={cn(
+                    'flex items-start gap-3 py-2.5',
+                    n.read !== true && (isActionRequired ? 'bg-destructive/5' : 'bg-primary/5')
                   )}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold truncate">{n.title || 'Notification'}</div>
-                  <div className="text-xs text-muted-foreground line-clamp-2">{n.body || ''}</div>
-                </div>
-                {n.read !== true ? <span className="ml-auto mt-1 h-2 w-2 rounded-full bg-primary" /> : null}
-              </DropdownMenuItem>
-            ))}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    void handleClickNotif(n);
+                  }}
+                >
+                  <div className={cn('mt-0.5')}>
+                    {String(n.type || '') === 'message_received' || String(n.category || '') === 'messages' ? (
+                      <MessageSquare className="h-4 w-4 text-primary" />
+                    ) : isActionRequired ? (
+                      <Bell className="h-4 w-4 text-destructive" />
+                    ) : (
+                      <Bell className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold truncate">{n.title || 'Notification'}</div>
+                    <div className="text-xs text-muted-foreground line-clamp-2">{n.body || ''}</div>
+                    <div className="mt-1.5 text-xs font-semibold text-primary">{actionLabel}</div>
+                  </div>
+                  {n.read !== true ? (
+                    <span
+                      className={cn(
+                        'ml-auto mt-1 h-2 w-2 rounded-full shrink-0',
+                        isActionRequired ? 'bg-destructive' : 'bg-primary'
+                      )}
+                    />
+                  ) : null}
+                </DropdownMenuItem>
+              );
+            })}
 
             <DropdownMenuSeparator />
             <DropdownMenuItem

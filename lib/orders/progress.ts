@@ -16,6 +16,21 @@ import { getEffectiveTransactionStatus } from './status';
 import { isRegulatedWhitetailDeal, hasComplianceConfirmations } from '@/lib/compliance/whitetail';
 import { ORDER_COPY, getStatusLabel } from './copy';
 
+/**
+ * Balance due for final payment (deposit flow).
+ * When the buyer paid a deposit, balance due = order total − deposit.
+ * Otherwise uses stored finalPaymentAmount (legacy or precomputed).
+ */
+export function getOrderBalanceDue(order: Order): number {
+  const total = typeof order.amount === 'number' ? order.amount : 0;
+  const deposit = typeof (order as any).depositAmount === 'number' ? (order as any).depositAmount : 0;
+  if (deposit > 0 && total >= deposit) {
+    return Math.round((total - deposit) * 100) / 100;
+  }
+  const stored = typeof (order as any).finalPaymentAmount === 'number' ? (order as any).finalPaymentAmount : 0;
+  return stored;
+}
+
 export type MilestoneOwnerRole = 'buyer' | 'seller' | 'system' | 'admin';
 
 export interface OrderMilestone {
@@ -140,36 +155,38 @@ export function getOrderMilestones(order: Order, role?: 'buyer' | 'seller'): Ord
       helpText: 'Pick one of the seller’s proposed delivery times.',
     });
 
-    // When DELIVERY_SCHEDULED: seller must start (live tracking or mark out); buyer waits.
-    // Use role-aware label: "Start delivery" (seller) vs "Waiting for delivery" (buyer).
-    const outStepCurrent = txStatus === 'DELIVERY_SCHEDULED' && !outForDelivery;
+    const balanceDue = getOrderBalanceDue(order);
+    const hasFinalPaymentDue = balanceDue > 0;
+    const inspectionFinalComplete = !!order.finalPaymentConfirmedAt || !hasFinalPaymentDue;
+    // Out for delivery + Inspection and Final payment are the same phase: both current (orange) until buyer pays.
+    const combinedPhaseCurrent =
+      txStatus === 'DELIVERY_SCHEDULED' || (txStatus === 'OUT_FOR_DELIVERY' && hasFinalPaymentDue && !inspectionFinalComplete);
+    const combinedPhaseComplete = inspectionFinalComplete; // both complete when buyer pays
+
+    // When DELIVERY_SCHEDULED: seller must start (live tracking or mark out); buyer waits. Both steps orange with Inspection until buyer pays.
     const outStepLabel =
-      outForDelivery ? 'Out for delivery' : outStepCurrent && viewerRole === 'seller' ? 'Start delivery' : outStepCurrent ? 'Waiting for delivery' : 'Out for delivery';
+      combinedPhaseComplete ? 'Out for delivery' : combinedPhaseCurrent && viewerRole === 'seller' ? 'Start delivery' : combinedPhaseCurrent ? 'Waiting for delivery' : 'Out for delivery';
 
     milestones.push({
       key: 'out_for_delivery',
       label: outStepLabel,
-      isComplete: outForDelivery,
-      isCurrent: outStepCurrent,
+      isComplete: combinedPhaseComplete,
+      isCurrent: combinedPhaseCurrent,
       isBlocked: false,
       ownerRole: 'seller',
-      completedAt: isValidNonEpochDate(order.inTransitAt) ? order.inTransitAt : undefined,
+      completedAt: isValidNonEpochDate(order.finalPaymentConfirmedAt) ? order.finalPaymentConfirmedAt : isValidNonEpochDate(order.inTransitAt) ? order.inTransitAt : undefined,
     });
 
-    const hasFinalPaymentDue = typeof order.finalPaymentAmount === 'number' && order.finalPaymentAmount > 0;
-    const inspectionFinalComplete = !!order.finalPaymentConfirmedAt || !hasFinalPaymentDue;
-    const inspectionFinalCurrent =
-      txStatus === 'OUT_FOR_DELIVERY' && !inspectionFinalComplete && hasFinalPaymentDue;
     const inspectionLabel =
-      viewerRole === 'seller' && inspectionFinalCurrent
+      viewerRole === 'seller' && combinedPhaseCurrent && hasFinalPaymentDue
         ? 'Waiting on buyer – Inspection and Final payment'
         : 'Inspection and Final payment';
 
     milestones.push({
       key: 'inspection_final_payment',
       label: inspectionLabel,
-      isComplete: inspectionFinalComplete,
-      isCurrent: inspectionFinalCurrent,
+      isComplete: combinedPhaseComplete,
+      isCurrent: combinedPhaseCurrent,
       isBlocked: false,
       ownerRole: 'buyer',
       helpText: hasFinalPaymentDue
@@ -178,31 +195,34 @@ export function getOrderMilestones(order: Order, role?: 'buyer' | 'seller'): Ord
       completedAt: isValidNonEpochDate(order.finalPaymentConfirmedAt) ? order.finalPaymentConfirmedAt : undefined,
     });
 
+    // Delivery: seller has checklist, buyer has PIN. Label "Delivery" until complete, then "Delivered".
+    const deliveredCurrent =
+      (txStatus === 'DELIVERED_PENDING_CONFIRMATION' || (txStatus === 'OUT_FOR_DELIVERY' && inspectionFinalComplete)) && !completed;
     milestones.push({
       key: 'delivered',
-      label: 'Delivered',
-      isComplete: delivered,
-      isCurrent: txStatus === 'OUT_FOR_DELIVERY' && !delivered && inspectionFinalComplete,
+      label: completed ? 'Delivered' : 'Delivery',
+      isComplete: completed,
+      isCurrent: deliveredCurrent,
       isBlocked: false,
       ownerRole: 'seller',
+      helpText: 'Seller completes delivery checklist at handoff (PIN, signature, photo). Buyer uses PIN when seller arrives.',
       completedAt: isValidNonEpochDate(order.deliveredAt) ? order.deliveredAt : undefined,
     });
 
+    // Transaction complete: always show after Delivery/Delivered (pending until checklist is done).
     milestones.push({
-      key: 'confirm_receipt',
-      label: 'Confirm receipt',
+      key: 'completed',
+      label: 'Transaction complete',
       isComplete: completed,
-      isCurrent: txStatus === 'DELIVERED_PENDING_CONFIRMATION' && !completed,
+      isCurrent: false,
       isBlocked: false,
-      ownerRole: 'buyer',
-      dueAt: isValidNonEpochDate(order.disputeDeadlineAt) ? order.disputeDeadlineAt : undefined,
-      helpText: 'Confirm you received the order to complete the transaction.',
-      completedAt: isValidNonEpochDate(order.buyerConfirmedAt ?? order.acceptedAt) ? (order.buyerConfirmedAt ?? order.acceptedAt) : undefined,
+      ownerRole: 'system',
+      completedAt: isValidNonEpochDate(order.completedAt) ? order.completedAt : undefined,
     });
   }
 
-  // Completion milestone
-  if (txStatus === 'COMPLETED') {
+  // Completion milestone for non–seller-delivery flows (e.g. pickup) when already completed
+  if (txStatus === 'COMPLETED' && milestones[milestones.length - 1]?.key !== 'completed') {
     milestones.push({
       key: 'completed',
       label: 'Transaction complete',
@@ -298,8 +318,12 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
 
   // Role-specific actions (seller delivery only)
   if (role === 'buyer') {
-    const hasFinalPaymentDue = typeof (order as any).finalPaymentAmount === 'number' && (order as any).finalPaymentAmount > 0;
-    if (txStatus === 'OUT_FOR_DELIVERY' && hasFinalPaymentDue && !(order as any).finalPaymentConfirmedAt) {
+    const balanceDue = getOrderBalanceDue(order);
+    const hasFinalPaymentDue = balanceDue > 0 && !(order as any).finalPaymentConfirmedAt;
+    if (
+      (txStatus === 'DELIVERY_SCHEDULED' || txStatus === 'OUT_FOR_DELIVERY') &&
+      hasFinalPaymentDue
+    ) {
       return {
         title: 'Inspection and Final payment',
         description: 'Complete your final payment (balance due) to receive your delivery PIN.',
@@ -311,12 +335,11 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
     }
     if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
       return {
-        title: 'Confirm receipt',
-        description: 'Confirm you received the order to complete the transaction.',
-        ctaLabel: ORDER_COPY.actions.confirmReceipt,
-        ctaAction: `/dashboard/orders/${order.id}#confirm-receipt`,
+        title: 'Complete delivery',
+        description: 'Use your delivery PIN when the seller arrives with the checklist. They’ll have you enter it, sign, and take a photo to complete the transaction.',
+        ctaLabel: 'View order',
+        ctaAction: `/dashboard/orders/${order.id}`,
         severity: 'info',
-        dueAt: isValidNonEpochDate(order.disputeDeadlineAt) ? order.disputeDeadlineAt : undefined,
         ownerRole: 'buyer',
       };
     }
@@ -333,7 +356,7 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
     if (['DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY'].includes(txStatus)) {
       return {
         title: 'Waiting for delivery',
-        description: 'Your order is on its way. You will be able to confirm receipt once it arrives.',
+        description: 'Your order is on its way. Buyer pays final balance to get their PIN; at handoff you’ll complete the delivery checklist.',
         ctaLabel: 'View Details',
         ctaAction: `/dashboard/orders/${order.id}`,
         severity: 'info',
@@ -354,7 +377,7 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
       }
       return {
         title: 'Waiting on seller',
-        description: 'Seller will propose a delivery date using your address. You’ll confirm the date, then confirm receipt when it arrives.',
+        description: 'Seller will propose a delivery date using your address. You’ll confirm the date, pay any balance due to get your PIN, then complete delivery with the checklist when they arrive.',
         ctaLabel: 'View order',
         ctaAction: `/dashboard/orders/${order.id}`,
         severity: 'info',
@@ -418,12 +441,12 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
     }
     if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
       return {
-        title: 'Waiting on buyer',
-        description: 'Waiting for buyer to confirm receipt.',
-        ctaLabel: 'View Details',
+        title: 'Complete delivery checklist',
+        description: 'At handoff, have the buyer enter their PIN, sign, and take a photo to complete the transaction.',
+        ctaLabel: 'Open checklist',
         ctaAction: `/seller/orders/${order.id}`,
         severity: 'info',
-        ownerRole: 'buyer',
+        ownerRole: 'seller',
       };
     }
   }
@@ -473,8 +496,8 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
       blockingRole = 'seller';
       stalledStep = 'Mark delivered';
     } else if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
-      blockingRole = 'buyer';
-      stalledStep = 'Confirm receipt';
+      blockingRole = 'seller';
+      stalledStep = 'Complete delivery checklist';
     } else if (txStatus === 'READY_FOR_PICKUP' || txStatus === 'PICKUP_PROPOSED') {
       blockingRole = 'buyer';
       stalledStep = 'Select pickup window';

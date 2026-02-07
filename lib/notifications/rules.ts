@@ -296,6 +296,24 @@ export function getEventRule(type: NotificationEventType, payload: NotificationE
         rateLimitPerUser: {},
         allowDuringQuietHours: true,
       };
+    case 'Order.FinalPaymentDue':
+      return {
+        category: 'orders',
+        urgency: 'high',
+        channels: ['inApp', 'email'],
+        dedupeWindowMs: 1000 * 60 * 60 * 2,
+        rateLimitPerUser: { email: { perHour: 4, perDay: 10 } },
+        allowDuringQuietHours: true,
+      };
+    case 'Order.FinalPaymentConfirmed':
+      return {
+        category: 'orders',
+        urgency: 'normal',
+        channels: ['inApp', 'email'],
+        dedupeWindowMs: 1000 * 60 * 60 * 24,
+        rateLimitPerUser: { email: { perHour: 4, perDay: 10 } },
+        allowDuringQuietHours: true,
+      };
     case 'Order.TransferComplianceRequired':
       return {
         category: 'orders',
@@ -462,6 +480,8 @@ export function decideChannels(params: {
         if (params.eventType === 'Order.DeliveryAddressSet') return cats.orders.confirmed;
         if (params.eventType === 'Order.DeliveryTrackingStarted') return cats.orders.confirmed;
         if (params.eventType === 'Order.DeliveryTrackingStopped') return cats.orders.confirmed;
+        if (params.eventType === 'Order.FinalPaymentDue') return cats.orders.confirmed;
+        if (params.eventType === 'Order.FinalPaymentConfirmed') return cats.orders.confirmed;
         if (params.eventType === 'Order.TransferComplianceRequired') return cats.orders.confirmed;
         if (params.eventType === 'Review.Request') return cats.orders.confirmed;
         if (params.eventType === 'Review.Received') return cats.orders.confirmed;
