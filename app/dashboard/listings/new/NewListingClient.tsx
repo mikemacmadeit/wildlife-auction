@@ -2100,7 +2100,7 @@ function NewListingPageContent() {
       title: 'Photos',
       description: 'Upload + select photos (required)',
       content: (
-        <div className="space-y-4">
+        <div className="space-y-4 max-md:pb-4">
           {validationAttempted.media && formData.photoIds.length === 0 ? (
             <Alert className="bg-destructive/10 border-destructive/20">
               <AlertCircle className="h-4 w-4 text-destructive" />
@@ -3502,8 +3502,8 @@ function NewListingPageContent() {
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="container mx-auto px-4 py-4 sm:py-6 md:py-8 max-w-4xl">
+      {/* Main Content - extra bottom padding on mobile so content and buttons clear fixed bottom nav */}
+      <div className="container mx-auto px-4 py-4 sm:py-6 md:py-8 max-w-4xl max-md:pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))]">
         {/* Show a subtle banner if not authenticated */}
         {!user && (
           <div className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-lg">

@@ -558,6 +558,9 @@ export async function POST(request: Request) {
       }
     }
 
+    // Policy: all listings (including duplicates and verified sellers) require admin approval before going live.
+    needsReview = true;
+
     // Admin-only guardrails (flags only): compute on submission/publish for whitetail
     const flagUpdate: any = {};
     if (normalizedCategory === 'whitetail_breeder') {
@@ -832,58 +835,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // Publish listing (non-review categories)
-    const now = Timestamp.now();
-    const durationDays = coerceDurationDays((listingData as any)?.durationDays, 7);
-    // Initialize inventory tracking for fixed multi-quantity listings (fixed_group)
-    const attrsQty = Number((listingData as any)?.attributes?.quantity ?? 1) || 1;
-    const isFixedMultiQty = String((listingData as any)?.type || '') === 'fixed' && attrsQty > 1;
-    const inventoryInit = isFixedMultiQty
-      ? { quantityTotal: Math.max(1, Math.floor(attrsQty)), quantityAvailable: Math.max(1, Math.floor(attrsQty)) }
-      : {};
-    // startAt/endAt are only set when the listing becomes ACTIVE (not pending review).
-    const startAt = now;
-    const endAtMs = computeEndAt(startAt.toMillis(), durationDays);
-    const endAt = Timestamp.fromMillis(endAtMs);
-
-    // Safety: hard cap at 10 days even if caller tries to sneak something else in.
-    if (!isValidDurationDays(durationDays)) {
-      return json(
-        { error: 'Invalid duration', code: 'INVALID_DURATION', message: 'Listing duration must be 1, 3, 5, 7, or 10 days.' },
-        { status: 400 }
-      );
-    }
-
-    await listingRef.update({
-      category: normalizedCategory,
-      status: 'active',
-      publishedAt: now,
-      startAt,
-      endAt,
-      durationDays,
-      // Back-compat: auctions still use endsAt for countdown/bidding gates.
-      ...(String((listingData as any)?.type || '') === 'auction' ? { endsAt: endAt } : {}),
-      updatedAt: now,
-      updatedBy: userId,
-      sellerTierSnapshot: sellerTier,
-      sellerTierWeightSnapshot: sellerTierWeight,
-      sellerSnapshot: publicSellerSnapshot,
-      ...flagUpdate,
-      ...inventoryInit,
-    });
-
-    logInfo('Listing published', {
-      route: '/api/listings/publish',
-      listingId,
-      userId,
-      sellerTier,
-    });
-
-    return json({
-      success: true,
-      listingId,
-      status: 'active',
-    });
+    // All listings go through the review path above (needsReview is always true). No direct-to-active path.
   } catch (error: any) {
     logError('Error publishing listing', error, {
       route: '/api/listings/publish',

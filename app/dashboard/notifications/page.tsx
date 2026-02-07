@@ -569,8 +569,8 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-6">
-      <div className="container mx-auto px-4 py-4 md:py-8 max-w-7xl space-y-4 md:space-y-8">
+    <div className="min-h-screen bg-background pb-20 md:pb-6 max-md:pb-[max(5rem,calc(env(safe-area-inset-bottom)+4rem))]">
+      <div className="container mx-auto px-3 py-4 sm:px-4 md:py-8 max-w-7xl space-y-4 md:space-y-8">
       <Card className="border border-border/60 overflow-hidden shadow-warm">
         <CardContent className="p-4 md:p-6">
           <div className="flex flex-col gap-4">
@@ -614,22 +614,22 @@ export default function NotificationsPage() {
       </Card>
 
       <Card className="border border-border/60 overflow-hidden">
-        <CardHeader className="px-4 pt-4 pb-2 md:px-6 md:pt-6 md:pb-4">
-          <CardTitle className="text-base flex items-center gap-2">
+        <CardHeader className="px-3 pt-3 pb-2 sm:px-4 md:px-6 md:pt-6 md:pb-4">
+          <CardTitle className="text-base flex items-center gap-2 flex-wrap">
             <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
             To do
             {actionItems.length > 0 ? (
-              <Badge variant="destructive" className="ml-1">
+              <Badge variant="destructive" className="ml-0 sm:ml-1 shrink-0">
                 {actionItems.length}
               </Badge>
             ) : null}
           </CardTitle>
         </CardHeader>
-        <CardContent className="px-4 pb-4 md:px-6 md:pb-6 pt-0">
+        <CardContent className="px-3 pb-4 sm:px-4 md:px-6 md:pb-6 pt-0">
           {actionItems.length === 0 ? (
             <p className="text-sm text-muted-foreground">You&apos;re all caught up. Nothing needs your response right now.</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-2 sm:space-y-2">
               {actionItems.map((n) => {
                 const typeNorm = normalizeType(n);
                 const tag = tagForNotification(n);
@@ -637,17 +637,24 @@ export default function NotificationsPage() {
                 const hasLink = (n.deepLinkUrl || '').trim().length > 0;
                 const label = n.linkLabel || 'Open';
                 return (
-                  <li key={n.id} className="flex items-center justify-between gap-3 py-2 px-3 rounded-lg border border-destructive/30 bg-destructive/10 dark:bg-destructive/20">
+                  <li
+                    key={n.id}
+                    className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 py-3 px-3 sm:py-2 rounded-lg border border-destructive/30 bg-destructive/10 dark:bg-destructive/20"
+                  >
                     <div className="min-w-0 flex-1">
-                      <span className="text-sm font-medium">{n.title}</span>
-                      {n.body ? <p className="text-xs text-muted-foreground mt-0.5 truncate">{n.body}</p> : null}
+                      <span className="text-sm font-medium block">{n.title}</span>
+                      {n.body ? (
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 sm:line-clamp-1 sm:truncate break-words">{n.body}</p>
+                      ) : null}
                     </div>
-                    {hasLink ? (
-                      <Button asChild size="sm" variant="destructive" className="shrink-0">
-                        <Link href={href}>{label}</Link>
-                      </Button>
-                    ) : null}
-                    {tag ? <Badge variant={tag.variant} className="shrink-0">{tag.label}</Badge> : null}
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      {hasLink ? (
+                        <Button asChild size="sm" variant="destructive" className="min-h-[40px] w-full sm:w-auto sm:min-w-0">
+                          <Link href={href}>{label}</Link>
+                        </Button>
+                      ) : null}
+                      {tag ? <Badge variant={tag.variant} className="shrink-0">{tag.label}</Badge> : null}
+                    </div>
                   </li>
                 );
               })}

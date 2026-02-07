@@ -223,13 +223,13 @@ export function StepperForm({
         )}
       </div>
 
-      {/* Step Content with Better Spacing */}
-      <div className="min-h-[300px] sm:min-h-[400px] py-4 sm:py-6">
+      {/* Step Content with Better Spacing - extra bottom padding on mobile so content clears fixed bottom nav */}
+      <div className="min-h-[300px] sm:min-h-[400px] py-4 sm:py-6 max-md:pb-8">
         {currentStepData.content}
       </div>
 
-      {/* Enhanced Navigation */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 pt-6 pb-6 sm:pb-4 border-t">
+      {/* Enhanced Navigation - extra bottom padding on mobile so buttons clear fixed bottom nav */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 pt-6 pb-6 sm:pb-4 max-md:pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] border-t">
         <Button
           type="button"
           variant="outline"
