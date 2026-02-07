@@ -5,7 +5,7 @@
  * Transitions: DELIVERY_PROPOSED → DELIVERY_SCHEDULED.
  */
 
-import { getFirestore, Timestamp, serverTimestamp } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { TransactionStatus } from '@/lib/types';
 import { z } from 'zod';
@@ -209,7 +209,7 @@ export async function POST(
         .get();
       await Promise.all(
         snap.docs.map((d) =>
-          d.ref.update({ read: true, readAt: serverTimestamp() })
+          d.ref.update({ read: true, readAt: FieldValue.serverTimestamp() })
         )
       );
     } catch (e) {

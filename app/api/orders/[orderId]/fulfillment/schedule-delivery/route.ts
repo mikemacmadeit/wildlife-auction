@@ -239,7 +239,7 @@ export async function POST(
           listingTitle,
           orderUrl: `${getSiteUrl()}/dashboard/orders/${orderId}`,
           ...(useWindows
-            ? { proposedWindows: windowsWithDates, message: 'Seller offered delivery times. Choose one that works for you.' }
+            ? { proposedWindows: windowsWithDates?.map((w) => ({ start: w.start.toISOString(), end: w.end.toISOString() })), message: 'Seller offered delivery times. Choose one that works for you.' }
             : { eta: (deliveryPayload as any).eta?.toISOString?.() }),
         },
         optionalHash: `delivery_${useWindows ? 'proposed' : 'scheduled'}:${now.toISOString()}`,

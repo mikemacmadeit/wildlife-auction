@@ -274,7 +274,7 @@ export type NotificationEventPayload =
       listingTitle: string;
       orderUrl: string;
       eta?: string; // ISO 8601 (legacy)
-      proposedWindows?: Array<{ start: Date; end: Date }>;
+      proposedWindows?: Array<{ start: string; end: string }>; // ISO 8601 strings
       message?: string;
     }
   | {

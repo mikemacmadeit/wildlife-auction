@@ -103,7 +103,7 @@ export default function BuyerOrderDetailPage() {
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [processing, setProcessing] = useState<'dispute' | 'pay-final' | null>(null);
+  const [processing, setProcessing] = useState<'agree-delivery' | 'dispute' | 'pay-final' | null>(null);
   const [setAddressModalOpen, setSetAddressModalOpen] = useState(false);
   const [sendPhotosPromptOpen, setSendPhotosPromptOpen] = useState(false);
   const [sendPhotosModalOpen, setSendPhotosModalOpen] = useState(false);
@@ -747,7 +747,7 @@ export default function BuyerOrderDetailPage() {
                             className="flex w-full flex-col items-stretch gap-3 rounded-lg border border-border bg-card p-4 text-left transition-colors hover:border-primary/50 hover:bg-muted/30 disabled:opacity-60 disabled:pointer-events-none sm:flex-row sm:items-center sm:justify-between sm:gap-4 min-h-[56px] touch-manipulation"
                             onClick={async () => {
                               try {
-                                setProcessing('confirm');
+                                setProcessing('agree-delivery');
                                 await postAuthJson(`/api/orders/${o.id}/fulfillment/agree-delivery`, { agreedWindowIndex: idx });
                                 toast({ title: 'Date chosen', description: 'Seller will deliver within this timeframe.' });
                                 const refreshed = await getOrderById(o.id);
