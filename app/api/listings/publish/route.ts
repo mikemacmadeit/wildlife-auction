@@ -251,7 +251,10 @@ export async function POST(request: Request) {
       return json({ error: 'Unauthorized - Invalid token' }, { status: 401 });
     }
 
-    const userId = decodedToken.uid;
+    const userId = (decodedToken as any)?.uid;
+    if (!userId || typeof userId !== 'string') {
+      return json({ error: 'Unauthorized', message: 'Invalid token: missing user ID.' }, { status: 401 });
+    }
     // Require verified email before allowing publish (reduces abuse + ensures reliable seller contact).
     if ((decodedToken as any)?.email_verified !== true) {
       return json(
@@ -282,11 +285,23 @@ export async function POST(request: Request) {
       // If user doc read fails, fail open (do not block publishing).
     }
 
-    // Validate request body
-    const body = await request.json();
+    // Validate request body (parse safely so we always return JSON errors)
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return json(
+        { error: 'Invalid request body', message: 'Request body must be valid JSON with a listingId.' },
+        { status: 400 }
+      );
+    }
     const validation = validateRequest(publishListingSchema, body);
     if (!validation.success) {
-      return json({ error: validation.error, details: validation.details?.errors }, { status: 400 });
+      return json({
+        error: validation.error,
+        message: validation.error || 'Invalid request. Please provide a valid listing ID.',
+        details: validation.details?.errors,
+      }, { status: 400 });
     }
 
     const { listingId } = validation.data;
@@ -296,7 +311,8 @@ export async function POST(request: Request) {
     const listingDoc = await listingRef.get();
     
     if (!listingDoc.exists) {
-      return json({ error: 'Listing not found' }, { status: 404 });
+      logError('Publish failed: listing not found', new Error('Listing not found'), { listingId, userId });
+      return json({ error: 'Listing not found', message: 'This listing no longer exists or was deleted.' }, { status: 404 });
     }
 
     const listingData = listingDoc.data()!;
@@ -361,6 +377,12 @@ export async function POST(request: Request) {
     // Core publish validation (business rules). Prevent publishing "free" listings (price=0) and other incomplete data.
     const required = validatePublishRequiredFields(listingData);
     if (!required.ok) {
+      logInfo('Publish blocked: listing validation failed', {
+        route: '/api/listings/publish',
+        listingId,
+        userId,
+        missing: required.missing,
+      });
       return json(
         {
           error: 'Listing validation failed',
@@ -609,71 +631,8 @@ export async function POST(request: Request) {
           return out;
         };
 
-        if (decision.canAutoApprove) {
-          const now = Timestamp.now();
-          const startAt = now;
-          const endAtMs = computeEndAt(startAt.toMillis(), durationDays);
-          const endAt = Timestamp.fromMillis(endAtMs);
-          const inventoryInit = isFixedMultiQtyPending
-            ? { quantityTotal: Math.max(1, Math.floor(attrsQtyPending)), quantityAvailable: Math.max(1, Math.floor(attrsQtyPending)) }
-            : {};
-
-          await listingRef.update({
-            category: normalizedCategory,
-            status: 'active',
-            publishedAt: now,
-            startAt,
-            endAt,
-            durationDays,
-            ...(String((listingData as any)?.type || '') === 'auction' ? { endsAt: endAt } : {}),
-            updatedAt: now,
-            updatedBy: userId,
-            sellerTierSnapshot: sellerTier,
-            sellerTierWeightSnapshot: sellerTierWeight,
-            sellerSnapshot: publicSellerSnapshot,
-            complianceStatus: 'approved',
-            aiModeration: buildAiModeration('auto_approved'),
-            ...flagUpdate,
-            ...inventoryInit,
-          });
-
-          await createAuditLog(db as any, {
-            actorUid: 'system',
-            actorRole: 'system',
-            actionType: 'listing_ai_auto_approved',
-            listingId,
-            targetUserId: userId,
-            beforeState: { status: 'draft' },
-            afterState: { status: 'active', complianceStatus: 'approved' },
-            metadata: { scores: decision.scores, flags: decision.flags },
-            source: 'api',
-          });
-
-          try {
-            const { getSiteUrl } = await import('@/lib/site-url');
-            const origin = getSiteUrl();
-            await emitAndProcessEventForUser({
-              type: 'Listing.Approved',
-              actorId: 'system',
-              entityType: 'listing',
-              entityId: listingId,
-              targetUserId: userId,
-              payload: {
-                type: 'Listing.Approved',
-                listingId,
-                listingTitle: String(listingData?.title || 'Listing'),
-                listingUrl: `${origin}/listing/${listingId}`,
-              },
-              optionalHash: `listing_approved:${listingId}`,
-            });
-          } catch {
-            // Do not block on notification failure
-          }
-
-          logInfo('Listing AI auto-approved', { route: '/api/listings/publish', listingId, userId });
-          return json({ success: true, listingId, status: 'active' });
-        }
-
+        // All listings in the review path go to pending (no auto-approve on submit).
+        // Admins can still use "Try AI auto-approve" from the admin queue to approve individual listings.
         aiModerationForPending = buildAiModeration(decision.decision);
       } catch (e: any) {
         logError('AI moderation evaluation failed (falling back to manual)', e, { listingId });
@@ -700,6 +659,14 @@ export async function POST(request: Request) {
         ...flagUpdate,
         ...inventoryInitPending,
         ...(aiModerationForPending ? { aiModeration: aiModerationForPending } : {}),
+      });
+
+      logInfo('Listing submitted for review', {
+        route: '/api/listings/publish',
+        listingId,
+        userId,
+        status: 'pending',
+        pendingReason: requiresAdminApproval ? 'admin_approval' : 'compliance_review',
       });
 
       // Generate AI summary immediately when listing goes to pending

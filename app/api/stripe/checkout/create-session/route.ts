@@ -381,7 +381,7 @@ export async function POST(request: Request) {
     let auctionResultSnapshot: any | null = null;
     
     if (offerId) {
-      // Accepted offer dictates the price (server authoritative)
+      // Accepted offer dictates the price (server authoritative). Same deposit logic as Buy Now: 20% at checkout.
       if (listingData.type !== 'fixed' && listingData.type !== 'classified') {
         return NextResponse.json({ error: 'Offer checkout is only supported for fixed/classified listings' }, { status: 400 });
       }
@@ -389,6 +389,7 @@ export async function POST(request: Request) {
       if (!Number.isFinite(accepted) || accepted <= 0) {
         return NextResponse.json({ error: 'Offer has an invalid accepted amount' }, { status: 400 });
       }
+      // Offer amounts are in dollars (same as listing.price); deposit = purchaseTotalAmount * 0.2
       purchaseAmount = accepted;
     } else if (listingData.type === 'fixed') {
       // Fixed price listing - use listing price

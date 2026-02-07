@@ -71,7 +71,7 @@ export const ORDER_COPY = {
     trackFulfillmentProgress: 'Track fulfillment progress, compliance milestones, and delivery—exactly who we\'re waiting on.',
     sellerReceivesFundsImmediately: 'Seller receives funds immediately upon successful payment via Stripe Connect destination charges. No payout release needed.',
     waitingForSellerToStart: 'Waiting for seller to start fulfillment',
-    waitingForDelivery: 'Waiting for delivery',
+    waitingForDelivery: 'Out for delivery',
     waitingForBuyerConfirmation: 'Waiting for buyer confirmation',
     waitingForPickup: 'Waiting for pickup',
     transactionComplete: 'Transaction complete. Seller was paid immediately upon successful payment.',

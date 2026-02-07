@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
+import { resolveActionNotifications } from '@/lib/notifications/resolveAction';
 import { getSiteUrl } from '@/lib/site-url';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { sanitizeFirestorePayload } from '@/lib/firebase/sanitizeFirestore';
@@ -257,6 +258,16 @@ export async function POST(
       }
     } catch (e) {
       console.error('Error emitting Order.DeliveryScheduled notification event:', e);
+    }
+
+    // Resolve seller "new sale / propose delivery" action items for this order
+    try {
+      await Promise.all([
+        resolveActionNotifications(db as any, sellerId, { type: 'order_created', entityId: orderId }),
+        resolveActionNotifications(db as any, sellerId, { type: 'order_delivery_address_set', entityId: orderId }),
+      ]);
+    } catch {
+      /* best-effort */
     }
 
     return json({

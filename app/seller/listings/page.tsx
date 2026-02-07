@@ -1082,9 +1082,9 @@ function SellerListingsPageContent() {
               </div>
             </div>
 
-            {/* Filters: mobile = scrollable row (like Orders); desktop = one row */}
-            <div className="md:hidden overflow-x-auto overflow-y-hidden pt-1 pb-2 -mx-1 px-1 we-scrollbar-hover">
-              <div className="flex items-center gap-2 flex-nowrap min-w-0">
+            {/* Filters: mobile = swipeable row (horizontal scroll) */}
+            <div className="md:hidden overflow-x-auto overflow-y-hidden pt-1 pb-2 -mx-1 px-1 we-scrollbar-hover touch-pan-x overscroll-x-auto touch-scroll-x">
+              <div className="inline-flex items-center gap-2 flex-nowrap w-max min-h-9">
                 <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap flex-shrink-0">Status</span>
                 {statusChipDefs.map((d) => {
                   const active = statusFilter === d.key;
@@ -1190,45 +1190,88 @@ function SellerListingsPageContent() {
               </div>
             </div>
 
-            {/* Sort + Gallery / List view toggle — same line */}
-            <div className="flex flex-row items-center justify-between gap-3 border-t border-border/40 mt-2 pt-3">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-muted-foreground">Sort:</span>
-                <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'newest' | 'oldest')}>
-                  <SelectTrigger className="h-8 w-[160px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="newest">Date added (newest)</SelectItem>
-                    <SelectItem value="oldest">Date added (oldest)</SelectItem>
-                  </SelectContent>
-                </Select>
+            {/* Sort + Gallery / List view toggle — swipeable on mobile */}
+            <div className="border-t border-border/40 mt-2 pt-3">
+              {/* Desktop: single row */}
+              <div className="hidden md:flex flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-muted-foreground">Sort:</span>
+                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'newest' | 'oldest')}>
+                    <SelectTrigger className="h-8 w-[160px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="newest">Date added (newest)</SelectItem>
+                      <SelectItem value="oldest">Date added (oldest)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-muted-foreground">View:</span>
+                  <div className="flex rounded-lg border border-border/60 bg-background/40 p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('gallery')}
+                      className={cn(
+                        'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold transition',
+                        viewMode === 'gallery' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground hover:bg-muted/60'
+                      )}
+                    >
+                      <LayoutGrid className="h-4 w-4" />
+                      Gallery
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('list')}
+                      className={cn(
+                        'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold transition',
+                        viewMode === 'list' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground hover:bg-muted/60'
+                      )}
+                    >
+                      <List className="h-4 w-4" />
+                      List
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-muted-foreground">View:</span>
-                <div className="flex rounded-lg border border-border/60 bg-background/40 p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('gallery')}
-                    className={cn(
-                      'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold transition',
-                      viewMode === 'gallery' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground hover:bg-muted/60'
-                    )}
-                  >
-                    <LayoutGrid className="h-4 w-4" />
-                    Gallery
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('list')}
-                    className={cn(
-                      'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold transition',
-                      viewMode === 'list' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground hover:bg-muted/60'
-                    )}
-                  >
-                    <List className="h-4 w-4" />
-                    List
-                  </button>
+              {/* Mobile: swipeable row */}
+              <div className="md:hidden overflow-x-auto overflow-y-hidden -mx-1 px-1 we-scrollbar-hover touch-pan-x overscroll-x-auto touch-scroll-x">
+                <div className="inline-flex items-center gap-3 flex-nowrap w-max min-h-10 py-1">
+                  <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap flex-shrink-0">Sort:</span>
+                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'newest' | 'oldest')}>
+                    <SelectTrigger className="h-8 w-[140px] flex-shrink-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="newest">Date added (newest)</SelectItem>
+                      <SelectItem value="oldest">Date added (oldest)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap flex-shrink-0">View:</span>
+                  <div className="flex rounded-lg border border-border/60 bg-background/40 p-0.5 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('gallery')}
+                      className={cn(
+                        'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold transition',
+                        viewMode === 'gallery' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground hover:bg-muted/60'
+                      )}
+                    >
+                      <LayoutGrid className="h-4 w-4" />
+                      Gallery
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('list')}
+                      className={cn(
+                        'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold transition',
+                        viewMode === 'list' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground hover:bg-muted/60'
+                      )}
+                    >
+                      <List className="h-4 w-4" />
+                      List
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

@@ -1204,7 +1204,7 @@ function EditListingPageContent() {
       description: 'Upload + select photos (required)',
       content: (
         <div className="space-y-4">
-          {publishMissingFields.includes('photos') && formData.photoIds.length === 0 ? (
+          {publishMissingFields.includes('photos') && formData.photos.length === 0 && formData.images.length === 0 ? (
             <Alert className="bg-destructive/10 border-destructive/20">
               <AlertCircle className="h-4 w-4 text-destructive" />
               <AlertDescription className="text-destructive">
@@ -1215,7 +1215,7 @@ function EditListingPageContent() {
           {user ? (
             <div
               className={cn(
-                publishMissingFields.includes('photos') && formData.photoIds.length === 0 && 'rounded-xl ring-2 ring-destructive/30'
+                publishMissingFields.includes('photos') && formData.photos.length === 0 && formData.images.length === 0 && 'rounded-xl ring-2 ring-destructive/30'
               )}
             >
               <ListingPhotoPicker

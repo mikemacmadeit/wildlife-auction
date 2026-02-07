@@ -456,6 +456,11 @@
     background: hsl(var(--primary));
   }
 
+  /* Touch-friendly horizontal scroll (swipeable rows on mobile) */
+  .touch-scroll-x {
+    -webkit-overflow-scrolling: touch;
+  }
+
   /* Inverted (subtle thumb) for dark sections e.g. browse header chip row; scrollbar on hover, blends with background */
   .we-scrollbar-hover-inverted {
     scrollbar-width: none;

@@ -12,6 +12,7 @@ import { createAuditLog } from '@/lib/audit/logger';
 import { logInfo, logWarn, logError } from '@/lib/monitoring/logger';
 import { captureException } from '@/lib/monitoring/capture';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
+import { resolveActionNotifications } from '@/lib/notifications/resolveAction';
 import { getSiteUrl } from '@/lib/site-url';
 import { MARKETPLACE_FEE_PERCENT } from '@/lib/pricing/plans';
 import { normalizeCategory } from '@/lib/listings/normalizeCategory';
@@ -912,6 +913,13 @@ export async function handleCheckoutSessionCompleted(
           },
           { merge: true }
         );
+        // Smart notifications: resolve "Offer accepted – Pay now" when buyer completes checkout.
+        if (buyerId && paymentConfirmed) {
+          await resolveActionNotifications(db, buyerId, {
+            type: 'offer_accepted',
+            entityId: String(offerId),
+          });
+        }
       } catch (e) {
         logWarn('Failed to link offer to order', {
           requestId,
@@ -1272,19 +1280,11 @@ export async function handleFinalPaymentCompleted(
     now: nowTs,
   });
 
-  // Mark buyer's "Pay now" notification(s) as read – action completed.
-  try {
-    const notificationsRef = db.collection('users').doc(buyerId).collection('notifications');
-    const snap = await notificationsRef
-      .where('entityId', '==', orderId)
-      .where('type', '==', 'order_final_payment_due')
-      .get();
-    await Promise.all(
-      snap.docs.map((d) => d.ref.update({ read: true, readAt: nowTs }))
-    );
-  } catch (e) {
-    logWarn('handleFinalPaymentCompleted: failed to mark Pay now notification(s) read', { orderId, error: String(e) });
-  }
+  // Smart notifications: resolve "Pay now" so it drops from Needs action in real time.
+  await resolveActionNotifications(db, buyerId, {
+    type: 'order_final_payment_due',
+    entityId: orderId,
+  });
 
   const sellerId = orderData.sellerId ? String(orderData.sellerId) : null;
   const listingId = orderData.listingId ? String(orderData.listingId) : '';

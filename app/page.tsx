@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, Shield, TrendingUp, Users, ArrowRight, Gavel, Zap, FileCheck, BookOpen, ChevronLeft, ChevronRight, Star, Store, MessageCircle, MessageSquare, Heart } from 'lucide-react';
+import { Search, Shield, TrendingUp, Users, ArrowRight, Gavel, Zap, FileCheck, BookOpen, ChevronLeft, ChevronRight, Star, Store, MessageCircle, MessageSquare, Heart, Package } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
@@ -1059,9 +1059,9 @@ export default function HomePage() {
                       </Link>
                     </Button>
                     <Button asChild variant="secondary" size="lg" className="min-h-[44px] flex-1 min-w-0 px-2 sm:px-4 md:px-5 text-sm sm:text-base font-semibold border-2 border-border/80 hover:border-primary/40 hover:bg-primary/5">
-                      <Link href="/dashboard/watchlist" className="flex items-center justify-center gap-1.5 sm:gap-2">
-                        <Heart className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
-                        <span className="truncate">Watchlist</span>
+                      <Link href="/seller/listings" className="flex items-center justify-center gap-1.5 sm:gap-2">
+                        <Package className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
+                        <span className="truncate">My listings</span>
                       </Link>
                     </Button>
                     <Button asChild variant="secondary" size="lg" className="min-h-[44px] flex-1 min-w-0 px-2 sm:px-4 md:px-5 text-sm sm:text-base font-semibold border-2 border-border/80 hover:border-primary/40 hover:bg-primary/5 relative">

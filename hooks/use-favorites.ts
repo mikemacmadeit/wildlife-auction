@@ -44,6 +44,7 @@ export function useFavorites() {
   const isLoadingRef = useRef(true);
   const [isLoading, setIsLoading] = useState(true);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [watchlistRetry, setWatchlistRetry] = useState(0);
   const unsubscribeRef = useRef<Unsubscribe | null>(null);
   const pendingOpsRef = useRef<Map<string, { desired: boolean; startedAt: number }>>(new Map());
   // Use module-level refs that are shared across all hook instances
@@ -90,8 +91,10 @@ export function useFavorites() {
       return;
     }
 
-    // Logged-in mode: subscribe to Firestore
-    isLoadingRef.current = true;
+    // Give Firestore client time to receive auth state; retry uses longer delay
+    const delayMs = watchlistRetry > 0 ? 1500 : 150;
+    const timeoutId = setTimeout(() => {
+      isLoadingRef.current = true;
     // Don't call setIsLoading - it causes FavoritesInitializer to re-render
     // Components that need isLoading can poll isLoadingRef.current
     const watchlistRef = collection(db, 'users', user.uid, 'watchlist');
@@ -169,22 +172,27 @@ export function useFavorites() {
         // Don't call setIsLoading - it causes FavoritesInitializer to re-render
         // Components that need isLoading can poll isLoadingRef.current
       },
-      (error) => {
+      (error: any) => {
+        const code = String(error?.code || '');
+        const isPermissionDenied = code === 'permission-denied' || code === 'auth/permission-denied';
         console.error('Error subscribing to watchlist:', error);
         isLoadingRef.current = false;
-        // Don't call setIsLoading - it causes FavoritesInitializer to re-render
-        // Components that need isLoading can poll isLoadingRef.current
+        // Retry once after auth may have propagated (e.g. right after sign-in)
+        if (isPermissionDenied && watchlistRetry < 1) {
+          setWatchlistRetry((r) => r + 1);
+        }
       }
-    );
+      );
+    }, delayMs);
 
-    // Cleanup subscription on unmount or user change
     return () => {
+      clearTimeout(timeoutId);
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
         unsubscribeRef.current = null;
       }
     };
-  }, [user, authLoading]);
+  }, [user, authLoading, watchlistRetry]);
 
   // Update userRef when user changes (already declared above)
   userRef.current = user;

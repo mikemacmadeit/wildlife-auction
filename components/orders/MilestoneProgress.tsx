@@ -44,14 +44,15 @@ export function MilestoneProgress({
     if (transportOption === 'SELLER_TRANSPORT') {
       const proposed = ['DELIVERY_PROPOSED', 'DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY', 'DELIVERED_PENDING_CONFIRMATION', 'COMPLETED'].includes(txStatus);
       const scheduled = ['DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY', 'DELIVERED_PENDING_CONFIRMATION', 'COMPLETED'].includes(txStatus);
-      const out = ['OUT_FOR_DELIVERY', 'DELIVERED_PENDING_CONFIRMATION', 'COMPLETED'].includes(txStatus);
       const deliveredPending = ['DELIVERED_PENDING_CONFIRMATION', 'COMPLETED'].includes(txStatus);
       const completed = txStatus === 'COMPLETED';
+      // Out for delivery: green only when delivery is actually done (past that phase), not when we're in OUT_FOR_DELIVERY
+      const outComplete = deliveredPending || completed;
 
       items.push(
         { key: 'proposed', label: 'Delivery proposed', completed: proposed, current: txStatus === 'DELIVERY_PROPOSED' },
         { key: 'scheduled', label: 'Buyer agreed', completed: scheduled, current: txStatus === 'DELIVERY_SCHEDULED' },
-        { key: 'out', label: 'Out for delivery', completed: out, current: txStatus === 'OUT_FOR_DELIVERY' },
+        { key: 'out', label: 'Out for delivery', completed: outComplete, current: txStatus === 'OUT_FOR_DELIVERY' },
         { key: 'delivered', label: 'Delivered (pending confirmation)', completed: deliveredPending, current: txStatus === 'DELIVERED_PENDING_CONFIRMATION' },
         { key: 'completed', label: 'Completed', completed, current: txStatus === 'COMPLETED' }
       );

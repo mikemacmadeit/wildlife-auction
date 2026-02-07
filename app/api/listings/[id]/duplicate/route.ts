@@ -109,9 +109,25 @@ export async function POST(
       return attrs;
     })(),
 
-    // Media (Phase 1 photo library support + legacy images)
-    images: Array.isArray(src?.images) ? src.images.filter((u: any) => typeof u === 'string') : [],
-    photoIds: Array.isArray(src?.photoIds) ? src.photoIds.filter((p: any) => typeof p === 'string') : FieldValue.delete(),
+    // Media (Phase 1 photo library support + legacy images). Derive photoIds from photos when present so duplicate passes "has photos" checks.
+    images: (() => {
+      if (Array.isArray(src?.images) && src.images.length > 0) {
+        return src.images.filter((u: any) => typeof u === 'string');
+      }
+      if (Array.isArray(src?.photos) && src.photos.length > 0) {
+        return src.photos.map((p: any) => (p && typeof p.url === 'string' ? p.url : '')).filter(Boolean);
+      }
+      return [];
+    })(),
+    photoIds: (() => {
+      if (Array.isArray(src?.photoIds) && src.photoIds.length > 0) {
+        return src.photoIds.filter((p: any) => typeof p === 'string');
+      }
+      if (Array.isArray(src?.photos) && src.photos.length > 0) {
+        return src.photos.map((p: any, i: number) => (p && typeof p.photoId === 'string' ? p.photoId : `legacy-${i}`));
+      }
+      return FieldValue.delete();
+    })(),
     photos: Array.isArray(src?.photos) ? src.photos : FieldValue.delete(),
     coverPhotoId: typeof src?.coverPhotoId === 'string' ? src.coverPhotoId : FieldValue.delete(),
 
@@ -123,6 +139,10 @@ export async function POST(
     endsAt: FieldValue.delete(),
     currentBid: FieldValue.delete(),
     currentBidderId: FieldValue.delete(),
+    // Auction timing: reset so publish sets startAt/endAt/durationDays for the new listing.
+    startAt: FieldValue.delete(),
+    endAt: FieldValue.delete(),
+    durationDays: FieldValue.delete(),
 
     // Delivery details (seller transport) — copy so duplicate retains delivery info
     deliveryDetails: src?.deliveryDetails && typeof src.deliveryDetails === 'object' ? src.deliveryDetails : FieldValue.delete(),
@@ -139,7 +159,7 @@ export async function POST(
     protectedTermsVersion: FieldValue.delete(),
     protectedEnabledAt: FieldValue.delete(),
 
-    // Ownership + publish lifecycle
+    // Ownership + publish lifecycle (listed date = when duplicate is published, not original)
     sellerId: uid,
     sellerSnapshot,
     status: 'draft',
@@ -162,6 +182,10 @@ export async function POST(
     complianceReviewedBy: FieldValue.delete(),
     complianceReviewedAt: FieldValue.delete(),
 
+    // Seller attestation (whitetail): clear so duplicate requires re-acceptance and correct date
+    sellerAttestationAccepted: FieldValue.delete(),
+    sellerAttestationAcceptedAt: FieldValue.delete(),
+
     // Sold fields cleared
     soldAt: FieldValue.delete(),
     soldPriceCents: FieldValue.delete(),
@@ -175,7 +199,7 @@ export async function POST(
     metrics: { views: 0, favorites: 0, bidCount: 0 },
     watcherCount: FieldValue.delete(),
 
-    // Audit
+    // Audit: duplicate gets fresh timestamps; listed date (publishedAt) set when published
     createdAt: now,
     updatedAt: now,
     createdBy: uid,

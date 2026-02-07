@@ -68,7 +68,7 @@ export interface UXBadge {
 /**
  * Get all milestones for an order (transport-aware).
  * Role affects labels for the "out for delivery" step: when scheduled but not yet started,
- * seller sees "Start delivery" and buyer sees "Waiting for delivery".
+ * seller sees "Start delivery" and buyer sees "Out for delivery".
  */
 export function getOrderMilestones(order: Order, role?: 'buyer' | 'seller'): OrderMilestone[] {
   const txStatus = getEffectiveTransactionStatus(order);
@@ -158,23 +158,25 @@ export function getOrderMilestones(order: Order, role?: 'buyer' | 'seller'): Ord
     const balanceDue = getOrderBalanceDue(order);
     const hasFinalPaymentDue = balanceDue > 0;
     const inspectionFinalComplete = !!order.finalPaymentConfirmedAt || !hasFinalPaymentDue;
-    // Out for delivery + Inspection and Final payment are the same phase: both current (orange) until buyer pays.
+    // Out for delivery + Inspection and Final payment: current (orange) until buyer pays; Out for delivery turns green only when delivery is actually done.
     const combinedPhaseCurrent =
       txStatus === 'DELIVERY_SCHEDULED' || (txStatus === 'OUT_FOR_DELIVERY' && hasFinalPaymentDue && !inspectionFinalComplete);
-    const combinedPhaseComplete = inspectionFinalComplete; // both complete when buyer pays
+    const combinedPhaseComplete = inspectionFinalComplete; // Inspection/Final payment complete when buyer pays
+    // Out for delivery is complete only when we're past that phase (delivery done or transaction complete)
+    const outForDeliveryComplete = delivered || completed;
 
     // When DELIVERY_SCHEDULED: seller must start (live tracking or mark out); buyer waits. Both steps orange with Inspection until buyer pays.
     const outStepLabel =
-      combinedPhaseComplete ? 'Out for delivery' : combinedPhaseCurrent && viewerRole === 'seller' ? 'Start delivery' : combinedPhaseCurrent ? 'Waiting for delivery' : 'Out for delivery';
+      combinedPhaseComplete ? 'Out for delivery' : combinedPhaseCurrent && viewerRole === 'seller' ? 'Start delivery' : combinedPhaseCurrent ? 'Out for delivery' : 'Out for delivery';
 
     milestones.push({
       key: 'out_for_delivery',
       label: outStepLabel,
-      isComplete: combinedPhaseComplete,
+      isComplete: outForDeliveryComplete,
       isCurrent: combinedPhaseCurrent,
       isBlocked: false,
       ownerRole: 'seller',
-      completedAt: isValidNonEpochDate(order.finalPaymentConfirmedAt) ? order.finalPaymentConfirmedAt : isValidNonEpochDate(order.inTransitAt) ? order.inTransitAt : undefined,
+      completedAt: outForDeliveryComplete && isValidNonEpochDate(order.deliveredAt) ? order.deliveredAt : undefined,
     });
 
     const inspectionLabel =
@@ -355,7 +357,7 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
     }
     if (['DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY'].includes(txStatus)) {
       return {
-        title: 'Waiting for delivery',
+        title: 'Out for delivery',
         description: 'Your order is on its way. Buyer pays final balance to get their PIN; at handoff you’ll complete the delivery checklist.',
         ctaLabel: 'View Details',
         ctaAction: `/dashboard/orders/${order.id}`,

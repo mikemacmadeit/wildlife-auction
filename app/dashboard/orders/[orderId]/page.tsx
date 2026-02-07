@@ -790,7 +790,6 @@ export default function BuyerOrderDetailPage() {
                   </div>
                 );
               }
-              const qrSignedAt = (o.delivery as any)?.confirmedMethod === 'qr_public' && (o.delivery as any)?.confirmedAt;
               if ((milestone.isCurrent || milestone.isComplete) && txStatus === 'OUT_FOR_DELIVERY') {
                 return (
                   <Collapsible open={outForDeliveryExpanded} onOpenChange={setOutForDeliveryExpanded} className="mt-3">
@@ -802,33 +801,11 @@ export default function BuyerOrderDetailPage() {
                       <DeliveryTrackingCard order={o} role="buyer" currentUserUid={user?.uid ?? null} onStartTracking={async () => {}} onStopTracking={async () => {}} onMarkDelivered={async () => {}} />
                       {!order?.deliveryTracking?.enabled && (
                         <p className="text-sm text-muted-foreground">
-                          Live tracking will appear when the seller starts delivery. When they arrive, they&apos;ll hand you their phone — enter your PIN to unlock the signature and photo steps, then sign and they&apos;ll take a photo to complete delivery.
+                          Live tracking will appear when the seller starts delivery. When they arrive, complete the delivery checklist (PIN, sign, photo) in the <strong>Delivery</strong> section below.
                         </p>
-                      )}
-                      {qrSignedAt && (
-                        <div className="mt-3">
-                          <DeliveryProofTimelineBlock
-                            signedLabel="You signed for delivery"
-                            signedAt={(o.delivery as any).confirmedAt instanceof Date ? (o.delivery as any).confirmedAt : new Date((o.delivery as any).confirmedAt)}
-                            signatureUrl={(o.delivery as any)?.signatureUrl}
-                            deliveryPhotoUrl={(o.delivery as any)?.deliveryPhotoUrl}
-                          />
-                        </div>
                       )}
                     </CollapsibleContent>
                   </Collapsible>
-                );
-              }
-              if (qrSignedAt && (milestone.isCurrent || milestone.isComplete) && (txStatus === 'DELIVERED_PENDING_CONFIRMATION' || txStatus === 'OUT_FOR_DELIVERY')) {
-                return (
-                  <div className="mt-3 space-y-3">
-                    <DeliveryProofTimelineBlock
-                      signedLabel="You signed for delivery"
-                      signedAt={(o.delivery as any).confirmedAt instanceof Date ? (o.delivery as any).confirmedAt : new Date((o.delivery as any).confirmedAt)}
-                      signatureUrl={(o.delivery as any)?.signatureUrl}
-                      deliveryPhotoUrl={(o.delivery as any)?.deliveryPhotoUrl}
-                    />
-                  </div>
                 );
               }
             }
@@ -860,7 +837,8 @@ export default function BuyerOrderDetailPage() {
                           const { auth } = await import('@/lib/firebase/config');
                           const u = auth.currentUser;
                           if (!u) throw new Error('Auth required');
-                          const token = await u.getIdToken();
+                          // Force token refresh so first click succeeds (avoids expired/cached token 401)
+                          const token = await u.getIdToken(true);
                           const res = await fetch(`/api/orders/${o.id}/final-payment-session`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -879,7 +857,7 @@ export default function BuyerOrderDetailPage() {
                         } catch (e: any) {
                           toast({
                             title: 'Payment could not start',
-                            description: formatUserFacingError(e, 'Failed to start payment'),
+                            description: `${formatUserFacingError(e, 'Failed to start payment')} You can try again.`,
                             variant: 'destructive',
                           });
                         } finally {

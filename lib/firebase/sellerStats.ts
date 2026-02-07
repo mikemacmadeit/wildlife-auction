@@ -1,7 +1,9 @@
 /**
  * Seller Stats Helpers
- * 
- * Computes seller statistics for seller profile modules.
+ *
+ * Computes seller statistics from orders (completion rate, completed sales).
+ * Uses the same completion definition as the app: transactionStatus === 'COMPLETED'
+ * or legacy status completed/accepted/buyer_confirmed/ready_to_release.
  */
 
 import {
@@ -11,8 +13,18 @@ import {
   getDocs,
 } from 'firebase/firestore';
 import { db } from './config';
+
+/** Order counts as completed when transaction is COMPLETED (delivery checklist done, no refund/cancel). */
+function isOrderCompleted(orderData: Record<string, unknown>): boolean {
+  const tx = orderData.transactionStatus as string | undefined;
+  if (tx === 'COMPLETED') return true;
+  const s = orderData.status as string | undefined;
+  return s === 'completed' || s === 'accepted' || s === 'buyer_confirmed' || s === 'ready_to_release';
+}
+
 /**
- * Get seller statistics including completed sales count and completion rate
+ * Get seller statistics from orders: completed sales count and completion rate.
+ * Completion rate = (orders with status COMPLETED) / (all seller orders), as a percentage.
  */
 export async function getSellerStats(
   sellerId: string,
@@ -20,12 +32,11 @@ export async function getSellerStats(
 ): Promise<{
   completedSalesCount: number;
   completionRate: number;
+  totalOrders: number;
   visible: boolean;
 }> {
-  // Privacy + rules: only the seller (or admin) can read seller orders.
-  // Listing pages are public, so avoid noisy permission errors for buyers/anon users.
   if (!viewerId || viewerId !== sellerId) {
-    return { completedSalesCount: 0, completionRate: 0, visible: false };
+    return { completedSalesCount: 0, completionRate: 0, totalOrders: 0, visible: false };
   }
 
   try {
@@ -34,32 +45,30 @@ export async function getSellerStats(
       ordersRef,
       where('sellerId', '==', sellerId)
     );
-    
+
     const snapshot = await getDocs(sellerOrdersQuery);
-    
     let completedCount = 0;
-    let totalCount = 0;
-    
+    const totalCount = snapshot.size;
+
     snapshot.forEach((doc) => {
-      const orderData = doc.data();
-      totalCount++;
-      if (orderData.status === 'completed' || orderData.status === 'accepted') {
-        completedCount++;
-      }
+      const orderData = doc.data() as Record<string, unknown>;
+      if (isOrderCompleted(orderData)) completedCount++;
     });
-    
-    const completionRate = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-    
+
+    const completionRate =
+      totalCount > 0 ? Math.round((completedCount / totalCount) * 1000) / 10 : 0;
+
     return {
       completedSalesCount: completedCount,
-      completionRate: Math.round(completionRate * 10) / 10, // Round to 1 decimal place
+      completionRate,
+      totalOrders: totalCount,
       visible: true,
     };
-  } catch (error) {
-    // Don't spam console on public listing pages; treat as "not available".
+  } catch {
     return {
       completedSalesCount: 0,
       completionRate: 0,
+      totalOrders: 0,
       visible: false,
     };
   }

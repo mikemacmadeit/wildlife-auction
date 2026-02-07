@@ -126,7 +126,7 @@ export async function POST(request: Request) {
         return { ok: false as const, status: 409, body: { error: 'Listing is reserved by an accepted offer' } };
       }
 
-      // FIX-005: Prevent offers > listing price for fixed-price listings
+      // FIX-005: Prevent offers > listing price for fixed-price listings (amount and listing.price both in dollars)
       if (listing.type === 'fixed' && listing.price && typeof listing.price === 'number' && amount > listing.price) {
         return { 
           ok: false as const, 
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
           body: { 
             error: 'Offer amount cannot exceed listing price',
             code: 'OFFER_EXCEEDS_PRICE',
-            message: `The maximum offer amount for this listing is $${(listing.price / 100).toFixed(2)}.`
+            message: `The maximum offer amount for this listing is $${Number(listing.price).toFixed(2)}.`
           } 
         };
       }

@@ -36,6 +36,7 @@ import { OrderMilestoneTimeline } from '@/components/orders/OrderMilestoneTimeli
 import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
 import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
+import { getOrderBalanceDue } from '@/lib/orders/progress';
 import { ORDER_COPY } from '@/lib/orders/copy';
 import { cn, formatDate } from '@/lib/utils';
 import { formatUserFacingError } from '@/lib/format-user-facing-error';
@@ -384,22 +385,67 @@ export default function SellerOrderDetailPage() {
             if (milestone.key === 'out_for_delivery' && (milestone.isCurrent || milestone.isComplete)) {
               const outTxStatus = getEffectiveTransactionStatus(o);
               const needsMarkOut = milestone.isCurrent && outTxStatus === 'DELIVERY_SCHEDULED';
+              const buyerPaid = !!(o as any).finalPaymentConfirmedAt || (getOrderBalanceDue(o as any) <= 0);
               const qrSignedAt = (o.delivery as any)?.confirmedMethod === 'qr_public' && (o.delivery as any)?.confirmedAt;
               const hasDeliveryProof = qrSignedAt && ((o.delivery as any)?.signatureUrl || (o.delivery as any)?.deliveryPhotoUrl);
 
-              // When complete, show "Complete" + delivery proof only (no instructions)
+              // When transaction complete, show "Complete" only — signature appears under Delivered
               if (outTxStatus === 'COMPLETED') {
                 return (
                   <div className="mt-3 space-y-3">
                     <p className="text-sm font-semibold text-primary">Complete</p>
-                    {hasDeliveryProof && (
-                      <DeliveryProofTimelineBlock
-                        signedLabel="Recipient signed for delivery"
-                        signedAt={(o.delivery as any).confirmedAt instanceof Date ? (o.delivery as any).confirmedAt : new Date((o.delivery as any).confirmedAt)}
-                        signatureUrl={(o.delivery as any)?.signatureUrl}
-                        deliveryPhotoUrl={(o.delivery as any)?.deliveryPhotoUrl}
-                      />
-                    )}
+                  </div>
+                );
+              }
+
+              // Once buyer makes final payment, Out for delivery is complete — show completed state and point to Delivery for checklist
+              if (milestone.isComplete && buyerPaid && outTxStatus === 'OUT_FOR_DELIVERY') {
+                return (
+                  <div className="mt-3 space-y-3">
+                    <p className="text-sm font-semibold text-primary">Complete</p>
+                    <p className="text-xs text-muted-foreground">Buyer has paid. Complete the delivery checklist at handoff in the <strong>Delivery</strong> section below.</p>
+                    <DeliveryTrackingCard
+                      order={o}
+                      role="seller"
+                      currentUserUid={user?.uid ?? null}
+                      processing={trackingProcessing}
+                      onStartTracking={async () => {
+                        setTrackingProcessing('start');
+                        try {
+                          await postAuthJson(`/api/orders/${o.id}/start-delivery-tracking`);
+                          toast({ title: 'Live tracking started', description: 'Buyer can now see your location on the map.' });
+                          await loadOrder();
+                        } catch (e: any) {
+                          toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to start tracking'), variant: 'destructive' });
+                        } finally {
+                          setTrackingProcessing(null);
+                        }
+                      }}
+                      onStopTracking={async () => {
+                        setTrackingProcessing('stop');
+                        try {
+                          await postAuthJson(`/api/orders/${o.id}/stop-delivery-tracking`, { mode: 'STOP_ONLY' });
+                          toast({ title: 'Tracking stopped', description: 'Buyer will no longer see live location.' });
+                          await loadOrder();
+                        } catch (e: any) {
+                          toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to stop tracking'), variant: 'destructive' });
+                        } finally {
+                          setTrackingProcessing(null);
+                        }
+                      }}
+                      onMarkDelivered={async () => {
+                        setTrackingProcessing('delivered');
+                        try {
+                          await postAuthJson(`/api/orders/${o.id}/stop-delivery-tracking`, { mode: 'DELIVERED' });
+                          toast({ title: 'Marked as delivered', description: 'Buyer can confirm receipt on their order page.' });
+                          await loadOrder();
+                        } catch (e: any) {
+                          toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to mark delivered'), variant: 'destructive' });
+                        } finally {
+                          setTrackingProcessing(null);
+                        }
+                      }}
+                    />
                   </div>
                 );
               }
@@ -407,37 +453,7 @@ export default function SellerOrderDetailPage() {
               return (
                 <div className="mt-3 space-y-3">
                   <p className="text-sm font-medium text-foreground/90">Delivering?</p>
-                  <p className="text-xs text-muted-foreground">Open the checklist at handoff — recipient enters PIN, signs, you take a photo.</p>
-                  <div className="flex flex-wrap gap-2">
-                    {user && (
-                      <>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => setDeliveryChecklistOpen(true)}
-                          className="min-h-[44px] touch-manipulation"
-                        >
-                          <ClipboardList className="h-4 w-4 mr-2" />
-                          Open delivery checklist
-                        </Button>
-                        <DeliveryChecklistModal
-                          orderId={o.id}
-                          getAuthToken={async () => {
-                            const { auth } = await import('@/lib/firebase/config');
-                            const u = auth.currentUser;
-                            if (!u) throw new Error('Auth required');
-                            return u.getIdToken();
-                          }}
-                          onError={(msg) => toast({ title: 'Error', description: msg, variant: 'destructive' })}
-                          open={deliveryChecklistOpen}
-                          onOpenChange={(open) => {
-                            setDeliveryChecklistOpen(open);
-                            if (!open) void loadOrder();
-                          }}
-                        />
-                      </>
-                    )}
-                  </div>
+                  <p className="text-xs text-muted-foreground">When you arrive, open the delivery checklist in the <strong>Delivery</strong> section below — recipient enters PIN, signs, you take a photo.</p>
                   <DeliveryTrackingCard
                     order={o}
                     role="seller"
@@ -512,25 +528,66 @@ export default function SellerOrderDetailPage() {
                       />
                     )}
                   </div>
-                  {qrSignedAt && (
+                </div>
+              );
+            }
+            if (milestone.key === 'delivered') {
+              const outTxStatus = getEffectiveTransactionStatus(o);
+              const qrSignedAt = (o.delivery as any)?.confirmedMethod === 'qr_public' && (o.delivery as any)?.confirmedAt;
+              const hasDeliveryProof = qrSignedAt && ((o.delivery as any)?.signatureUrl || (o.delivery as any)?.deliveryPhotoUrl);
+              // Show checklist whenever order is out for delivery or delivered-pending (not only when "delivered" is current — it becomes current only after buyer pays)
+              const showChecklist =
+                (outTxStatus === 'OUT_FOR_DELIVERY' || outTxStatus === 'DELIVERED_PENDING_CONFIRMATION') && !hasDeliveryProof;
+              if (showChecklist) {
+                return (
+                  <div id="mark-delivered" className="mt-3 space-y-3 rounded-lg border border-border/60 bg-muted/30 p-4">
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      Complete the delivery checklist at handoff. Recipient enters PIN, signs, and you take a photo. No shortcut to mark delivered.
+                    </p>
+                    {user && (
+                      <>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => setDeliveryChecklistOpen(true)}
+                          className="min-h-[44px] touch-manipulation"
+                        >
+                          <ClipboardList className="h-4 w-4 mr-2" />
+                          Open delivery checklist
+                        </Button>
+                        <DeliveryChecklistModal
+                          orderId={o.id}
+                          getAuthToken={async () => {
+                            const { auth } = await import('@/lib/firebase/config');
+                            const u = auth.currentUser;
+                            if (!u) throw new Error('Auth required');
+                            return u.getIdToken();
+                          }}
+                          onError={(msg) => toast({ title: 'Error', description: msg, variant: 'destructive' })}
+                          open={deliveryChecklistOpen}
+                          onOpenChange={(open) => {
+                            setDeliveryChecklistOpen(open);
+                            if (!open) void loadOrder();
+                          }}
+                        />
+                      </>
+                    )}
+                  </div>
+                );
+              }
+              if (outTxStatus === 'COMPLETED' && hasDeliveryProof) {
+                return (
+                  <div className="mt-3 space-y-3">
+                    <p className="text-sm font-semibold text-primary">Complete</p>
                     <DeliveryProofTimelineBlock
                       signedLabel="Recipient signed for delivery"
                       signedAt={(o.delivery as any).confirmedAt instanceof Date ? (o.delivery as any).confirmedAt : new Date((o.delivery as any).confirmedAt)}
                       signatureUrl={(o.delivery as any)?.signatureUrl}
                       deliveryPhotoUrl={(o.delivery as any)?.deliveryPhotoUrl}
                     />
-                  )}
-                </div>
-              );
-            }
-            if (milestone.key === 'delivered' && milestone.isCurrent && getEffectiveTransactionStatus(o) === 'OUT_FOR_DELIVERY') {
-              return (
-                <div id="mark-delivered" className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-4">
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    Complete the delivery checklist at handoff. Recipient enters PIN, signs, and you take a photo — use <strong>Open delivery checklist</strong> above. No shortcut to mark delivered.
-                  </p>
-                </div>
-              );
+                  </div>
+                );
+              }
             }
             return null;
           }}

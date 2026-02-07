@@ -27,11 +27,19 @@ import { SellerTierBadge } from '@/components/seller/SellerTierBadge';
 import { getSellerReputation } from '@/lib/users/getSellerReputation';
 import type { UserProfile } from '@/lib/types';
 import { BreederPermitCard } from '@/components/seller/BreederPermitCard';
+import { getSellerStats } from '@/lib/firebase/sellerStats';
 
 export default function SellerReputationPage() {
   const { user } = useAuth();
   const [tier, setTier] = useState<SubscriptionTier>('standard');
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [sellerStats, setSellerStats] = useState<{
+    completedSalesCount: number;
+    completionRate: number;
+    totalOrders: number;
+    visible: boolean;
+  } | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [reviewStats, setReviewStats] = useState<{ reviewCount: number; avgRating: number } | null>(null);
   const [reviews, setReviews] = useState<any[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -51,6 +59,26 @@ export default function SellerReputationPage() {
           setTier('standard');
           setProfile(null);
         }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    let cancelled = false;
+    setStatsLoading(true);
+    getSellerStats(user.uid, user.uid)
+      .then((stats) => {
+        if (cancelled) return;
+        setSellerStats(stats);
+      })
+      .catch(() => {
+        if (!cancelled) setSellerStats(null);
+      })
+      .finally(() => {
+        if (!cancelled) setStatsLoading(false);
       });
     return () => {
       cancelled = true;
@@ -81,14 +109,29 @@ export default function SellerReputationPage() {
     };
   }, [user?.uid]);
 
-  const reputation = getSellerReputation({ profile });
-  const completedSales = Number(profile?.completedSalesCount || 0) || 0;
-  const disputeCount = 0; // Not available in current data model; keep honest.
+  const profileWithStats =
+    profile && sellerStats?.visible
+      ? {
+          ...profile,
+          completedSalesCount: sellerStats.completedSalesCount,
+          completionRate: sellerStats.completionRate,
+        }
+      : profile;
+  const reputation = getSellerReputation({
+    profile: profileWithStats,
+    totalTransactionsOverride: sellerStats?.visible ? sellerStats.totalOrders : undefined,
+  });
+  const completedSales =
+    sellerStats?.visible ? sellerStats.completedSalesCount : Number(profile?.completedSalesCount || 0) || 0;
+  const totalOrders = sellerStats?.visible ? sellerStats.totalOrders : 0;
+  const disputeCount = 0;
 
   const completionRate =
-    typeof profile?.completionRate === 'number'
-      ? Math.round(profile.completionRate > 1 ? profile.completionRate : profile.completionRate * 100)
-      : null;
+    sellerStats?.visible && typeof sellerStats.completionRate === 'number'
+      ? sellerStats.completionRate
+      : typeof profile?.completionRate === 'number'
+        ? Math.round(profile.completionRate > 1 ? profile.completionRate : profile.completionRate * 100)
+        : null;
 
   const flags = [
     {
@@ -176,17 +219,23 @@ export default function SellerReputationPage() {
               <div className="rounded-lg border-2 border-border/50 bg-background/40 p-4">
                 <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Reputation level</div>
                 <div className="mt-1 text-xl font-extrabold capitalize">{reputation.level}</div>
-                <div className="mt-1 text-xs text-muted-foreground">Derived from account age + transaction history (when available).</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  From account age and order history (completed orders, completion rate).
+                </div>
               </div>
               <div className="rounded-lg border-2 border-border/50 bg-background/40 p-4">
-                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Completed sales</div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Completed orders</div>
                 <div className="mt-1 text-xl font-extrabold">{completedSales.toLocaleString()}</div>
-                <div className="mt-1 text-xs text-muted-foreground">On-platform transactions (if tracked).</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {sellerStats?.visible ? `Of ${totalOrders} total orders` : 'From your order history.'}
+                </div>
               </div>
               <div className="rounded-lg border-2 border-border/50 bg-background/40 p-4">
-                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Disputes</div>
-                <div className="mt-1 text-xl font-extrabold">{disputeCount.toLocaleString()}</div>
-                <div className="mt-1 text-xs text-muted-foreground">Dispute data not available yet.</div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Delivery success</div>
+                <div className="mt-1 text-xl font-extrabold">{Math.round(reputation.deliverySuccessRate * 100)}%</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Same as completion rate: orders finished (delivery checklist done).
+                </div>
               </div>
             </div>
 
@@ -205,7 +254,7 @@ export default function SellerReputationPage() {
           </CardContent>
         </Card>
 
-        {/* Seller stats (real, when available) */}
+        {/* Seller stats from orders */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           <Card className="border-2 border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
@@ -215,10 +264,21 @@ export default function SellerReputationPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl md:text-3xl font-extrabold text-foreground mb-1">
-                {completionRate !== null ? `${completionRate}%` : 'Not available yet'}
-              </div>
-              <p className="text-xs text-muted-foreground font-medium">Based on on-platform transactions (if tracked).</p>
+              {statsLoading ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span className="text-sm">Loading…</span>
+                </div>
+              ) : (
+                <>
+                  <div className="text-2xl md:text-3xl font-extrabold text-foreground mb-1">
+                    {completionRate !== null ? `${completionRate}%` : '—'}
+                  </div>
+                  <p className="text-xs text-muted-foreground font-medium">
+                    Completed orders ÷ total orders. Completed = delivery checklist done (PIN, signature, photo).
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -241,22 +301,31 @@ export default function SellerReputationPage() {
                   <Badge variant="outline" className="font-semibold">No badges yet</Badge>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground font-medium">Badges are derived from existing profile fields.</p>
+              <p className="text-xs text-muted-foreground font-medium">From verification and order history.</p>
             </CardContent>
           </Card>
 
           <Card className="border-2 border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Transactions</CardTitle>
+              <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Total orders</CardTitle>
               <div className="w-10 h-10 rounded-lg bg-primary/10 border-2 border-primary/20 flex items-center justify-center">
                 <TrendingUp className="h-5 w-5 text-primary" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl md:text-3xl font-extrabold text-foreground mb-1">
-                {Math.max(Number(profile?.verifiedTransactionsCount || 0), Number(profile?.completedSalesCount || 0)).toLocaleString()}
-              </div>
-              <p className="text-xs text-muted-foreground font-medium">Verified transactions count (if tracked).</p>
+              {statsLoading ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span className="text-sm">Loading…</span>
+                </div>
+              ) : (
+                <>
+                  <div className="text-2xl md:text-3xl font-extrabold text-foreground mb-1">
+                    {(sellerStats?.visible ? sellerStats.totalOrders : Math.max(Number(profile?.verifiedTransactionsCount || 0), Number(profile?.completedSalesCount || 0))).toLocaleString()}
+                  </div>
+                  <p className="text-xs text-muted-foreground font-medium">Orders where you are the seller (all statuses).</p>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

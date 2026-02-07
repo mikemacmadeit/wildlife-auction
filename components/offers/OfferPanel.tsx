@@ -27,6 +27,7 @@ import { WireInstructionsDialog } from '@/components/payments/WireInstructionsDi
 import { isAnimalCategory } from '@/lib/compliance/requirements';
 import { AnimalRiskAcknowledgmentDialog } from '@/components/legal/AnimalRiskAcknowledgmentDialog';
 import { OfferAcceptedSuccessModal } from './OfferAcceptedSuccessModal';
+import { CHECKOUT_DEPOSIT_PERCENT } from '@/lib/pricing/plans';
 
 type OfferDTO = {
   offerId: string;
@@ -336,8 +337,11 @@ export function OfferPanel(props: { listing: Listing }) {
     if (!offer) return;
     setLoading(true);
     try {
+      // Same deposit logic as Buy Now: 20% at checkout, balance due at inspection/final payment
       const purchaseAmount = Number(offer.acceptedAmount ?? offer.currentAmount);
-      setPendingCheckoutAmount(Number.isFinite(purchaseAmount) ? purchaseAmount : 0);
+      const depositAmount =
+        Number.isFinite(purchaseAmount) ? Math.round(purchaseAmount * CHECKOUT_DEPOSIT_PERCENT * 100) / 100 : 0;
+      setPendingCheckoutAmount(depositAmount);
       if (isAnimalListing && !animalRiskAcked) setAnimalAckOpen(true);
       else setPaymentDialogOpen(true);
       setLoading(false);

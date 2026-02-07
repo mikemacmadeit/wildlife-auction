@@ -351,9 +351,9 @@ service cloud.firestore {
     // WATCHLIST COLLECTION (Subcollection under users)
     // ============================================
     // Using subcollection pattern: /users/{uid}/watchlist/{listingId}
+    // get/list explicitly so collection queries work; owner-only.
     match /users/{userId}/watchlist/{listingId} {
-      // Allow read: only the owner can read their watchlist
-      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow get, list: if isAuthenticated() && request.auth.uid == userId;
 
       // Phase 3A/B3 (scale + correctness): watch/unwatch mutations must go through
       // `POST /api/watchlist/toggle` (Admin SDK) so we can maintain:

@@ -5,13 +5,14 @@
  * Transitions: DELIVERY_PROPOSED → DELIVERY_SCHEDULED.
  */
 
-import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { TransactionStatus } from '@/lib/types';
 import { z } from 'zod';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
+import { resolveActionNotifications } from '@/lib/notifications/resolveAction';
 import { getSiteUrl } from '@/lib/site-url';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { captureException } from '@/lib/monitoring/capture';
@@ -200,22 +201,11 @@ export async function POST(
       console.error('Error emitting Order.DeliveryAgreed notification event:', e);
     }
 
-    // Mark buyer's "Accept delivery date" notification(s) as read – action completed.
-    try {
-      const notificationsRef = db.collection('users').doc(buyerId).collection('notifications');
-      const snap = await notificationsRef
-        .where('entityId', '==', orderId)
-        .where('type', '==', 'order_delivery_scheduled')
-        .get();
-      await Promise.all(
-        snap.docs.map((d) =>
-          d.ref.update({ read: true, readAt: FieldValue.serverTimestamp() })
-        )
-      );
-    } catch (e) {
-      // best-effort; don't fail the request
-      console.warn('agree-delivery: failed to mark Accept delivery date notification(s) read', { orderId, error: String(e) });
-    }
+    // Smart notifications: resolve "Accept delivery date" when buyer completes the action (real-time update in UI).
+    await resolveActionNotifications(db, buyerId, {
+      type: 'order_delivery_scheduled',
+      entityId: orderId,
+    });
 
     return json({
       success: true,

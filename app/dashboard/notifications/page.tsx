@@ -1,6 +1,12 @@
 /**
  * /dashboard/notifications
  * User Notification Center (in-app)
+ *
+ * Red "Needs action" = notifications that require a response (Pay now, Accept delivery date,
+ * Outbid, Offer countered/accepted). Each user sees only their own notifications from Firestore.
+ * If you don't see red items another user sees, you're on a different account or have different
+ * notifications. To rule out caching: hard refresh (Ctrl+Shift+R / Cmd+Shift+R) or check "Synced"
+ * at the bottom — it updates when Firestore sends new data.
  */
 
 'use client';
@@ -32,7 +38,6 @@ import {
   Handshake,
   Star,
   User,
-  ListTodo,
   ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -53,6 +58,8 @@ type UserNotification = {
   linkLabel?: string;
   read?: boolean;
   createdAt?: any;
+  /** Set when the user completed the action (e.g. paid, accepted date); notification then drops from Needs action. */
+  actionCompletedAt?: any;
   entityType?: string;
   entityId?: string;
   eventType?: string;
@@ -96,6 +103,17 @@ function normalizeType(n: UserNotification): string {
   return ev.toLowerCase().replaceAll('.', '_');
 }
 
+/** True if this action-required notification is for the current user (recipient). Seller-only actions only count when link is to seller order page. */
+function isActionForCurrentUser(n: UserNotification): boolean {
+  const t = normalizeType(n);
+  const ev = String(n.eventType || '').trim();
+  const url = String(n.deepLinkUrl || '');
+  // Seller-only actions: only count when link is to seller order page (notification was sent to seller)
+  if (t === 'order_created' && ev === 'Order.Received') return url.includes('/seller/');
+  if (t === 'order_delivery_address_set') return url.includes('/seller/');
+  return true;
+}
+
 function listingIdFromUrl(url: string): string | null {
   try {
     const m = String(url || '').match(/\/listing\/([^/?#]+)/i);
@@ -133,19 +151,23 @@ function listingIdFor(n: UserNotification): string | null {
 function filterFor(n: UserNotification): UiFilter {
   const c = String(n.category || '').toLowerCase();
   const t = normalizeType(n);
+  const ev = String(n.eventType || '').trim();
 
   if (c === 'marketing' || t.startsWith('marketing_')) return 'recommended';
   if (c === 'onboarding' || t === 'user_welcome' || t === 'profile_incomplete') return 'account';
   if (c === 'admin' || t.startsWith('admin_') || t.startsWith('listing_') || t.startsWith('compliance_')) return 'account';
 
-  // Selling-side signals
+  // Selling-side signals (seller actions: propose delivery, new sale, etc.)
   if (t === 'bid_received') return 'selling';
   if (t === 'offer_received') return 'selling';
   if (t === 'order_received' || t === 'payout_released') return 'selling';
+  if (t === 'order_created' && ev === 'Order.Received') return 'selling'; // New sale – propose delivery (seller)
+  if (t === 'order_delivery_address_set') return 'selling'; // Buyer set address – seller propose delivery
 
   // Buying-side signals
   if (t.startsWith('auction_') || t.startsWith('bid_')) return 'buying';
   if (t.startsWith('offer_')) return 'buying';
+  if (t === 'order_created' && ev === 'Order.Confirmed') return 'buying'; // Set delivery address (buyer)
   if (t.startsWith('order_')) return 'buying';
 
   // Messages: show under Important (and All)
@@ -181,6 +203,10 @@ function tagForNotification(n: UserNotification): { label: string; variant: Noti
   if (t === 'order_delivery_scheduled') return { label: 'Accept delivery date', variant: 'warning' };
   if (t === 'order_final_payment_due') return { label: 'Pay now', variant: 'destructive' };
   if (t === 'order_final_payment_confirmed') return { label: 'Final payment', variant: 'success' };
+  // Seller-only actions: show "Your sale" so it's clear the action is for the viewer (seller)
+  const ev = String(n.eventType || '').trim();
+  if (t === 'order_created' && ev === 'Order.Received') return { label: 'Your sale', variant: 'warning' };
+  if (t === 'order_delivery_address_set') return { label: 'Your sale', variant: 'warning' };
   if (t.startsWith('order_')) return { label: 'Order', variant: 'info' };
   if (t === 'payout_released') return { label: 'Payout', variant: 'success' };
   if (t === 'message_received') return { label: 'Message', variant: 'default' };
@@ -289,7 +315,9 @@ export default function NotificationsPage() {
   const [filter, setFilter] = useState<UiFilter>('all');
   const [items, setItems] = useState<UserNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const autoMarkedReadRef = useRef(false);
+  const syncStaleCalledRef = useRef(false);
   const [listingById, setListingById] = useState<Record<string, Listing | null>>({});
 
   useEffect(() => {
@@ -308,13 +336,14 @@ export default function NotificationsPage() {
       (snap) => {
         const next = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as UserNotification[];
         setItems(next);
+        setLastSyncedAt(new Date());
         setLoading(false);
 
         // UX: once user is on the notifications page, mark non–action-required unread as read (one-time per visit).
-        // Do NOT mark action-required types (bid_outbid, offer_countered, offer_accepted) — they stay until user completes the action or dismisses.
+        // Do NOT mark action-required types — they stay until user completes the action or dismisses.
         if (!autoMarkedReadRef.current) {
           autoMarkedReadRef.current = true;
-          const actionRequiredTypes = new Set(['bid_outbid', 'auction_outbid', 'offer_countered', 'offer_accepted', 'order_delivery_scheduled', 'order_final_payment_due']);
+          const actionRequiredTypes = new Set(['bid_outbid', 'auction_outbid', 'offer_countered', 'offer_accepted', 'order_created', 'order_delivery_address_set', 'order_delivery_scheduled', 'order_final_payment_due']);
           const unread = next.filter((n) => {
             if (n.read === true) return false;
             const t = normalizeType(n);
@@ -342,6 +371,27 @@ export default function NotificationsPage() {
     return () => unsub();
   }, [user?.uid, authLoading]);
 
+  // Once per visit: sync stale action-required notifications (mark completed when order/offer/listing is already past that step)
+  useEffect(() => {
+    if (authLoading || !user?.uid || loading || syncStaleCalledRef.current) return;
+    syncStaleCalledRef.current = true;
+    user
+      .getIdToken()
+      .then((token) =>
+        fetch('/api/notifications/sync-stale', {
+          method: 'GET',
+          headers: { authorization: `Bearer ${token}` },
+        })
+      )
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.updated && data.updated > 0) {
+          // Firestore onSnapshot will pick up the updated docs; no need to refetch
+        }
+      })
+      .catch(() => {});
+  }, [user, authLoading, loading]);
+
   // Action-required: don't mark as read on click; stay until the action is completed (e.g. accept delivery date until buyer agrees).
   const actionRequiredTypes = useMemo(
     () => new Set([
@@ -349,6 +399,8 @@ export default function NotificationsPage() {
       'auction_outbid',
       'offer_countered',
       'offer_accepted',
+      'order_created', // New sale – propose delivery date (seller To do)
+      'order_delivery_address_set', // Buyer set address – propose delivery date (seller To do)
       'order_delivery_scheduled', // Accept delivery date – stays until buyer completes agree-delivery
       'order_final_payment_due', // Pay remaining balance – stays until buyer pays (To Do "Pay now")
     ]),
@@ -359,10 +411,11 @@ export default function NotificationsPage() {
     let list: UserNotification[];
     if (filter === 'all') list = items;
     else if (filter === 'important') {
-      // Needs action = unread OR high-signal transactional types
+      // Needs action = unread OR high-signal types; exclude action-required that are already resolved (actionCompletedAt)
       list = items.filter((n) => {
-        if (n.read !== true) return true;
         const t = normalizeType(n);
+        if (actionRequiredTypes.has(t) && (n as UserNotification).actionCompletedAt != null) return false;
+        if (n.read !== true) return true;
         return (
           t === 'message_received' ||
           t === 'bid_outbid' ||
@@ -375,12 +428,12 @@ export default function NotificationsPage() {
           t === 'compliance_rejected'
         );
       });
-      // Sort: action-required first, then by createdAt desc
+      // Sort: action-required (for current user) first, then by createdAt desc
       list = [...list].sort((a, b) => {
         const ta = normalizeType(a);
         const tb = normalizeType(b);
-        const aAction = actionRequiredTypes.has(ta) ? 1 : 0;
-        const bAction = actionRequiredTypes.has(tb) ? 1 : 0;
+        const aAction = actionRequiredTypes.has(ta) && isActionForCurrentUser(a) ? 1 : 0;
+        const bAction = actionRequiredTypes.has(tb) && isActionForCurrentUser(b) ? 1 : 0;
         if (bAction !== aAction) return bAction - aAction;
         return toMillisSafe(b.createdAt) - toMillisSafe(a.createdAt);
       });
@@ -389,6 +442,21 @@ export default function NotificationsPage() {
   }, [items, filter, actionRequiredTypes]);
 
   const unreadCount = useMemo(() => items.filter((n) => n.read !== true).length, [items]);
+
+  // To-do list: action-required notifications that are not yet resolved and are for the current user's role
+  const actionItems = useMemo(() => {
+    return items
+      .filter((n) => {
+        if (!actionRequiredTypes.has(normalizeType(n))) return false;
+        const completedAt = (n as UserNotification).actionCompletedAt;
+        if (completedAt != null) return false; // resolved – user completed the action
+        if (!isActionForCurrentUser(n)) return false; // seller-only action in wrong feed (e.g. buyer seeing "Propose delivery date")
+        return true;
+      })
+      .sort((a, b) => toMillisSafe(b.createdAt) - toMillisSafe(a.createdAt))
+      .slice(0, 10);
+  }, [items, actionRequiredTypes]);
+
   const filterCounts = useMemo(() => {
     const all = items.length;
     const important = items.filter((n) => {
@@ -412,22 +480,6 @@ export default function NotificationsPage() {
     const account = items.filter((n) => n.read !== true && filterFor(n) === 'account').length;
     return { all, important, buying, selling, recommended, account };
   }, [items, unreadCount]);
-
-  // Actionable to-do: unread items with a link (something the user can do), action-required first, then by date. Cap at 7.
-  const actionItems = useMemo(() => {
-    const hasLink = (n: UserNotification) => (n.deepLinkUrl || '').trim().length > 0;
-    const unreadWithLink = items.filter((n) => n.read !== true && hasLink(n));
-    return [...unreadWithLink]
-      .sort((a, b) => {
-        const ta = normalizeType(a);
-        const tb = normalizeType(b);
-        const aAction = actionRequiredTypes.has(ta) ? 1 : 0;
-        const bAction = actionRequiredTypes.has(tb) ? 1 : 0;
-        if (bAction !== aAction) return bAction - aAction;
-        return toMillisSafe(b.createdAt) - toMillisSafe(a.createdAt);
-      })
-      .slice(0, 7);
-  }, [items, actionRequiredTypes]);
 
   // Fetch listing thumbnails for the current feed (best-effort).
   useEffect(() => {
@@ -561,67 +613,41 @@ export default function NotificationsPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-2 border-border/60 overflow-hidden">
+      <Card className="border border-border/60 overflow-hidden">
         <CardHeader className="px-4 pt-4 pb-2 md:px-6 md:pt-6 md:pb-4">
           <CardTitle className="text-base flex items-center gap-2">
-            <ListTodo className="h-5 w-5 text-primary shrink-0" />
+            <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
             To do
-            {actionItems.length > 0 && (
-              <span className="inline-flex items-center rounded-full bg-destructive/15 px-2 py-0.5 text-xs font-semibold text-destructive">
+            {actionItems.length > 0 ? (
+              <Badge variant="destructive" className="ml-1">
                 {actionItems.length}
-              </span>
-            )}
+              </Badge>
+            ) : null}
           </CardTitle>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Things that need your action. Tap to open.
-          </p>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="px-4 pb-4 md:px-6 md:pb-6 pt-0">
           {actionItems.length === 0 ? (
-            <div className="px-4 py-6 md:px-6 md:py-8 text-center">
-              <div className="mx-auto h-10 w-10 rounded-xl bg-muted flex items-center justify-center mb-3">
-                <CheckCircle2 className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <p className="text-sm font-semibold text-foreground">Nothing to do right now</p>
-              <p className="text-xs text-muted-foreground mt-1">When something needs your action, it’ll show up here.</p>
-            </div>
+            <p className="text-sm text-muted-foreground">You&apos;re all caught up. Nothing needs your response right now.</p>
           ) : (
-            <ul className="divide-y">
+            <ul className="space-y-2">
               {actionItems.map((n) => {
                 const typeNorm = normalizeType(n);
-                const isActionRequired = actionRequiredTypes.has(typeNorm);
-                const s = styleForNotification(n);
-                const Icon = s.Icon || AlertTriangle;
+                const tag = tagForNotification(n);
                 const href = toAppPath(n.deepLinkUrl || '');
+                const hasLink = (n.deepLinkUrl || '').trim().length > 0;
                 const label = n.linkLabel || 'Open';
-                const ago = timeAgo(n);
-                const safeHref = href && href !== '' ? href : '/dashboard/notifications';
                 return (
-                  <li key={n.id}>
-                    <Link
-                      href={safeHref}
-                      onClick={() => { if (!isActionRequired) void markClicked(n.id); }}
-                      className={cn(
-                        'flex items-center gap-3 px-4 py-3 md:px-6 md:py-3.5 transition-colors hover:bg-muted/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-sm',
-                        isActionRequired && 'bg-destructive/5 hover:bg-destructive/10'
-                      )}
-                      aria-label={`${n.title}. ${label}.`}
-                    >
-                      <div className={cn(
-                        'h-9 w-9 shrink-0 rounded-lg flex items-center justify-center',
-                        isActionRequired ? 'bg-destructive/15 text-destructive' : 'bg-primary/10 text-primary'
-                      )}>
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{n.title}</p>
-                        {ago && <p className="text-xs text-muted-foreground mt-0.5">{ago}</p>}
-                      </div>
-                      <span className="shrink-0 inline-flex items-center gap-1 text-sm font-semibold text-primary">
-                        {label}
-                        <ChevronRight className="h-4 w-4" />
-                      </span>
-                    </Link>
+                  <li key={n.id} className="flex items-center justify-between gap-3 py-2 px-3 rounded-lg border border-destructive/30 bg-destructive/10 dark:bg-destructive/20">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-sm font-medium">{n.title}</span>
+                      {n.body ? <p className="text-xs text-muted-foreground mt-0.5 truncate">{n.body}</p> : null}
+                    </div>
+                    {hasLink ? (
+                      <Button asChild size="sm" variant="destructive" className="shrink-0">
+                        <Link href={href}>{label}</Link>
+                      </Button>
+                    ) : null}
+                    {tag ? <Badge variant={tag.variant} className="shrink-0">{tag.label}</Badge> : null}
                   </li>
                 );
               })}
@@ -635,8 +661,8 @@ export default function NotificationsPage() {
           <CardTitle className="text-base">Inbox</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="px-4 py-3 md:px-6 md:py-4">
-            <div className="flex items-center gap-3 overflow-x-auto we-scrollbar-hover pb-1 -mx-1 min-h-[44px]">
+          <div className="px-3 py-3 sm:px-4 md:px-6 md:py-4 -mx-1 sm:mx-0">
+            <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto we-scrollbar-hover pb-1 min-h-[44px] snap-x snap-mandatory scroll-px-3">
               {(
                 [
                   { key: 'all', label: 'All' },
@@ -662,9 +688,9 @@ export default function NotificationsPage() {
                     type="button"
                     variant="outline"
                     onClick={() => setFilter(f.key)}
-                    className={cn('min-h-[44px] shrink-0 rounded-full font-semibold whitespace-nowrap px-4 transition-colors', tabClass)}
+                    className={cn('min-h-[44px] shrink-0 rounded-full font-semibold whitespace-nowrap px-3 sm:px-4 transition-colors snap-start touch-manipulation', tabClass)}
                   >
-                    <Icon className="h-4 w-4 mr-2 shrink-0" />
+                    <Icon className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
                     {f.label}
                     {unread > 0 ? (
                       <Badge variant="secondary" className={cn('ml-2 h-5 px-1.5 text-xs shrink-0', badgeClass)}>
@@ -695,7 +721,8 @@ export default function NotificationsPage() {
                   {filtered.map((n) => {
                     const isUnread = n.read !== true;
                     const typeNorm = normalizeType(n);
-                    const isActionRequired = actionRequiredTypes.has(typeNorm);
+                    const isResolved = (n as UserNotification).actionCompletedAt != null;
+                    const isActionRequired = actionRequiredTypes.has(typeNorm) && !isResolved && isActionForCurrentUser(n);
                     const tag = tagForNotification(n);
                     const s = styleForNotification(n);
                     const Icon = s.Icon || AlertTriangle;
@@ -720,14 +747,14 @@ export default function NotificationsPage() {
                         )}
                       >
                         {isActionRequired && (
-                          <div className="flex items-center justify-center gap-2 rounded-t-xl bg-destructive px-4 py-2.5 text-destructive-foreground">
-                            <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden />
-                            <span className="text-sm font-bold uppercase tracking-wider">Action required</span>
+                          <div className="flex items-center justify-center gap-2 rounded-t-xl bg-destructive px-3 py-2 sm:px-4 sm:py-2.5 text-destructive-foreground text-xs sm:text-sm font-bold uppercase tracking-wider">
+                            <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" aria-hidden />
+                            <span>Action required</span>
                           </div>
                         )}
-                        <div className={cn('flex items-start gap-3', 'p-4 md:p-5')}>
+                        <div className={cn('flex items-start gap-3', 'p-3 sm:p-4 md:p-5')}>
                         <div className={cn(
-                          'h-12 w-12 md:h-20 md:w-20 rounded-xl overflow-hidden border bg-muted shrink-0',
+                          'h-11 w-11 sm:h-12 sm:w-12 md:h-20 md:w-20 rounded-lg sm:rounded-xl overflow-hidden border bg-muted shrink-0',
                           isActionRequired && !coverUrl ? 'border-destructive/50 bg-destructive/20 dark:bg-destructive/25 ring-2 ring-destructive/30' : 'border-border/60'
                         )}>
                           {coverUrl ? (
@@ -736,12 +763,12 @@ export default function NotificationsPage() {
                               alt=""
                               width={80}
                               height={80}
-                              className="h-12 w-12 md:h-20 md:w-20 object-cover"
+                              className="h-11 w-11 sm:h-12 sm:w-12 md:h-20 md:w-20 object-cover"
                               unoptimized
                             />
                           ) : (
-                            <div className={cn('h-12 w-12 md:h-20 md:w-20 flex items-center justify-center', isActionRequired ? 'bg-destructive/20 dark:bg-destructive/25' : isUnread ? s.chipClass : 'bg-muted/30')}>
-                              <Icon className={cn('h-5 w-5 md:h-6 md:w-6', isActionRequired ? 'text-destructive' : isUnread ? undefined : 'text-muted-foreground')} />
+                            <div className={cn('h-11 w-11 sm:h-12 sm:w-12 md:h-20 md:w-20 flex items-center justify-center', isActionRequired ? 'bg-destructive/20 dark:bg-destructive/25' : isUnread ? s.chipClass : 'bg-muted/30')}>
+                              <Icon className={cn('h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6', isActionRequired ? 'text-destructive' : isUnread ? undefined : 'text-muted-foreground')} />
                             </div>
                           )}
                         </div>
@@ -756,7 +783,7 @@ export default function NotificationsPage() {
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     {tag ? (
-                                      <Badge variant={tag.variant} className="font-semibold shrink-0">
+                                      <Badge variant={tag.variant} className="font-semibold shrink-0 text-xs">
                                         {tag.label}
                                       </Badge>
                                     ) : null}
@@ -766,22 +793,29 @@ export default function NotificationsPage() {
                                       </span>
                                     ) : null}
                                   </div>
-                                  <div className={cn('mt-0.5', isActionRequired ? 'text-base font-bold text-foreground' : cn('text-sm font-semibold', isUnread ? 'text-foreground' : 'text-foreground/90'))}>
+                                  <div className={cn('mt-0.5', isActionRequired ? 'text-sm sm:text-base font-bold text-foreground' : cn('text-sm font-semibold', isUnread ? 'text-foreground' : 'text-foreground/90'))}>
                                     {n.title}
                                   </div>
-                                  <div className={cn('text-sm mt-0.5 line-clamp-2', isUnread ? 'text-muted-foreground' : 'text-muted-foreground/90')}>
+                                  <div className={cn('text-xs sm:text-sm mt-0.5 line-clamp-2', isUnread ? 'text-muted-foreground' : 'text-muted-foreground/90')}>
                                     {n.body}
                                   </div>
-                                  {ago ? <div className="text-xs text-muted-foreground mt-2">{ago}</div> : null}
+                                  {ago ? <div className="text-xs text-muted-foreground mt-1.5 sm:mt-2">{ago}</div> : null}
+                                  {/* Mobile: show CTA below content for needs-action; desktop keeps it inline */}
+                                  {isActionRequired && hasLink ? (
+                                    <span className="mt-3 flex sm:hidden w-full min-h-[44px] items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">
+                                      <ExternalLink className="h-4 w-4 shrink-0" />
+                                      {label}
+                                    </span>
+                                  ) : null}
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0 flex-wrap">
                                   {isUnread && !isActionRequired && (
-                                    <Badge variant="outline" className={cn('font-semibold', s.newBadgeClass)}>
+                                    <Badge variant="outline" className={cn('font-semibold text-xs', s.newBadgeClass)}>
                                       New
                                     </Badge>
                                   )}
                                   {isActionRequired && hasLink ? (
-                                    <span className="hidden sm:inline-flex shrink-0 items-center rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
+                                    <span className="hidden sm:inline-flex shrink-0 items-center rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground min-h-[40px]">
                                       <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
                                       {label}
                                     </span>
@@ -833,6 +867,14 @@ export default function NotificationsPage() {
                 </div>
               )}
           </div>
+          {user && (
+            <div className="px-4 py-2 md:px-6 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
+              <span title="Notifications load live from the server. If something looks wrong, try a hard refresh (Ctrl+Shift+R or Cmd+Shift+R).">
+                {lastSyncedAt ? `Synced ${formatDistanceToNow(lastSyncedAt, { addSuffix: true })}` : 'Syncing…'}
+              </span>
+              <span className="hidden sm:inline">Red = action required (Pay now, Accept date, etc.)</span>
+            </div>
+          )}
         </CardContent>
       </Card>
       </div>

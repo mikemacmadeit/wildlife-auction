@@ -11,6 +11,7 @@ import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { stripe, isStripeConfigured } from '@/lib/stripe/config';
 import { handleFinalPaymentCompleted } from '@/app/api/stripe/webhook/handlers';
+import { resolveActionNotifications } from '@/lib/notifications/resolveAction';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -105,6 +106,12 @@ export async function POST(request: Request, { params }: { params: { orderId: st
     }
 
     await handleFinalPaymentCompleted(db, session as any);
+
+    // Smart notifications: resolve "Pay now" so it drops from Needs action in real time.
+    await resolveActionNotifications(db, uid, {
+      type: 'order_final_payment_due',
+      entityId: orderId,
+    });
 
     return json({ applied: true });
   } catch (e: any) {
