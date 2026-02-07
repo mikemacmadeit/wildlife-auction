@@ -81,9 +81,23 @@ export async function syncStaleActionNotifications(
         if (!orderSnap.exists) {
           stale = true; // order gone → treat as stale so we don't block To do
         } else {
-          const order = orderSnap.data() as { transactionStatus?: string } | undefined;
+          const order = orderSnap.data() as {
+            transactionStatus?: string;
+            buyerId?: string;
+            delivery?: { buyerAddress?: unknown; buyerAddressSetAt?: unknown };
+          } | undefined;
           const tx = order?.transactionStatus;
-          stale = !!tx && SELLER_PROPOSED_STATUSES.includes(tx);
+          // Seller's "Propose delivery date": stale once order moved past that step
+          if (!!tx && SELLER_PROPOSED_STATUSES.includes(tx)) {
+            stale = true;
+          }
+          // Buyer's "Set delivery address": stale as soon as buyer has set address (fixes red To do after they set it)
+          const buyerSetAddress =
+            order?.delivery?.buyerAddressSetAt != null ||
+            (order?.delivery?.buyerAddress != null && typeof order.delivery.buyerAddress === 'object' && Object.keys(order.delivery.buyerAddress as object).length > 0);
+          if (order?.buyerId === userId && buyerSetAddress) {
+            stale = true;
+          }
         }
       } catch {
         // on error, don't mark stale

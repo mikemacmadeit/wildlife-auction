@@ -13,6 +13,7 @@ import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
+import { resolveActionNotifications } from '@/lib/notifications/resolveAction';
 import { getSiteUrl } from '@/lib/site-url';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { captureException } from '@/lib/monitoring/capture';
@@ -183,6 +184,16 @@ export async function POST(
       }
     } catch (e) {
       captureException(e instanceof Error ? e : new Error(String(e)), { orderId, context: 'Order.DeliveryAddressSet' });
+    }
+
+    // Resolve the buyer's "Set delivery address" action-required notification so it disappears from Needs action
+    try {
+      await resolveActionNotifications(db as any, buyerId, { type: 'order_created', entityId: orderId });
+    } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), {
+        context: 'resolve-action-after-set-delivery-address',
+        orderId,
+      });
     }
 
     return json({

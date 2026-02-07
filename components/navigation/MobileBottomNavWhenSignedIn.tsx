@@ -15,7 +15,7 @@ import type { NotificationType } from '@/lib/types';
 
 /**
  * Renders the mobile bottom nav on public routes (e.g. home, browse) when the user is signed in.
- * Alerts badge = notifications + messages + offers (same as dashboard bottom nav).
+ * Notifications badge = notifications + messages + offers (same as dashboard bottom nav).
  * Dashboard and seller routes have their own layout with bottom nav, so we skip those.
  */
 export function MobileBottomNavWhenSignedIn() {
@@ -53,8 +53,8 @@ export function MobileBottomNavWhenSignedIn() {
       { href: '/browse', label: 'Buy', shortLabel: 'Buy', icon: Compass },
       {
         href: '/dashboard/notifications',
-        label: 'Alerts',
-        shortLabel: 'Alerts',
+        label: 'Notifications',
+        shortLabel: 'Notifications',
         icon: Bell,
         badge: alertsTotal > 0 ? alertsTotal : undefined,
       },

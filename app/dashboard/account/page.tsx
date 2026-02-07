@@ -15,7 +15,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BottomNav } from '@/components/navigation/BottomNav';
 import { 
   User, 
   Mail, 
@@ -580,7 +579,7 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-6">
+    <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-6">
       <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
         {/* Header */}
         <motion.div
@@ -1286,7 +1285,7 @@ export default function AccountPage() {
         </motion.div>
       </div>
 
-      <BottomNav />
+      {/* Mobile bottom nav is provided by dashboard layout (LayoutBottomNav) */}
       
       {/* Avatar Crop Dialog */}
       {cropImageSrc && (

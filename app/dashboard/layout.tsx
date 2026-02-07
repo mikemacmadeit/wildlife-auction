@@ -340,7 +340,7 @@ export default function DashboardLayout({
       { href: '/dashboard/menu', label: 'Dashboard', icon: LayoutGrid, shortLabel: 'Dashboard' },
       { href: '/dashboard/listings/new', label: 'Sell', icon: PlusCircle, shortLabel: 'Sell' },
       { ...pick('/browse', { href: '/browse', label: 'Buy', icon: Compass, shortLabel: 'Buy' }), label: 'Buy', shortLabel: 'Buy' },
-      { ...pick('/dashboard/notifications', { href: '/dashboard/notifications', label: 'Alerts', icon: Bell }), badge: alertsTotal > 0 ? alertsTotal : undefined },
+      { ...pick('/dashboard/notifications', { href: '/dashboard/notifications', label: 'Notifications', icon: Bell, shortLabel: 'Notifications' }), badge: alertsTotal > 0 ? alertsTotal : undefined },
     ];
     return items.map((item) => ({ ...item, shortLabel: (item as { shortLabel?: string }).shortLabel ?? item.label }));
   }, [navItems, badges.notifications, badges.messages, badges.offers]);

@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Loader2,
@@ -218,6 +219,11 @@ export default function BidsOffersPage() {
     const t = parseTabFromSearchParams(searchParams);
     setTabState(t);
   }, [searchParams]);
+
+  // Close mobile filters sheet when switching tabs so it doesn't stay open on the wrong tab
+  useEffect(() => {
+    setMobileFiltersOpen(false);
+  }, [tab]);
   const [unreadNeedsAction, setUnreadNeedsAction] = useState(0);
   const [unreadBids, setUnreadBids] = useState(0);
   const [unreadOffers, setUnreadOffers] = useState(0);
@@ -226,6 +232,7 @@ export default function BidsOffersPage() {
   const [sortKey, setSortKey] = useState<SortKey>('ending_soon');
   const [offerStatusFilter, setOfferStatusFilter] = useState<OfferStatusFilter>('all');
   const [offerSortKey, setOfferSortKey] = useState<OfferSortKey>('status');
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [query, setQuery] = useState('');
 
   const [loading, setLoading] = useState(false);
@@ -777,7 +784,7 @@ export default function BidsOffersPage() {
 
         {/* Top summary — 2x2 on mobile for touch-friendly tiles, 4 cols on desktop */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 min-w-0">
-          <Card className="rounded-xl border border-border/50 bg-card min-w-0">
+          <Card className="rounded-xl border border-border bg-card shadow-warm min-w-0">
             <CardContent className="p-3 sm:p-4 flex flex-row items-center justify-between gap-2 min-w-0">
               <span className="text-[11px] sm:text-xs text-muted-foreground truncate">Winning</span>
               <div className="flex items-center gap-1 shrink-0">
@@ -786,7 +793,7 @@ export default function BidsOffersPage() {
               </div>
             </CardContent>
           </Card>
-          <Card className="rounded-xl border border-border/50 bg-card min-w-0">
+          <Card className="rounded-xl border border-border bg-card shadow-warm min-w-0">
             <CardContent className="p-3 sm:p-4 flex flex-row items-center justify-between gap-2 min-w-0">
               <span className="text-[11px] sm:text-xs text-muted-foreground truncate">Outbid</span>
               <div className="flex items-center gap-1 shrink-0">
@@ -795,7 +802,7 @@ export default function BidsOffersPage() {
               </div>
             </CardContent>
           </Card>
-          <Card className="rounded-xl border border-border/50 bg-card min-w-0">
+          <Card className="rounded-xl border border-border bg-card shadow-warm min-w-0">
             <CardContent className="p-3 sm:p-4 flex flex-row items-center justify-between gap-2 min-w-0">
               <span className="text-[11px] sm:text-xs text-muted-foreground truncate">Offers active</span>
               <div className="flex items-center gap-1 shrink-0">
@@ -804,7 +811,7 @@ export default function BidsOffersPage() {
               </div>
             </CardContent>
           </Card>
-          <Card className="rounded-xl border border-border/50 bg-card min-w-0">
+          <Card className="rounded-xl border border-border bg-card shadow-warm min-w-0">
             <CardContent className="p-3 sm:p-4 flex flex-row items-center justify-between gap-2 min-w-0">
               <span className="text-[11px] sm:text-xs text-muted-foreground truncate">Accepted</span>
               <div className="flex items-center gap-1 shrink-0">
@@ -815,7 +822,7 @@ export default function BidsOffersPage() {
           </Card>
         </div>
 
-        <Card className="rounded-xl border border-border/50 bg-card">
+        <Card className="rounded-xl border border-border bg-card shadow-warm">
           <CardContent className="pt-4 sm:pt-6 space-y-4">
             <Tabs
               value={tab}
@@ -825,20 +832,21 @@ export default function BidsOffersPage() {
                 void clearTabNotifs(next);
               }}
             >
-              {/* Row 1: Tabs — neutral style, only active tab uses primary (design-system consistent) */}
-              <TabsList className="w-full flex gap-2 p-1 h-auto rounded-lg bg-muted/40 border border-border/60 mb-4 overflow-x-auto overflow-y-hidden -mx-1 px-1 sm:overflow-visible sm:mx-0 sm:px-0">
+              {/* Row 1: Tabs — mobile: shorter labels + horizontal scroll; desktop: full labels */}
+              <TabsList className="w-full flex flex-nowrap gap-2 p-1 h-auto rounded-lg bg-muted/40 border border-border/60 mb-4 overflow-x-auto overflow-y-hidden -mx-1 px-1 we-scrollbar-hover sm:overflow-visible sm:mx-0 sm:px-0">
                   <TabsTrigger
                     value="needs_action"
-                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-md text-sm font-medium transition-colors border border-transparent bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm min-h-[44px] justify-center gap-1.5"
+                    className="flex-1 min-w-[4rem] sm:min-w-0 py-2.5 px-2 sm:px-3 rounded-md text-sm font-medium transition-colors border border-transparent bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm min-h-[44px] justify-center gap-1.5 shrink-0"
                   >
-                    Needs action
+                    <span className="md:hidden">Action</span>
+                    <span className="hidden md:inline">Needs action</span>
                     {unreadNeedsAction > 0 ? (
                       <Badge variant="secondary" className="h-5 min-w-[20px] px-1.5 text-xs bg-background/80 text-foreground border-0">{unreadNeedsAction}</Badge>
                     ) : null}
                   </TabsTrigger>
                   <TabsTrigger
                     value="bids"
-                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-md text-sm font-medium transition-colors border border-transparent bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm min-h-[44px] justify-center gap-1.5"
+                    className="flex-1 min-w-[4rem] sm:min-w-0 py-2.5 px-2 sm:px-3 rounded-md text-sm font-medium transition-colors border border-transparent bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm min-h-[44px] justify-center gap-1.5 shrink-0"
                   >
                     Bids
                     {unreadBids > 0 ? (
@@ -847,7 +855,7 @@ export default function BidsOffersPage() {
                   </TabsTrigger>
                   <TabsTrigger
                     value="offers"
-                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-md text-sm font-medium transition-colors border border-transparent bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm min-h-[44px] justify-center gap-1.5"
+                    className="flex-1 min-w-[4rem] sm:min-w-0 py-2.5 px-2 sm:px-3 rounded-md text-sm font-medium transition-colors border border-transparent bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm min-h-[44px] justify-center gap-1.5 shrink-0"
                   >
                     Offers
                     {unreadOffers > 0 ? (
@@ -856,7 +864,7 @@ export default function BidsOffersPage() {
                   </TabsTrigger>
                   <TabsTrigger
                     value="history"
-                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-md text-sm font-medium transition-colors border border-transparent bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm min-h-[44px] justify-center gap-1.5"
+                    className="flex-1 min-w-[4rem] sm:min-w-0 py-2.5 px-2 sm:px-3 rounded-md text-sm font-medium transition-colors border border-transparent bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm min-h-[44px] justify-center gap-1.5 shrink-0"
                   >
                     History
                     {unreadHistory > 0 ? (
@@ -867,7 +875,7 @@ export default function BidsOffersPage() {
 
               {/* Row 2: Filters — mobile: full-width search + Filters popover; desktop: search, sort, status, hide-removed */}
               <div className="flex flex-col gap-2 sm:gap-3">
-                {/* Mobile: search full width, then Filters popover when Bids or Offers */}
+                {/* Mobile: search full width, then Filters sheet when Bids or Offers (better touch targets) */}
                 <div className="flex flex-col gap-2 sm:hidden">
                   <div className="relative w-full min-w-0">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -879,20 +887,25 @@ export default function BidsOffersPage() {
                     />
                   </div>
                   {tab === 'bids' ? (
-                    <Popover>
-                      <PopoverTrigger asChild>
+                    <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+                      <SheetTrigger asChild>
                         <Button variant="outline" className="w-full min-h-[44px] h-11 justify-between font-medium">
-                          {sortKey === 'ending_soon' ? 'Ending soon' : sortKey === 'newest' ? 'Newest' : 'Highest'} · {statusFilter === 'all' ? 'All' : statusFilter === 'winning' ? 'Winning' : statusFilter === 'outbid' ? 'Outbid' : statusFilter === 'accepted' ? 'Won' : 'Lost'}
-                          <ChevronDown className="h-4 w-4 opacity-50" />
+                          <span className="truncate">
+                            {sortKey === 'ending_soon' ? 'Ending soon' : sortKey === 'newest' ? 'Newest' : 'Highest'} · {statusFilter === 'all' ? 'All' : statusFilter === 'winning' ? 'Winning' : statusFilter === 'outbid' ? 'Outbid' : statusFilter === 'accepted' ? 'Won' : 'Lost'}
+                          </span>
+                          <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
                         </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-                        <div className="p-3 space-y-3">
+                      </SheetTrigger>
+                      <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto pb-safe">
+                        <SheetHeader>
+                          <SheetTitle>Sort & filter</SheetTitle>
+                        </SheetHeader>
+                        <div className="mt-6 space-y-6 pb-6">
                           <div>
                             <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sort by</Label>
-                            <div className="mt-1.5 flex flex-wrap gap-2">
+                            <div className="mt-3 flex flex-wrap gap-2">
                               {(['ending_soon', 'newest', 'highest_amount'] as const).map((s) => (
-                                <Button key={s} variant={sortKey === s ? 'default' : 'outline'} size="sm" onClick={() => setSortKey(s)}>
+                                <Button key={s} variant={sortKey === s ? 'default' : 'outline'} size="default" className="min-h-[44px]" onClick={() => setSortKey(s)}>
                                   {s === 'ending_soon' ? 'Ending soon' : s === 'newest' ? 'Newest' : 'Highest'}
                                 </Button>
                               ))}
@@ -900,36 +913,41 @@ export default function BidsOffersPage() {
                           </div>
                           <div>
                             <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</Label>
-                            <div className="mt-1.5 flex flex-wrap gap-2">
+                            <div className="mt-3 flex flex-wrap gap-2">
                               {(['all', 'winning', 'outbid', 'accepted', 'expired'] as const).map((f) => (
-                                <Button key={f} variant={statusFilter === f ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter(f)}>
+                                <Button key={f} variant={statusFilter === f ? 'default' : 'outline'} size="default" className="min-h-[44px]" onClick={() => setStatusFilter(f)}>
                                   {f === 'all' ? 'All' : f === 'winning' ? 'Winning' : f === 'outbid' ? 'Outbid' : f === 'accepted' ? 'Won' : 'Lost'}
                                 </Button>
                               ))}
                             </div>
                           </div>
-                          <div className="flex items-center justify-between gap-2 pt-2 border-t">
-                            <Label htmlFor="hide-removed-popover" className="text-sm font-medium">Hide removed listings</Label>
-                            <Switch id="hide-removed-popover" checked={hideRemovedListings} onCheckedChange={setHideRemovedListings} className="data-[state=checked]:bg-primary" />
+                          <div className="flex items-center justify-between gap-3 pt-4 border-t min-h-[44px]">
+                            <Label htmlFor="hide-removed-sheet" className="text-sm font-medium">Hide removed listings</Label>
+                            <Switch id="hide-removed-sheet" checked={hideRemovedListings} onCheckedChange={setHideRemovedListings} className="data-[state=checked]:bg-primary" />
                           </div>
                         </div>
-                      </PopoverContent>
-                    </Popover>
+                      </SheetContent>
+                    </Sheet>
                   ) : tab === 'offers' ? (
-                    <Popover>
-                      <PopoverTrigger asChild>
+                    <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+                      <SheetTrigger asChild>
                         <Button variant="outline" className="w-full min-h-[44px] h-11 justify-between font-medium">
-                          {offerSortKey === 'status' ? 'Status' : offerSortKey === 'newest' ? 'Newest' : offerSortKey === 'ending_soon' ? 'Ending soon' : 'Highest'} · {offerStatusFilter === 'all' ? 'All' : offerStatusFilter === 'sent' ? 'You sent' : offerStatusFilter === 'received' ? 'Received' : offerStatusFilter === 'open' ? 'Open' : offerStatusFilter === 'countered' ? 'Countered' : offerStatusFilter === 'accepted' ? 'Accepted' : offerStatusFilter === 'declined' ? 'Declined' : 'Expired'}
-                          <ChevronDown className="h-4 w-4 opacity-50" />
+                          <span className="truncate">
+                            {offerSortKey === 'status' ? 'Status' : offerSortKey === 'newest' ? 'Newest' : offerSortKey === 'ending_soon' ? 'Ending soon' : 'Highest'} · {offerStatusFilter === 'all' ? 'All' : offerStatusFilter === 'sent' ? 'You sent' : offerStatusFilter === 'received' ? 'Received' : offerStatusFilter === 'open' ? 'Open' : offerStatusFilter === 'countered' ? 'Countered' : offerStatusFilter === 'accepted' ? 'Accepted' : offerStatusFilter === 'declined' ? 'Declined' : 'Expired'}
+                          </span>
+                          <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
                         </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-                        <div className="p-3 space-y-3">
+                      </SheetTrigger>
+                      <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto pb-safe">
+                        <SheetHeader>
+                          <SheetTitle>Sort & filter offers</SheetTitle>
+                        </SheetHeader>
+                        <div className="mt-6 space-y-6 pb-6">
                           <div>
                             <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sort by</Label>
-                            <div className="mt-1.5 flex flex-wrap gap-2">
+                            <div className="mt-3 flex flex-wrap gap-2">
                               {(['status', 'newest', 'ending_soon', 'highest_amount'] as const).map((s) => (
-                                <Button key={s} variant={offerSortKey === s ? 'default' : 'outline'} size="sm" onClick={() => setOfferSortKey(s)}>
+                                <Button key={s} variant={offerSortKey === s ? 'default' : 'outline'} size="default" className="min-h-[44px]" onClick={() => setOfferSortKey(s)}>
                                   {s === 'status' ? 'Status' : s === 'newest' ? 'Newest' : s === 'ending_soon' ? 'Ending soon' : 'Highest'}
                                 </Button>
                               ))}
@@ -937,17 +955,17 @@ export default function BidsOffersPage() {
                           </div>
                           <div>
                             <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</Label>
-                            <div className="mt-1.5 flex flex-wrap gap-2">
+                            <div className="mt-3 flex flex-wrap gap-2">
                               {(['all', 'sent', 'received', 'open', 'countered', 'accepted', 'declined', 'expired'] as const).map((f) => (
-                                <Button key={f} variant={offerStatusFilter === f ? 'default' : 'outline'} size="sm" onClick={() => setOfferStatusFilter(f)}>
+                                <Button key={f} variant={offerStatusFilter === f ? 'default' : 'outline'} size="default" className="min-h-[44px]" onClick={() => setOfferStatusFilter(f)}>
                                   {f === 'all' ? 'All' : f === 'sent' ? 'You sent' : f === 'received' ? 'Received' : f === 'open' ? 'Open' : f === 'countered' ? 'Countered' : f === 'accepted' ? 'Accepted' : f === 'declined' ? 'Declined' : 'Expired'}
                                 </Button>
                               ))}
                             </div>
                           </div>
                         </div>
-                      </PopoverContent>
-                    </Popover>
+                      </SheetContent>
+                    </Sheet>
                   ) : null}
                 </div>
                 {/* Desktop: full grid */}
@@ -1052,41 +1070,62 @@ export default function BidsOffersPage() {
                       <div className="space-y-4">
                         {needsAction.map((r) =>
                           r.type === 'offer' ? (
-                            /* Same simple offer card as Offers tab */
+                            /* Offer card — same layout as Offers tab (truncate meta, ghost View listing + menu) */
                             (() => {
                               const o = r as Extract<UnifiedRow, { type: 'offer' }>;
                               const raw = o.raw as OfferRow;
                               const sellerId = raw?.sellerId;
+                              const metaTitle = [formatMoney(o.yourAmount), o.sellerName || getDisplaySeller(o) || '—', o.timeLeftMs != null && o.timeLeftMs > 0 && o.timeLeftMs <= 24 * 60 * 60 * 1000 ? `${Math.floor(o.timeLeftMs / (60 * 60 * 1000))}h left` : ''].filter(Boolean).join(' · ');
+                              const oExpired = o.status === 'EXPIRED' || o.status === 'DECLINED';
+                              const oAccepted = o.status === 'ACCEPTED';
                               return (
-                                <div key={r.id} className="rounded-xl border border-border/50 bg-card p-3 sm:p-4 transition-colors hover:bg-muted/20">
-                                  <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
+                                <div
+                                  key={r.id}
+                                  className={cn(
+                                    'rounded-xl border-2 border-border bg-card shadow-warm p-3 sm:p-4 transition-shadow hover:shadow-lifted',
+                                    'dark:bg-[hsl(75_8%_22%)] dark:border-[hsl(75_8%_28%)]',
+                                    oExpired && 'border-l-4 border-l-muted dark:border-l-muted-foreground/40',
+                                    oAccepted && 'border-l-4 border-l-primary',
+                                    !oExpired && !oAccepted && 'border-l-4 border-l-primary/40'
+                                  )}
+                                >
+                                  <div className="flex flex-col sm:flex-row items-stretch sm:items-start gap-3 sm:gap-4">
                                     <div className="flex flex-1 min-w-0 items-start gap-2.5 sm:gap-3">
-                                      <div className="h-20 w-20 sm:h-[5.5rem] sm:w-[5.5rem] rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+                                      <div className="h-20 w-20 sm:h-[5.5rem] sm:w-[5.5rem] rounded-lg overflow-hidden bg-muted flex-shrink-0 relative ring-1 ring-border/50">
                                         {o.listingImage ? <Image src={o.listingImage} alt="" fill className="object-cover" sizes="88px" /> : <div className="absolute inset-0 flex items-center justify-center"><Handshake className="h-7 w-7 text-muted-foreground/40" /></div>}
                                       </div>
                                       <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-1.5 flex-wrap">
-                                          <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0">{offerStatusBanner(o.status)}</Badge>
+                                          <Badge variant={oExpired ? 'secondary' : 'outline'} className={cn('text-[10px] sm:text-xs px-1.5 py-0', oExpired && 'text-muted-foreground border-muted-foreground/30')}>{offerStatusBanner(o.status)}</Badge>
                                           <span className="text-[10px] sm:text-xs text-muted-foreground">{o.direction === 'out' ? 'You sent' : 'Received'}</span>
                                         </div>
                                         <Link href={`/listing/${o.listingId}`} className="font-semibold text-sm sm:text-base leading-snug line-clamp-2 mt-0.5 hover:underline block text-foreground">{getDisplayTitle(o)}</Link>
-                                        <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
-                                          {formatMoney(o.yourAmount)}
+                                        <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 truncate font-medium tabular-nums" title={metaTitle}>
+                                          <span className="text-foreground">{formatMoney(o.yourAmount)}</span>
                                           {o.sellerName ? ` · ${o.sellerName}` : ` · ${getDisplaySeller(o) || '—'}`}
                                           {o.timeLeftMs != null && o.timeLeftMs > 0 && (o.timeLeftMs <= 24 * 60 * 60 * 1000 ? ` · ${Math.floor(o.timeLeftMs / (60 * 60 * 1000))}h left` : '')}
                                         </p>
                                       </div>
                                     </div>
-                                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:shrink-0 w-full sm:w-auto">
+                                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center shrink-0 w-full sm:w-auto">
                                       {o.status === 'ACCEPTED' && o.direction === 'out' ? (
-                                        <Button onClick={() => openOfferCheckout(o.raw)} variant="default" size="default" className="w-full sm:w-auto min-h-[44px] h-11 sm:h-10">Pay now<ArrowRight className="ml-1.5 h-4 w-4" /></Button>
+                                        <Button onClick={() => openOfferCheckout(o.raw)} variant="default" size="default" className="w-full sm:w-auto min-h-[44px] h-11 sm:h-10 font-semibold shadow-md hover:shadow-lg">Pay now<ArrowRight className="ml-1.5 h-4 w-4" /></Button>
                                       ) : (
-                                        <Button asChild variant={o.status === 'COUNTERED' ? 'default' : 'outline'} size="default" className={cn('w-full sm:w-auto min-h-[44px] h-11 sm:h-10', o.status !== 'COUNTERED' && 'border-2 border-primary bg-transparent text-primary hover:bg-primary/10')}>
+                                        <Button
+                                          asChild
+                                          variant={o.status === 'COUNTERED' ? 'default' : 'outline'}
+                                          size="default"
+                                          className={cn(
+                                            'w-full sm:w-auto min-h-[44px] h-11 sm:h-10 font-semibold',
+                                            o.status === 'COUNTERED' && 'shadow-md hover:shadow-lg',
+                                            o.status !== 'COUNTERED' && 'border-2 border-primary bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground'
+                                          )}
+                                        >
                                           <Link href={`/dashboard/offers/${o.id}`}>{o.status === 'COUNTERED' ? 'Respond to offer' : 'View offer'}</Link>
                                         </Button>
                                       )}
-                                      <div className="flex gap-2 w-full sm:w-auto">
-                                        <Button asChild variant="outline" size="default" className="flex-1 sm:flex-initial min-h-[44px] h-11 sm:h-10 sm:hidden">
+                                      <div className="flex items-center gap-2 w-full sm:w-auto min-h-[44px]">
+                                        <Button asChild variant="ghost" size="default" className="flex-1 sm:flex-initial justify-start min-h-[44px] h-11 sm:h-10 px-0 sm:px-4 text-muted-foreground hover:text-foreground">
                                           <Link href={`/listing/${o.listingId}`}>View listing</Link>
                                         </Button>
                                         <DropdownMenu>
@@ -1112,11 +1151,44 @@ export default function BidsOffersPage() {
                           ) : (
                           <div
                             key={r.id}
-                            className="rounded-xl border border-border/50 bg-card p-3 sm:p-4 transition-colors hover:bg-muted/20"
+                            className={cn(
+                              'rounded-xl border-2 border-border bg-card shadow-warm p-3 sm:p-4 transition-shadow hover:shadow-lifted relative',
+                              'dark:bg-[hsl(75_8%_22%)] dark:border-[hsl(75_8%_28%)]',
+                              (r as any).status === 'LOST' && 'border-l-4 border-l-muted dark:border-l-muted-foreground/40',
+                              ((r as any).status === 'WINNING' || (r as any).status === 'WON') && 'border-l-4 border-l-primary',
+                              (r as any).status === 'OUTBID' && 'border-l-4 border-l-primary/40'
+                            )}
                           >
-                          <div className="flex flex-col sm:flex-row lg:items-center gap-3 sm:gap-4 justify-between">
+                            {/* Three-dot menu — top right */}
+                            <div className="absolute top-3 right-3 z-10">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 min-w-8 rounded-full text-muted-foreground hover:text-foreground">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                    <span className="sr-only">Bid actions</span>
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                  <DropdownMenuLabel>Auction</DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem asChild>
+                                    <Link href={`/listing/${(r as any).listingId}`}>
+                                      <ArrowUpRight className="h-4 w-4 mr-2" />
+                                      View listing
+                                    </Link>
+                                  </DropdownMenuItem>
+                                  {isListingRemoved(r) && (
+                                    <DropdownMenuItem onClick={() => dismissRemovedListing((r as any).listingId)}>
+                                      <X className="h-4 w-4 mr-2" />
+                                      Remove from list
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          <div className="flex flex-col sm:flex-row lg:items-center gap-3 sm:gap-4 justify-between pr-10 sm:pr-10">
                             <div className="flex flex-1 min-w-0 items-start gap-2.5 sm:gap-3">
-                              <div className="h-20 w-20 sm:h-24 sm:w-24 lg:h-[8.5rem] lg:w-[8.5rem] rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+                              <div className="h-20 w-20 sm:h-24 sm:w-24 lg:h-[8.5rem] lg:w-[8.5rem] rounded-lg overflow-hidden bg-muted flex-shrink-0 relative ring-1 ring-border/50">
                                 {(r as any).listingImage ? <Image src={(r as any).listingImage} alt="" fill className="object-cover" sizes="136px" /> : null}
                               </div>
                               <div className="min-w-0 flex-1">
@@ -1200,12 +1272,48 @@ export default function BidsOffersPage() {
                   ) : (
                     <div className="space-y-3 lg:space-y-4">
                       {bidRows.map((r) => (
-                        <div key={r.id} className="rounded-xl border border-border/50 bg-card p-3 sm:p-4 lg:p-6 transition-colors hover:bg-muted/20">
+                        <div
+                          key={r.id}
+                          className={cn(
+                            'rounded-xl border-2 border-border bg-card shadow-warm p-3 sm:p-4 lg:p-6 transition-shadow hover:shadow-lifted relative',
+                            'dark:bg-[hsl(75_8%_22%)] dark:border-[hsl(75_8%_28%)]',
+                            r.status === 'LOST' && 'border-l-4 border-l-muted dark:border-l-muted-foreground/40',
+                            (r.status === 'WINNING' || r.status === 'WON') && 'border-l-4 border-l-primary',
+                            r.status === 'OUTBID' && 'border-l-4 border-l-primary/40'
+                          )}
+                        >
+                          {/* Three-dot menu — top right */}
+                          <div className="absolute top-3 right-3 z-10">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 min-w-8 rounded-full text-muted-foreground hover:text-foreground">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                  <span className="sr-only">Bid actions</span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuLabel>Auction</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/listing/${r.listingId}`}>
+                                    <ArrowUpRight className="h-4 w-4 mr-2" />
+                                    View listing
+                                  </Link>
+                                </DropdownMenuItem>
+                                {(r.status === 'LOST' || (r.timeLeftMs != null && r.timeLeftMs <= 0)) && (
+                                  <DropdownMenuItem onClick={() => dismissRemovedListing(r.listingId)}>
+                                    <X className="h-4 w-4 mr-2" />
+                                    Remove from list
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                           {/* Mobile: stacked (content then buttons). sm: flex col. lg: grid */}
-                          <div className="flex flex-col sm:flex-col lg:grid lg:grid-cols-[8.5rem_18rem_auto_auto] lg:items-center gap-3 sm:gap-4 lg:gap-8 w-full">
+                          <div className="flex flex-col sm:flex-col lg:grid lg:grid-cols-[8.5rem_18rem_auto_auto] lg:items-center gap-3 sm:gap-4 lg:gap-8 w-full pr-10 sm:pr-10 lg:pr-10">
                             {/* Left: thumb + title/seller (mobile row; lg grid cells) */}
                             <div className="flex min-w-0 items-start gap-2.5 sm:gap-3 lg:contents">
-                              <div className="h-20 w-20 sm:h-24 sm:w-24 lg:h-[8.5rem] lg:w-[8.5rem] rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+                              <div className="h-20 w-20 sm:h-24 sm:w-24 lg:h-[8.5rem] lg:w-[8.5rem] rounded-lg overflow-hidden bg-muted flex-shrink-0 relative ring-1 ring-border/50">
                                 {(r as any).listingImage ? <Image src={(r as any).listingImage} alt="" fill className="object-cover" sizes="136px" /> : null}
                               </div>
                               <div className="min-w-0 flex-1 lg:min-w-0 lg:overflow-hidden">
@@ -1291,7 +1399,7 @@ export default function BidsOffersPage() {
                                     {r.status === 'OUTBID' ? (
                                       <Button
                                         variant="default"
-                                        className="flex-1 sm:flex-initial min-h-[44px] h-11 sm:h-10"
+                                        className="flex-1 min-w-0 min-h-[44px] h-11 sm:flex-initial sm:h-10"
                                         onClick={() => {
                                           setRaiseTarget({
                                             listingId: r.listingId,
@@ -1315,7 +1423,7 @@ export default function BidsOffersPage() {
                                     ) : (
                                       <Button
                                         variant="default"
-                                        className="flex-1 sm:flex-initial min-h-[44px] h-11 sm:h-10"
+                                        className="flex-1 min-w-0 min-h-[44px] h-11 sm:flex-initial sm:h-10"
                                         onClick={() => {
                                           setRaiseTarget({
                                             listingId: r.listingId,
@@ -1337,27 +1445,15 @@ export default function BidsOffersPage() {
                                         Increase max
                                       </Button>
                                     )}
-                                    <Button variant="outline" size="default" asChild className="sm:hidden min-h-[44px] h-11 flex-shrink-0">
+                                    <Button
+                                      variant="outline"
+                                      size="default"
+                                      asChild
+                                      className="flex-1 min-w-0 min-h-[44px] h-11 sm:hidden border-2 border-primary bg-transparent text-primary hover:bg-primary/10 hover:text-primary-foreground"
+                                    >
                                       <Link href={`/listing/${r.listingId}`}>View</Link>
                                     </Button>
                                   </div>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="outline" size="icon" className="min-h-[44px] min-w-[44px] h-11 w-11 sm:h-10 sm:w-10 shrink-0">
-                                        <MoreHorizontal className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-56">
-                                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem asChild>
-                                        <Link href={`/listing/${r.listingId}`}>
-                                          <ArrowUpRight className="h-4 w-4 mr-2" />
-                                          View listing
-                                        </Link>
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
                                 </>
                               )}
                             </div>
@@ -1372,19 +1468,59 @@ export default function BidsOffersPage() {
                   {offerRows.length === 0 ? (
                     <div className="py-10 text-center text-sm text-muted-foreground">No offers match your filters.</div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-4 sm:space-y-3">
                       {offerRows.map((r) => {
                         const raw = r.raw as OfferRow;
                         const sellerId = raw?.sellerId;
+                        const isExpiredOrDeclined = r.status === 'EXPIRED' || r.status === 'DECLINED';
+                        const isAccepted = r.status === 'ACCEPTED';
                         return (
                           <div
                             key={r.id}
-                            className="rounded-xl border border-border/50 bg-card p-3 sm:p-4 transition-colors hover:bg-muted/20"
+                            className={cn(
+                              'rounded-xl border-2 border-border bg-card shadow-warm p-3 sm:p-4 transition-shadow hover:shadow-lifted relative',
+                              'dark:bg-[hsl(75_8%_22%)] dark:border-[hsl(75_8%_28%)]',
+                              isExpiredOrDeclined && 'border-l-4 border-l-muted dark:border-l-muted-foreground/40',
+                              isAccepted && 'border-l-4 border-l-primary',
+                              !isExpiredOrDeclined && !isAccepted && 'border-l-4 border-l-primary/40'
+                            )}
                           >
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-start gap-3 sm:gap-4">
+                            {/* Three-dot menu — top right (mobile + desktop) */}
+                            <div className="absolute top-3 right-3 z-10">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 min-w-8 rounded-full text-muted-foreground hover:text-foreground">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                    <span className="sr-only">Offer actions</span>
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                  <DropdownMenuLabel>Offer</DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem asChild>
+                                    <Link href={`/listing/${r.listingId}`}>
+                                      <ArrowUpRight className="h-4 w-4 mr-2" />
+                                      View listing
+                                    </Link>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem asChild>
+                                    <Link href={`/dashboard/offers/${r.id}`}>
+                                      <Handshake className="h-4 w-4 mr-2" />
+                                      Offer details
+                                    </Link>
+                                  </DropdownMenuItem>
+                                  {sellerId ? (
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/sellers/${sellerId}`}>Seller&apos;s other items</Link>
+                                    </DropdownMenuItem>
+                                  ) : null}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-start gap-3 sm:gap-4 pr-10 sm:pr-10">
                               {/* Left: image + title + meta */}
                               <div className="flex flex-1 min-w-0 items-start gap-2.5 sm:gap-3">
-                                <div className="h-20 w-20 sm:h-[5.5rem] sm:w-[5.5rem] rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+                                <div className="h-20 w-20 sm:h-[5.5rem] sm:w-[5.5rem] rounded-lg overflow-hidden bg-muted flex-shrink-0 relative ring-1 ring-border/50">
                                   {r.listingImage ? (
                                     <Image src={r.listingImage} alt="" fill className="object-cover" sizes="88px" />
                                   ) : (
@@ -1395,7 +1531,13 @@ export default function BidsOffersPage() {
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                    <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0">
+                                    <Badge
+                                      variant={isExpiredOrDeclined ? 'secondary' : 'outline'}
+                                      className={cn(
+                                        'text-[10px] sm:text-xs px-1.5 py-0',
+                                        isExpiredOrDeclined && 'text-muted-foreground border-muted-foreground/30'
+                                      )}
+                                    >
                                       {offerStatusBanner(r.status)}
                                     </Badge>
                                     <span className="text-[10px] sm:text-xs text-muted-foreground">
@@ -1405,8 +1547,8 @@ export default function BidsOffersPage() {
                                   <Link href={`/listing/${r.listingId}`} className="font-semibold text-sm sm:text-base leading-snug line-clamp-2 mt-0.5 hover:underline block text-foreground">
                                     {r.listingTitle}
                                   </Link>
-                                  <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
-                                    {formatMoney(r.yourAmount)}
+                                  <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 truncate font-medium tabular-nums" title={[formatMoney(r.yourAmount), r.sellerName, r.timeLeftMs != null && r.timeLeftMs > 0 && r.timeLeftMs <= 24 * 60 * 60 * 1000 ? `${Math.floor(r.timeLeftMs / (60 * 60 * 1000))}h left` : ''].filter(Boolean).join(' · ')}>
+                                    <span className="text-foreground">{formatMoney(r.yourAmount)}</span>
                                     {r.sellerName ? ` · ${r.sellerName}` : ''}
                                     {r.timeLeftMs != null && r.timeLeftMs > 0 && (
                                       r.timeLeftMs <= 24 * 60 * 60 * 1000
@@ -1416,15 +1558,20 @@ export default function BidsOffersPage() {
                                   </p>
                                 </div>
                               </div>
-                              {/* Right: primary action + menu — full width stacked on mobile */}
-                              <div className="flex flex-col sm:flex-row gap-2 sm:items-center shrink-0 w-full sm:w-auto">
+                              {/* Right: primary action + View listing on same row (mobile); desktop row */}
+                              <div className="flex flex-row sm:flex-row gap-2 sm:items-center shrink-0 w-full sm:w-auto">
                                 {r.status === 'ACCEPTED' && r.direction === 'out' ? (
-                                  <Button onClick={() => openOfferCheckout(r.raw)} variant="default" size="default" className="w-full sm:w-auto min-h-[44px] h-11 sm:h-10">
+                                  <Button onClick={() => openOfferCheckout(r.raw)} variant="default" size="default" className="flex-1 min-w-0 min-h-[44px] h-11 sm:flex-initial sm:h-10 font-semibold shadow-md hover:shadow-lg">
                                     Pay now
                                     <ArrowRight className="ml-1.5 h-4 w-4" />
                                   </Button>
                                 ) : r.status === 'EXPIRED' || r.status === 'DECLINED' ? (
-                                  <Button asChild variant="outline" size="default" className="w-full sm:w-auto min-h-[44px] h-11 sm:h-10">
+                                  <Button
+                                    asChild
+                                    variant="default"
+                                    size="default"
+                                    className="flex-1 min-w-0 min-h-[44px] h-11 sm:flex-initial sm:h-10 font-semibold shadow-md hover:shadow-lg"
+                                  >
                                     <Link href={`/listing/${r.listingId}`}>Make offer</Link>
                                   </Button>
                                 ) : (
@@ -1432,46 +1579,25 @@ export default function BidsOffersPage() {
                                     asChild
                                     variant={r.status === 'COUNTERED' ? 'default' : 'outline'}
                                     size="default"
-                                    className={cn('w-full sm:w-auto min-h-[44px] h-11 sm:h-10', r.status !== 'COUNTERED' && 'border-2 border-primary bg-transparent text-primary hover:bg-primary/10')}
+                                    className={cn(
+                                      'flex-1 min-w-0 min-h-[44px] h-11 sm:flex-initial sm:h-10 font-semibold',
+                                      r.status === 'COUNTERED' && 'shadow-md hover:shadow-lg',
+                                      r.status !== 'COUNTERED' && 'border-2 border-primary bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground'
+                                    )}
                                   >
                                     <Link href={`/dashboard/offers/${r.id}`}>
                                       {r.status === 'COUNTERED' ? 'Respond to offer' : 'View offer'}
                                     </Link>
                                   </Button>
                                 )}
-                                <div className="flex gap-2 w-full sm:w-auto">
-                                  <Button asChild variant="outline" size="default" className="flex-1 sm:hidden min-h-[44px] h-11">
-                                    <Link href={`/listing/${r.listingId}`}>View listing</Link>
-                                  </Button>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="outline" size="icon" className="min-h-[44px] min-w-[44px] h-11 w-11 sm:h-10 sm:w-10 shrink-0">
-                                        <MoreHorizontal className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-56">
-                                      <DropdownMenuLabel>Offer</DropdownMenuLabel>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem asChild>
-                                        <Link href={`/listing/${r.listingId}`}>
-                                          <ArrowUpRight className="h-4 w-4 mr-2" />
-                                          View listing
-                                        </Link>
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem asChild>
-                                        <Link href={`/dashboard/offers/${r.id}`}>
-                                          <Handshake className="h-4 w-4 mr-2" />
-                                          Offer details
-                                        </Link>
-                                      </DropdownMenuItem>
-                                      {sellerId ? (
-                                        <DropdownMenuItem asChild>
-                                          <Link href={`/sellers/${sellerId}`}>Seller&apos;s other items</Link>
-                                        </DropdownMenuItem>
-                                      ) : null}
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </div>
+                                <Button
+                                  asChild
+                                  variant="outline"
+                                  size="default"
+                                  className="flex-1 min-w-0 min-h-[44px] h-11 sm:flex-initial sm:h-10 border-2 border-primary bg-transparent text-primary hover:bg-primary/10 hover:text-primary-foreground"
+                                >
+                                  <Link href={`/listing/${r.listingId}`}>View listing</Link>
+                                </Button>
                               </div>
                             </div>
                           </div>
@@ -1487,7 +1613,7 @@ export default function BidsOffersPage() {
                   ) : (
                     <div className="space-y-3">
                       {filtered.map((r) => (
-                        <div key={r.id} className="rounded-xl border border-border/50 bg-card p-3 sm:p-4 transition-colors hover:bg-muted/20">
+                        <div key={r.id} className="rounded-xl border border-border bg-card shadow-warm p-3 sm:p-4 transition-shadow hover:shadow-lifted hover:bg-card">
                           <div className="flex items-center justify-between gap-3 flex-wrap">
                             <div className="min-w-0 flex-1">
                               <div className="font-semibold text-sm sm:text-base truncate">{getDisplayTitle(r)}</div>

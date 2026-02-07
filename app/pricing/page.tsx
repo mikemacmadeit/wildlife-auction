@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
-import { BottomNav } from '@/components/navigation/BottomNav';
 import { PLAN_CONFIG } from '@/lib/pricing/plans';
 import { useAuth } from '@/hooks/use-auth';
 import { createSubscription } from '@/lib/stripe/api';
@@ -673,8 +672,7 @@ export default function PricingPage() {
         </motion.div>
       </section>
 
-      {/* Mobile Bottom Navigation */}
-      <BottomNav />
+      {/* Mobile bottom nav from root layout (MobileBottomNavWhenSignedIn) when signed in */}
     </div>
   );
 }

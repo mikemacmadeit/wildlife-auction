@@ -24,7 +24,6 @@ import {
   HelpCircle
 } from 'lucide-react';
 import Link from 'next/link';
-import { BottomNav } from '@/components/navigation/BottomNav';
 
 export default function TrustPage() {
   return (
@@ -465,7 +464,7 @@ export default function TrustPage() {
         </Card>
       </div>
       </div>
-      <BottomNav />
+      {/* Mobile bottom nav from root layout (MobileBottomNavWhenSignedIn) when signed in */}
     </div>
   );
 }

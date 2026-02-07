@@ -103,6 +103,15 @@ function normalizeType(n: UserNotification): string {
   return ev.toLowerCase().replaceAll('.', '_');
 }
 
+/** True if this notification's action was completed (so it should not show as "needs action"). */
+function hasActionCompleted(n: UserNotification): boolean {
+  const v = (n as UserNotification).actionCompletedAt;
+  if (v == null) return false;
+  if (typeof v === 'object' && v !== null && ('toDate' in v || 'seconds' in v)) return true; // Firestore Timestamp
+  if (typeof v === 'string' || typeof v === 'number') return true;
+  return Boolean(v);
+}
+
 /** True if this action-required notification is for the current user (recipient). Seller-only actions only count when link is to seller order page. */
 function isActionForCurrentUser(n: UserNotification): boolean {
   const t = normalizeType(n);
@@ -371,10 +380,10 @@ export default function NotificationsPage() {
     return () => unsub();
   }, [user?.uid, authLoading]);
 
-  // Once per visit: sync stale action-required notifications (mark completed when order/offer/listing is already past that step)
-  useEffect(() => {
-    if (authLoading || !user?.uid || loading || syncStaleCalledRef.current) return;
-    syncStaleCalledRef.current = true;
+  // Sync stale action-required notifications (mark completed when order/offer/listing is already past that step).
+  // Run on mount and when user returns to the tab so "Pay now" etc. clear after they complete the action elsewhere.
+  const runSyncStale = useCallback(() => {
+    if (!user?.uid) return;
     user
       .getIdToken()
       .then((token) =>
@@ -386,11 +395,25 @@ export default function NotificationsPage() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.updated && data.updated > 0) {
-          // Firestore onSnapshot will pick up the updated docs; no need to refetch
+          // Firestore onSnapshot will pick up the updated docs
         }
       })
       .catch(() => {});
-  }, [user, authLoading, loading]);
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (authLoading || !user?.uid || loading) return;
+    runSyncStale();
+  }, [user?.uid, authLoading, loading, runSyncStale]);
+
+  // When user returns to this tab (e.g. after paying in another tab), re-run sync-stale so "Pay now" etc. clear
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && user?.uid) runSyncStale();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [user?.uid, runSyncStale]);
 
   // Action-required: don't mark as read on click; stay until the action is completed (e.g. accept delivery date until buyer agrees).
   const actionRequiredTypes = useMemo(
@@ -414,7 +437,7 @@ export default function NotificationsPage() {
       // Needs action = unread OR high-signal types; exclude action-required that are already resolved (actionCompletedAt)
       list = items.filter((n) => {
         const t = normalizeType(n);
-        if (actionRequiredTypes.has(t) && (n as UserNotification).actionCompletedAt != null) return false;
+        if (actionRequiredTypes.has(t) && hasActionCompleted(n)) return false;
         if (n.read !== true) return true;
         return (
           t === 'message_received' ||
@@ -448,8 +471,7 @@ export default function NotificationsPage() {
     return items
       .filter((n) => {
         if (!actionRequiredTypes.has(normalizeType(n))) return false;
-        const completedAt = (n as UserNotification).actionCompletedAt;
-        if (completedAt != null) return false; // resolved – user completed the action
+        if (hasActionCompleted(n)) return false; // resolved – user completed the action
         if (!isActionForCurrentUser(n)) return false; // seller-only action in wrong feed (e.g. buyer seeing "Propose delivery date")
         return true;
       })
@@ -728,7 +750,7 @@ export default function NotificationsPage() {
                   {filtered.map((n) => {
                     const isUnread = n.read !== true;
                     const typeNorm = normalizeType(n);
-                    const isResolved = (n as UserNotification).actionCompletedAt != null;
+                    const isResolved = hasActionCompleted(n);
                     const isActionRequired = actionRequiredTypes.has(typeNorm) && !isResolved && isActionForCurrentUser(n);
                     const tag = tagForNotification(n);
                     const s = styleForNotification(n);

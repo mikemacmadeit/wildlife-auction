@@ -24,7 +24,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
-import { BottomNav } from '@/components/navigation/BottomNav';
 
 export default function HowItWorksPage() {
   const containerVariants = {
@@ -519,8 +518,7 @@ export default function HowItWorksPage() {
         </motion.div>
       </section>
 
-      {/* Mobile Bottom Navigation */}
-      <BottomNav />
+      {/* Mobile bottom nav from root layout (MobileBottomNavWhenSignedIn) when signed in */}
     </div>
   );
 }

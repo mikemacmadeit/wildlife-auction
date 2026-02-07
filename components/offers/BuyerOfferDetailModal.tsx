@@ -11,7 +11,8 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { acceptOffer, counterOffer, declineOffer, getOffer, withdrawOffer } from '@/lib/offers/api';
-import { Loader2, Handshake, Clock, CheckCircle2, XCircle, ExternalLink } from 'lucide-react';
+import { formatOfferHistoryLabel, offerStatusBadgeVariant } from '@/lib/offers/format';
+import { Loader2, Handshake, Clock, CheckCircle2, XCircle, ExternalLink, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import { OfferAcceptedSuccessModal } from './OfferAcceptedSuccessModal';
 
@@ -117,6 +118,10 @@ export function BuyerOfferDetailModal(props: {
     [offer?.status, offer?.lastActorRole]
   );
   const canCheckout = useMemo(() => offer?.status === 'accepted', [offer?.status]);
+  const isExpiredOrDeclined = useMemo(
+    () => offer?.status === 'expired' || offer?.status === 'declined',
+    [offer?.status]
+  );
 
   const checkout = async () => {
     if (!offer?.listingId) return;
@@ -195,7 +200,7 @@ export function BuyerOfferDetailModal(props: {
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Handshake className="h-5 w-5 text-primary" />
@@ -210,7 +215,7 @@ export function BuyerOfferDetailModal(props: {
               Loading offer…
             </div>
           ) : (
-            <div className="grid gap-6 lg:grid-cols-[1.1fr_.9fr]">
+            <div className="grid gap-4 sm:gap-6 lg:grid-cols-[1.1fr_.9fr]">
               <Card className="border-2">
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between gap-3">
@@ -230,40 +235,42 @@ export function BuyerOfferDetailModal(props: {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="secondary" className="text-xs">
-                      Status: {offer.status}
+                    <Badge variant={offerStatusBadgeVariant(offer.status)} className="text-xs font-medium">
+                      {offer.status === 'expired' ? 'Expired' : offer.status === 'declined' ? 'Declined' : offer.status}
                     </Badge>
-                    <Badge variant="outline" className="text-xs">
-                      Current: ${Number(offer.currentAmount).toLocaleString()}
+                    <Badge variant="outline" className="text-xs font-medium tabular-nums">
+                      ${Number(offer.currentAmount).toLocaleString()}
                     </Badge>
-                    <Badge variant="outline" className="text-xs flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {formatTimeLeft(offer.expiresAt)}
-                    </Badge>
+                    {offer.expiresAt != null && (
+                      <Badge variant="outline" className="text-xs flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatTimeLeft(offer.expiresAt)}
+                      </Badge>
+                    )}
                   </div>
 
                   <div className="rounded-xl border bg-muted/20 p-4">
-                    <div className="text-sm font-semibold mb-2">Offer history</div>
-                    <div className="space-y-2">
-                      {(offer.history || [])
-                        .slice()
-                        .reverse()
-                        .map((h, idx) => (
-                          <div key={idx} className="text-sm flex items-start justify-between gap-3">
+                    <div className="text-sm font-semibold mb-3">Offer history</div>
+                    {(offer.history && offer.history.length > 0) ? (
+                      <div className="space-y-3">
+                        {offer.history.slice().reverse().map((h, idx) => (
+                          <div key={idx} className="text-sm flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-3">
                             <div className="min-w-0">
-                              <span className="font-semibold capitalize">{h.type}</span>{' '}
-                              <span className="text-muted-foreground">by {h.actorRole}</span>
+                              <span className="font-medium">{formatOfferHistoryLabel(h)}</span>
                               {typeof h.amount === 'number' ? (
-                                <span className="ml-2 font-semibold">${Number(h.amount).toLocaleString()}</span>
+                                <span className="ml-2 font-semibold tabular-nums">${Number(h.amount).toLocaleString()}</span>
                               ) : null}
                               {h.note ? <div className="text-xs text-muted-foreground mt-0.5">{h.note}</div> : null}
                             </div>
                             <div className="text-xs text-muted-foreground shrink-0">
-                              {h.createdAt ? new Date(h.createdAt).toLocaleString() : ''}
+                              {h.createdAt ? new Date(h.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : ''}
                             </div>
                           </div>
                         ))}
-                    </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No offer history yet.</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -273,17 +280,20 @@ export function BuyerOfferDetailModal(props: {
                   <CardTitle>Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {canCheckout ? (
-                    <Button onClick={checkout} disabled={actionLoading} className="w-full min-h-[44px] font-semibold">
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Checkout at ${(offer.acceptedAmount ?? offer.currentAmount).toLocaleString()}
-                    </Button>
-                  ) : null}
-
-                  {canRespondToCounter ? (
+                  {canCheckout && (
                     <>
-                      <Button onClick={doAccept} disabled={actionLoading} className="w-full min-h-[44px] font-semibold">
-                        {actionLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                      <Button onClick={checkout} disabled={actionLoading} className="w-full min-h-[48px] font-semibold">
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Checkout at ${(offer.acceptedAmount ?? offer.currentAmount).toLocaleString()}
+                      </Button>
+                      <p className="text-xs text-muted-foreground">Complete payment on the listing to secure this price.</p>
+                    </>
+                  )}
+
+                  {canRespondToCounter && (
+                    <>
+                      <Button onClick={doAccept} disabled={actionLoading} className="w-full min-h-[48px] font-semibold">
+                        {actionLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
                         Accept
                       </Button>
                       <Button
@@ -293,7 +303,7 @@ export function BuyerOfferDetailModal(props: {
                           setCounterOpen(true);
                         }}
                         disabled={actionLoading}
-                        className="w-full min-h-[44px] font-semibold"
+                        className="w-full min-h-[48px] font-semibold"
                       >
                         Counter
                       </Button>
@@ -301,7 +311,7 @@ export function BuyerOfferDetailModal(props: {
                         variant="outline"
                         onClick={doDecline}
                         disabled={actionLoading}
-                        className="w-full min-h-[44px] font-semibold"
+                        className="w-full min-h-[48px] font-semibold"
                       >
                         <XCircle className="h-4 w-4 mr-2" />
                         Decline
@@ -310,13 +320,32 @@ export function BuyerOfferDetailModal(props: {
                   ) : null}
 
                   {canWithdraw ? (
-                    <Button variant="outline" onClick={doWithdraw} disabled={actionLoading} className="w-full min-h-[44px]">
-                      Withdraw
+                    <Button variant="outline" onClick={doWithdraw} disabled={actionLoading} className="w-full min-h-[48px] font-semibold">
+                      Withdraw offer
                     </Button>
                   ) : null}
 
-                  {!canCheckout && !canRespondToCounter && !canWithdraw ? (
-                    <div className="text-sm text-muted-foreground">No actions available for this offer.</div>
+                  {isExpiredOrDeclined && (
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        {offer.status === 'expired'
+                          ? 'This offer has expired. You can make a new offer from the listing if it’s still available.'
+                          : 'This offer was declined. You can make a new offer from the listing if you’d like.'}
+                      </p>
+                      <Button asChild className="w-full min-h-[48px] font-semibold" size="default">
+                        <Link href={`/listing/${offer.listingId}`}>
+                          Make a new offer
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </Link>
+                      </Button>
+                      <Button asChild variant="outline" className="w-full min-h-[44px]">
+                        <Link href={`/listing/${offer.listingId}`}>View listing</Link>
+                      </Button>
+                    </>
+                  )}
+
+                  {!canCheckout && !canRespondToCounter && !canWithdraw && !isExpiredOrDeclined ? (
+                    <p className="text-sm text-muted-foreground">No actions available for this offer.</p>
                   ) : null}
                 </CardContent>
               </Card>

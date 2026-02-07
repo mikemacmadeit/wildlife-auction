@@ -42,7 +42,7 @@ export function useDashboardBadges(): DashboardBadges {
   return useContext(DashboardBadgesContext);
 }
 
-/** Total of notifications + messages + offers for mobile bottom nav Alerts badge */
+/** Total of notifications + messages + offers for mobile bottom nav Notifications badge */
 export function useDashboardAlertsTotal(): number {
   const { notifications, messages, offers } = useDashboardBadges();
   return notifications + messages + offers;
