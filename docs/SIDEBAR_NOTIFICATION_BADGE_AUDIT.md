@@ -67,23 +67,23 @@ When you visit a page, the corresponding sidebar badge should clear. Status:
 
 ---
 
-## Issues Found
+## Issues Found (and Fixed)
 
-### 1. Bids & Offers badge does not clear on initial visit
+### 1. Bids & Offers badge does not clear on initial visit — ✅ Fixed
 
 **Location:** `app/dashboard/bids-offers/page.tsx`
 
-**Problem:** `clearTabNotifs` is only called when the user **switches tabs**. When landing on `/dashboard/bids-offers` for the first time, no mark-as-read runs, so the sidebar badge stays until the user changes tabs.
+**Problem:** `clearTabNotifs` was only called when the user **switches tabs**. When landing on `/dashboard/bids-offers` for the first time, no mark-as-read ran, so the sidebar badge stayed until the user changed tabs.
 
-**Fix:** Call `clearTabNotifs` (or equivalent mark-as-read for all offer/bid types) in a `useEffect` on mount, using the current/default tab.
+**Fix:** Added a `useEffect` on mount that calls `clearTabNotifs(tab)` when `user?.uid` is set, so the current tab’s notifications are marked read on initial visit and the sidebar Bids & Offers badge updates.
 
-### 2. Seller layout does not subscribe to Admin Support badge
+### 2. Seller layout did not subscribe to Admin Support badge — ✅ Fixed
 
 **Location:** `app/seller/layout.tsx`
 
-**Problem:** Dashboard layout subscribes to `admin_support_ticket_submitted` for the Support badge. Seller layout does **not**. When viewing from `/seller/*` (e.g. `/seller/listings`), the Admin section shows "Support" with no badge, even if there are unread support ticket notifications.
+**Problem:** Dashboard layout subscribed to `admin_support_ticket_submitted` for the Support badge. Seller layout did **not**. When viewing from `/seller/*`, the Admin section showed "Support" with no badge even when there were unread support ticket notifications.
 
-**Fix:** Add the same `subscribeToUnreadCountByTypes(user.uid, ['admin_support_ticket_submitted'], ...)` in the Seller layout when `showAdminNav && isAdmin`.
+**Fix:** Added `subscribeToUnreadCountByTypes(user.uid, ['admin_support_ticket_submitted'], ...)` when `showAdminNav && isAdmin`, added `supportTickets` to badge state, and wired the Admin Support nav item to `badges.supportTickets`.
 
 ### 3. Seller layout does not mark Admin Support as read on visit
 
@@ -97,13 +97,5 @@ When you visit a page, the corresponding sidebar badge should clear. Status:
 
 | Category | Status |
 |----------|--------|
-| **Correct** | Messages, Notifications, Sold, Admin Support (Dashboard), Admin Compliance |
-| **Partial** | Bids & Offers (clears only on tab switch) |
-| **Missing subscription** | Admin Support badge when viewing from Seller layout |
-
----
-
-## Recommended Fixes
-
-1. **Bids & Offers:** Add a `useEffect` on mount to mark bid/offer notification types as read when the user lands on `/dashboard/bids-offers` (e.g. mark the current tab's types, or all offer-related types).
-2. **Seller layout:** Add `subscribeToUnreadCountByTypes` for `admin_support_ticket_submitted` and the `markNotificationsAsReadByTypes` effect when `pathname.startsWith('/dashboard/admin/support')`. Note: visiting `/dashboard/admin/support` uses Dashboard layout, so mark-as-read is already handled. The missing piece is the **subscription** so the badge shows correctly when on Seller routes.
+| **Correct** | Messages, Notifications, Sold, Admin Support (Dashboard + Seller), Admin Compliance, Bids & Offers (clears on mount and tab switch) |
+| **Fixed** | Bids & Offers (now clears on initial visit); Admin Support badge (Seller layout now subscribes) |

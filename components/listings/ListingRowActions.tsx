@@ -140,15 +140,17 @@ const ListingRowActions = memo(function ListingRowActions({
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem
-          onSelect={() => {
-            onDelete?.();
-          }}
-          className={cn('flex items-center gap-2 font-semibold text-destructive focus:text-destructive')}
-        >
-          <Trash2 className="h-4 w-4" />
-          Delete
-        </DropdownMenuItem>
+        {status !== 'sold' && (
+          <DropdownMenuItem
+            onSelect={() => {
+              onDelete?.();
+            }}
+            className={cn('flex items-center gap-2 font-semibold text-destructive focus:text-destructive')}
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

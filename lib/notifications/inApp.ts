@@ -354,6 +354,18 @@ export function buildInAppNotification(params: {
         metadata: { listingId: p.listingId, orderId: p.orderId, sellerId: p.sellerId },
       };
     }
+    case 'Review.Received': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Review.Received' }>;
+      return {
+        ...base,
+        type: 'review_received',
+        title: 'New buyer review',
+        body: `${p.rating} star${p.rating === 1 ? '' : 's'} for "${p.listingTitle}"`,
+        deepLinkUrl: p.reputationUrl,
+        linkLabel: 'View reputation',
+        metadata: { listingId: p.listingId, orderId: p.orderId, rating: p.rating },
+      };
+    }
     case 'Payout.Released': {
       const p = params.payload as Extract<NotificationEventPayload, { type: 'Payout.Released' }>;
       return {

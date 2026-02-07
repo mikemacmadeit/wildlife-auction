@@ -351,30 +351,30 @@ const MobileListingCard = memo(({
 }) => (
   <div
     key={listing.id}
-    className="rounded-xl border border-border/60 bg-card overflow-hidden transition-colors hover:bg-muted/30"
+    className="rounded-lg sm:rounded-xl border border-border/60 bg-card overflow-hidden transition-colors hover:bg-muted/30"
   >
     <Link href={`/listing/${listing.id}`} className="block w-full">
-      <div className="relative w-full aspect-[4/3] bg-muted">
+      <div className="relative w-full aspect-[1] sm:aspect-[4/3] bg-muted">
         {getPrimaryListingImageUrl(listing) ? (
           <Image
             src={getPrimaryListingImageUrl(listing) as string}
             alt=""
             fill
             className="object-cover"
-            sizes="(max-width: 768px) 100vw, 400px"
+            sizes="(max-width: 640px) 50vw, (max-width: 768px) 50vw, 400px"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-            <Package className="h-10 w-10 opacity-40" />
+            <Package className="h-8 w-8 sm:h-10 sm:w-10 opacity-40" />
           </div>
         )}
       </div>
     </Link>
-    <div className="p-3 flex flex-col gap-2">
+    <div className="p-2 sm:p-3 flex flex-col gap-2 min-w-0">
       <div className="flex items-start justify-between gap-2 min-w-0">
         <Link
           href={`/listing/${listing.id}`}
-          className="font-semibold text-sm text-foreground hover:text-primary line-clamp-2 min-w-0 flex-1"
+          className="font-semibold text-xs sm:text-sm text-foreground hover:text-primary line-clamp-2 min-w-0 flex-1 leading-tight"
         >
           {listing.title}
         </Link>
@@ -394,7 +394,7 @@ const MobileListingCard = memo(({
           />
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5 -mt-1">
         {getTypeBadge(listing.type)}
         {getStatusBadge({
           status: effectiveStatus,
@@ -402,24 +402,22 @@ const MobileListingCard = memo(({
           ended: isAuctionEnded(listing),
         })}
       </div>
-      <div className="flex items-baseline justify-between gap-2">
-        <span className={effectiveStatus === 'sold' ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}>
+      <div className="flex items-center justify-between gap-2 min-w-0 mt-1">
+        <span className={cn('font-bold tabular-nums text-sm sm:text-base truncate min-w-0', effectiveStatus === 'sold' ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground')}>
           {effectiveStatus === 'sold' ? (
             <>
-              <span className="text-base font-medium">Sold for </span>
-              <span className="text-base font-bold tabular-nums">
-                $
-                {typeof (listing as any).soldPriceCents === 'number'
-                  ? ((listing as any).soldPriceCents / 100).toLocaleString()
-                  : listing.type === 'auction' && listing.currentBid
-                    ? listing.currentBid.toLocaleString()
-                    : listing.price
-                      ? listing.price.toLocaleString()
-                      : '—'}
-              </span>
+              <span className="font-medium">Sold </span>
+              $
+              {typeof (listing as any).soldPriceCents === 'number'
+                ? ((listing as any).soldPriceCents / 100).toLocaleString()
+                : listing.type === 'auction' && listing.currentBid
+                  ? listing.currentBid.toLocaleString()
+                  : listing.price
+                    ? listing.price.toLocaleString()
+                    : '—'}
             </>
           ) : (
-            <span className="text-base font-bold tabular-nums">
+            <>
               {listing.type === 'auction'
                 ? listing.currentBid
                   ? `$${listing.currentBid.toLocaleString()}`
@@ -427,14 +425,14 @@ const MobileListingCard = memo(({
                 : listing.price
                 ? `$${listing.price.toLocaleString()}`
                 : 'Contact'}
-            </span>
+            </>
           )}
         </span>
-        <span className="text-xs text-muted-foreground shrink-0">
+        <span className="text-xs text-muted-foreground shrink-0 truncate max-w-[45%]">
           {listing.location?.city || '—'}, {listing.location?.state || '—'}
         </span>
       </div>
-      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+      <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground">
         <span>{listing.metrics.views} views</span>
         {listing.type === 'auction' && (
           <>
@@ -448,22 +446,22 @@ const MobileListingCard = memo(({
           </span>
         )}
       </div>
-      <div className="flex gap-2 pt-1">
+      <div className="flex gap-2">
         {effectiveStatus === 'sold' && orderId ? (
           <>
-            <Button variant="default" size="sm" asChild className="min-h-9 flex-1 text-sm">
+            <Button variant="default" size="sm" asChild className="min-h-8 sm:min-h-9 flex-1 text-xs sm:text-sm px-2 sm:px-3">
               <Link href={`/seller/orders/${orderId}`}>Manage sale</Link>
             </Button>
-            <Button variant="outline" size="sm" asChild className="min-h-9 flex-1 text-sm">
+            <Button variant="outline" size="sm" asChild className="min-h-8 sm:min-h-9 flex-1 text-xs sm:text-sm px-2 sm:px-3 border-primary text-primary hover:bg-primary/10 hover:text-primary">
               <Link href={`/listing/${listing.id}`}>View</Link>
             </Button>
           </>
         ) : (
           <>
-            <Button variant="default" size="sm" asChild className="min-h-9 flex-1 text-sm">
+            <Button variant="default" size="sm" asChild className="min-h-8 sm:min-h-9 flex-1 text-xs sm:text-sm px-2 sm:px-3">
               <Link href={`/listing/${listing.id}`}>View</Link>
             </Button>
-            <Button variant="outline" size="sm" asChild className="min-h-9 flex-1 text-sm border-primary text-primary hover:bg-primary/10 hover:text-primary">
+            <Button variant="outline" size="sm" asChild className="min-h-8 sm:min-h-9 flex-1 text-xs sm:text-sm px-2 sm:px-3 border-primary text-primary hover:bg-primary/10 hover:text-primary">
               <Link href={`/seller/listings/${listing.id}/edit`}>Edit</Link>
             </Button>
           </>
@@ -705,9 +703,13 @@ function SellerListingsPageContent() {
       const effectiveStatus = getEffectiveStatusForListing(listing, nowMs);
       const matchesSearch = !query || listing.title.toLowerCase().includes(query);
       const isPendingApproval = effectiveStatus === 'pending' || (listing as any).complianceStatus === 'pending_review';
+      // "All" = non-removed only (so count matches list); "Removed" = removed only
       const matchesStatus =
-        statusFilter === 'all' ||
-        (statusFilter === 'pending' ? isPendingApproval : effectiveStatus === statusFilter);
+        statusFilter === 'all'
+          ? effectiveStatus !== 'removed'
+          : statusFilter === 'pending'
+            ? isPendingApproval
+            : effectiveStatus === statusFilter;
       const matchesType = typeFilter === 'all' || listing.type === typeFilter;
       const matchesLocation = locationFilter === 'all' ||
         `${listing.location?.city || 'Unknown'}, ${listing.location?.state || 'Unknown'}` === locationFilter;
@@ -741,24 +743,33 @@ function SellerListingsPageContent() {
     return Array.from(locations);
   }, [listings]);
 
-  const nowMs = Date.now();
+  // Counts: exclude "removed" (deleted) from "All" so numbers match what you see; type counts sum to All
   const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: listings.length };
+    const nowMs = Date.now();
+    const counts: Record<string, number> = {};
     listings.forEach((l) => {
       const s = getEffectiveStatusForListing(l, nowMs);
       const effective = s === 'pending' || (l as any).complianceStatus === 'pending_review' ? 'pending' : s;
       counts[effective] = (counts[effective] ?? 0) + 1;
     });
+    // "All" = non-removed only, so the total matches the default view (removed excluded from All)
+    const removedCount = counts['removed'] ?? 0;
+    counts['all'] = listings.length - removedCount;
     return counts;
   }, [listings, getEffectiveStatusForListing]);
   const typeCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: listings.length };
-    listings.forEach((l) => {
-      const t = l.type || 'fixed';
+    const nowMs = Date.now();
+    const visibleListings = listings.filter((l) => {
+      const s = getEffectiveStatusForListing(l, nowMs);
+      return s !== 'removed';
+    });
+    const counts: Record<string, number> = { all: visibleListings.length };
+    visibleListings.forEach((l) => {
+      const t = (l.type === 'auction' ? 'auction' : 'fixed') as ListingType;
       counts[t] = (counts[t] ?? 0) + 1;
     });
     return counts;
-  }, [listings]);
+  }, [listings, getEffectiveStatusForListing]);
 
   const statusChipDefs: { key: ListingStatus | 'all'; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -773,15 +784,7 @@ function SellerListingsPageContent() {
     { key: 'all', label: 'All' },
     { key: 'auction', label: 'Auction' },
     { key: 'fixed', label: 'Fixed' },
-    { key: 'classified', label: 'Classified' },
   ];
-  const hasActiveFilters = searchQuery.trim() !== '' || statusFilter !== 'all' || typeFilter !== 'all' || locationFilter !== 'all';
-  const clearFilters = useCallback(() => {
-    setSearchQuery('');
-    setStatusFilter('all');
-    setTypeFilter('all');
-    setLocationFilter('all');
-  }, []);
 
   // Refresh listings (and sold-order map) after actions so "Manage sale" is available
   const refreshListings = useCallback(async () => {
@@ -842,12 +845,19 @@ function SellerListingsPageContent() {
   }, [user?.uid, selectedListing, toast, refreshListings]);
 
 
-  const handleDelete = useCallback(async (listing: Listing) => {
+  const handleDelete = useCallback((listing: Listing) => {
     if (!user?.uid) return;
-    
+    if (getEffectiveStatusForListing(listing) === 'sold') {
+      toast({
+        title: 'Cannot delete sold listing',
+        description: 'Sold and completed listings are retained for records. You can still view and manage the sale.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setSelectedListing(listing);
     setDeleteDialogOpen(true);
-  }, [user?.uid]);
+  }, [user?.uid, getEffectiveStatusForListing, toast]);
 
   const confirmDelete = useCallback(async () => {
     if (!user?.uid || !selectedListing) return;
@@ -1072,9 +1082,10 @@ function SellerListingsPageContent() {
               </div>
             </div>
 
-            {/* Status + Type chips (mobile: scroll; desktop: wrap) */}
-            <div className="overflow-x-auto overflow-y-hidden -mx-1 px-1 we-scrollbar-hover">
-              <div className="flex items-center gap-2 flex-nowrap md:flex-wrap min-w-0">
+            {/* Filters: mobile = scrollable row (like Orders); desktop = one row */}
+            <div className="md:hidden overflow-x-auto overflow-y-hidden pt-1 pb-2 -mx-1 px-1 we-scrollbar-hover">
+              <div className="flex items-center gap-2 flex-nowrap min-w-0">
+                <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap flex-shrink-0">Status</span>
                 {statusChipDefs.map((d) => {
                   const active = statusFilter === d.key;
                   const count = statusCounts[d.key] ?? 0;
@@ -1085,18 +1096,16 @@ function SellerListingsPageContent() {
                       onClick={() => setStatusFilter(d.key)}
                       className={cn(
                         'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold transition flex-shrink-0 whitespace-nowrap',
-                        active
-                          ? 'border-primary/40 bg-primary/10 text-primary'
-                          : 'border-border/60 bg-background/40 text-foreground hover:bg-muted/40'
+                        active ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border/60 bg-background/40 text-foreground hover:bg-muted/40'
                       )}
                     >
                       <span>{d.label}</span>
-                      <span className={cn('text-xs rounded-full px-2 py-0.5', active ? 'bg-primary/15' : 'bg-muted')}>
-                        {count}
-                      </span>
+                      <span className={cn('text-xs rounded-full px-2 py-0.5 min-w-[18px] text-center', active ? 'bg-primary/15' : 'bg-muted')}>{count}</span>
                     </button>
                   );
                 })}
+                <div className="h-8 w-px bg-border/60 flex-shrink-0" aria-hidden />
+                <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap flex-shrink-0">Type</span>
                 {typeChipDefs.map((d) => {
                   const active = typeFilter === d.key;
                   const count = typeCounts[d.key] ?? 0;
@@ -1107,56 +1116,82 @@ function SellerListingsPageContent() {
                       onClick={() => setTypeFilter(d.key)}
                       className={cn(
                         'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold transition flex-shrink-0 whitespace-nowrap',
-                        active
-                          ? 'border-primary/40 bg-primary/10 text-primary'
-                          : 'border-border/60 bg-background/40 text-foreground hover:bg-muted/40'
+                        active ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border/60 bg-background/40 text-foreground hover:bg-muted/40'
                       )}
                     >
                       <span>{d.label}</span>
-                      <span className={cn('text-xs rounded-full px-2 py-0.5', active ? 'bg-primary/15' : 'bg-muted')}>
-                        {count}
-                      </span>
+                      <span className={cn('text-xs rounded-full px-2 py-0.5 min-w-[18px] text-center', active ? 'bg-primary/15' : 'bg-muted')}>{count}</span>
                     </button>
                   );
                 })}
                 <Select value={locationFilter} onValueChange={handleLocationChange}>
-                  <SelectTrigger className="h-8 rounded-full min-w-0 w-auto px-3 text-xs font-semibold border-border/60 bg-background/40 flex-shrink-0 md:hidden [&>span]:max-w-[100px] [&>span]:truncate">
+                  <SelectTrigger className="h-8 rounded-full min-w-0 w-auto px-3 text-xs font-semibold border-border/60 bg-background/40 flex-shrink-0 [&>span]:max-w-[90px] [&>span]:truncate">
                     <SelectValue placeholder="Location" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All locations</SelectItem>
                     {uniqueLocations.map((location) => (
-                      <SelectItem key={location} value={location}>
-                        {location}
-                      </SelectItem>
+                      <SelectItem key={location} value={location}>{location}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {hasActiveFilters && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-full h-8 px-3 text-xs font-semibold flex-shrink-0"
-                    onClick={clearFilters}
-                  >
-                    Clear
-                  </Button>
-                )}
               </div>
             </div>
 
-            {/* Desktop: Clear filters link */}
-            {hasActiveFilters && (
-              <div className="hidden md:block text-right">
-                <Button type="button" variant="ghost" size="sm" className="font-semibold" onClick={clearFilters}>
-                  Clear filters
-                </Button>
+            <div className="hidden md:block w-full min-w-0 py-0.5">
+              <div className="flex flex-nowrap items-center gap-4 min-w-0 w-full">
+                <div className="flex items-center gap-2 flex-shrink-0 min-w-0">
+                  <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap flex-shrink-0">Status</span>
+                  <div className="flex items-center gap-2 flex-shrink-0 min-w-0">
+                    {statusChipDefs.map((d) => {
+                      const active = statusFilter === d.key;
+                      const count = statusCounts[d.key] ?? 0;
+                      return (
+                        <button
+                          key={d.key}
+                          type="button"
+                          onClick={() => setStatusFilter(d.key)}
+                          className={cn(
+                            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-sm font-semibold transition flex-shrink-0 whitespace-nowrap',
+                            active ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border/60 bg-background/40 text-foreground hover:bg-muted/40'
+                          )}
+                        >
+                          <span>{d.label}</span>
+                          <span className={cn('text-xs rounded-full px-2 py-0.5 min-w-[18px] text-center', active ? 'bg-primary/15' : 'bg-muted')}>{count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="h-8 w-px bg-border/60 flex-shrink-0" aria-hidden />
+                <div className="flex items-center gap-2 flex-shrink-0 min-w-0">
+                  <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap flex-shrink-0">Type</span>
+                  <div className="flex items-center gap-2 flex-shrink-0 min-w-0">
+                    {typeChipDefs.map((d) => {
+                      const active = typeFilter === d.key;
+                      const count = typeCounts[d.key] ?? 0;
+                      return (
+                        <button
+                          key={d.key}
+                          type="button"
+                          onClick={() => setTypeFilter(d.key)}
+                          className={cn(
+                            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-sm font-semibold transition flex-shrink-0 whitespace-nowrap',
+                            active ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border/60 bg-background/40 text-foreground hover:bg-muted/40'
+                          )}
+                        >
+                          <span>{d.label}</span>
+                          <span className={cn('text-xs rounded-full px-2 py-0.5 min-w-[18px] text-center', active ? 'bg-primary/15' : 'bg-muted')}>{count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
-            )}
+            </div>
 
-            {/* Sort + Gallery / List view toggle */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-border/40 mt-2 pt-3">
+            {/* Sort + Gallery / List view toggle — same line */}
+            <div className="flex flex-row items-center justify-between gap-3 border-t border-border/40 mt-2 pt-3">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-muted-foreground">Sort:</span>
                 <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'newest' | 'oldest')}>
@@ -1171,34 +1206,30 @@ function SellerListingsPageContent() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-muted-foreground">View:</span>
-              <div className="flex rounded-lg border border-border/60 bg-background/40 p-0.5">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('gallery')}
-                  className={cn(
-                    'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold transition',
-                    viewMode === 'gallery'
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-foreground hover:bg-muted/60'
-                  )}
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                  Gallery
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('list')}
-                  className={cn(
-                    'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold transition',
-                    viewMode === 'list'
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-foreground hover:bg-muted/60'
-                  )}
-                >
-                  <List className="h-4 w-4" />
-                  List
-                </button>
-              </div>
+                <div className="flex rounded-lg border border-border/60 bg-background/40 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('gallery')}
+                    className={cn(
+                      'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold transition',
+                      viewMode === 'gallery' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground hover:bg-muted/60'
+                    )}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                    Gallery
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('list')}
+                    className={cn(
+                      'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold transition',
+                      viewMode === 'list' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground hover:bg-muted/60'
+                    )}
+                  >
+                    <List className="h-4 w-4" />
+                    List
+                  </button>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -1238,7 +1269,7 @@ function SellerListingsPageContent() {
             <CardContent className="p-0">
               {/* Gallery view: cards in grid (mobile = single column, desktop = multi-column) */}
               {viewMode === 'gallery' && (
-                <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="p-2 sm:p-3 grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4">
                   {filteredListings.map((listing) => (
                     <MobileListingCard
                       key={listing.id}

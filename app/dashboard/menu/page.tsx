@@ -33,6 +33,8 @@ import { useAuth } from '@/hooks/use-auth';
 import { useAdmin } from '@/hooks/use-admin';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { ChevronRight } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { useDashboardBadges } from '@/contexts/DashboardBadgesContext';
 
 type NavItem = { href: string; label: string; subtext: string; icon: React.ComponentType<{ className?: string }> };
 
@@ -72,7 +74,7 @@ const ADMIN: NavItem[] = [
   { href: '/dashboard/admin/notifications', label: 'Notifications', subtext: 'Events and notification delivery.', icon: Bell },
 ];
 
-function Section({ title, items }: { title: string; items: NavItem[] }) {
+function Section({ title, items, badgeByHref }: { title: string; items: NavItem[]; badgeByHref?: Record<string, number> }) {
   const pathname = usePathname();
   return (
     <section className="mb-6">
@@ -83,6 +85,7 @@ function Section({ title, items }: { title: string; items: NavItem[] }) {
         {items.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href || pathname?.startsWith(item.href + '/');
+          const badgeCount = badgeByHref?.[item.href] ?? 0;
           return (
             <Link
               key={item.href}
@@ -98,6 +101,11 @@ function Section({ title, items }: { title: string; items: NavItem[] }) {
                 <div className={cn('font-medium text-sm', active && 'text-primary')}>{item.label}</div>
                 <div className="text-xs text-muted-foreground mt-0.5 leading-snug">{item.subtext}</div>
               </div>
+              {badgeCount > 0 && (
+                <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs shrink-0">
+                  {badgeCount}
+                </Badge>
+              )}
               <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
             </Link>
           );
@@ -109,7 +117,18 @@ function Section({ title, items }: { title: string; items: NavItem[] }) {
 
 function DashboardMenuPageContent() {
   const { isAdmin, isSuperAdmin } = useAdmin();
+  const badges = useDashboardBadges();
   const showAdmin = isAdmin === true || isSuperAdmin === true;
+
+  const badgeByHref: Record<string, number> = {
+    '/dashboard/bids-offers': badges.offers,
+    '/dashboard/notifications': badges.notifications,
+    '/dashboard/messages': badges.messages,
+    '/dashboard/admin/listings': badges.pendingApprovals,
+    '/dashboard/admin/notifications': isSuperAdmin ? badges.adminNotifications : 0,
+    '/dashboard/admin/support': isAdmin ? badges.supportTickets : 0,
+    '/dashboard/admin/compliance': isAdmin ? badges.pendingBreederPermits : 0,
+  };
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
@@ -119,10 +138,10 @@ function DashboardMenuPageContent() {
           Shopping, selling, and account – all in one place.
         </p>
 
-        <Section title="Buying" items={BUYING} />
-        <Section title="Selling" items={SELLING} />
-        <Section title="Account" items={ACCOUNT} />
-        {showAdmin ? <Section title="Admin" items={ADMIN} /> : null}
+        <Section title="Buying" items={BUYING} badgeByHref={badgeByHref} />
+        <Section title="Selling" items={SELLING} badgeByHref={badgeByHref} />
+        <Section title="Account" items={ACCOUNT} badgeByHref={badgeByHref} />
+        {showAdmin ? <Section title="Admin" items={ADMIN} badgeByHref={badgeByHref} /> : null}
       </div>
     </div>
   );

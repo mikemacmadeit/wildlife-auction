@@ -59,6 +59,7 @@ import { cn } from '@/lib/utils';
 import { BrandLogoText } from '@/components/navigation/BrandLogoText';
 import { LayoutBottomNav } from '@/components/navigation/LayoutBottomNav';
 import { RequireAuth } from '@/components/auth/RequireAuth';
+import { DashboardBadgesProvider } from '@/contexts/DashboardBadgesContext';
 import { ProfileCompletionGate } from '@/components/auth/ProfileCompletionGate';
 import { ProductionErrorBoundary } from '@/components/error-boundary/ProductionErrorBoundary';
 import {
@@ -333,15 +334,16 @@ export default function DashboardLayout({
   const mobileBottomNavItems = useMemo(() => {
     const byHref = new Map(navItems.map((n) => [n.href, n] as const));
     const pick = (href: string, fallback: SellerNavItem) => byHref.get(href) || fallback;
+    const alertsTotal = badges.notifications + badges.messages + badges.offers;
     const items = [
       { href: '/', label: 'Home', icon: Home, shortLabel: 'Home' },
       { href: '/dashboard/menu', label: 'Dashboard', icon: LayoutGrid, shortLabel: 'Dashboard' },
       { href: '/dashboard/listings/new', label: 'Sell', icon: PlusCircle, shortLabel: 'Sell' },
       { ...pick('/browse', { href: '/browse', label: 'Buy', icon: Compass, shortLabel: 'Buy' }), label: 'Buy', shortLabel: 'Buy' },
-      pick('/dashboard/notifications', { href: '/dashboard/notifications', label: 'Alerts', icon: Bell }),
+      { ...pick('/dashboard/notifications', { href: '/dashboard/notifications', label: 'Alerts', icon: Bell }), badge: alertsTotal > 0 ? alertsTotal : undefined },
     ];
     return items.map((item) => ({ ...item, shortLabel: (item as { shortLabel?: string }).shortLabel ?? item.label }));
-  }, [navItems]);
+  }, [navItems, badges.notifications, badges.messages, badges.offers]);
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -367,6 +369,7 @@ export default function DashboardLayout({
   return (
     <RequireAuth>
       <ProfileCompletionGate />
+      <DashboardBadgesProvider value={badges}>
       <div
         className={cn(
           'bg-background flex flex-col md:flex-row relative',
@@ -769,6 +772,7 @@ export default function DashboardLayout({
         <LayoutBottomNav items={mobileBottomNavItems} />
       </div>
       </div>
+      </DashboardBadgesProvider>
     </RequireAuth>
   );
 }

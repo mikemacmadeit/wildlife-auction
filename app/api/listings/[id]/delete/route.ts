@@ -97,6 +97,16 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
   if (!sellerId) return json({ ok: false, error: 'Listing is missing sellerId' }, { status: 400 });
   if (!requesterIsAdmin && sellerId !== uid) return json({ ok: false, error: 'Forbidden' }, { status: 403 });
 
+  // Sold or completed listings cannot be deleted — we retain them for records, tax, and disputes
+  const status = String(listing?.status || '').toLowerCase();
+  const hasSoldAt = listing?.soldAt != null;
+  if (status === 'sold' || hasSoldAt) {
+    return json(
+      { ok: false, error: 'Sold and completed listings cannot be deleted. We retain this data for records.' },
+      { status: 400 }
+    );
+  }
+
   // 1) Delete listing documents subcollection docs and any listing-owned Storage files they reference.
   try {
     const docsSnap = await listingRef.collection('documents').get();

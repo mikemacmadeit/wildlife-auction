@@ -104,6 +104,15 @@ export interface ReviewRequestEmailData {
   reviewUrl: string;
 }
 
+export interface ReviewReceivedEmailData {
+  sellerName: string;
+  listingTitle: string;
+  orderId: string;
+  rating: number;
+  reviewText?: string;
+  reputationUrl: string;
+}
+
 export interface VerifyEmailEmailData {
   userName: string;
   verifyUrl: string;
@@ -1427,6 +1436,42 @@ export function getReviewRequestEmail(data: ReviewRequestEmailData): { subject: 
 
     <div style="margin: 18px 0 0 0;">
       ${renderButton(data.reviewUrl, 'Leave a review')}
+    </div>
+  `;
+
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
+export function getReviewReceivedEmail(data: ReviewReceivedEmailData): { subject: string; html: string } {
+  const subject = `New review — ${data.rating} star${data.rating === 1 ? '' : 's'} for ${data.listingTitle}`;
+  const preheader = `A buyer left you a review.`;
+  const origin = canonicalOrigin(tryGetOrigin(data.reputationUrl));
+
+  const stars = '★'.repeat(Math.min(5, Math.max(0, Math.round(data.rating)))) + '☆'.repeat(5 - Math.min(5, Math.max(0, Math.round(data.rating))));
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      New buyer review
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 14px 0;">
+      Hi ${escapeHtml(data.sellerName)} — a buyer left you a <strong>${data.rating} star</strong> review for <strong>${escapeHtml(data.listingTitle)}</strong>.
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="background:#FBFAF7; border:1px solid rgba(34,37,31,0.16); border-radius: 16px;">
+      <tr>
+        <td style="padding: 14px 14px;">
+          <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase;">
+            Rating
+          </div>
+          <div style="margin-top: 6px; font-size: 18px; color:#D4A853;">${stars}</div>
+          ${data.reviewText ? `<div style="margin-top: 10px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#22251F;">${escapeHtml(data.reviewText)}</div>` : ''}
+          <div style="margin-top: 10px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">Order: ${escapeHtml(data.orderId)}</div>
+        </td>
+      </tr>
+    </table>
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.reputationUrl, 'View your reputation')}
     </div>
   `;
 

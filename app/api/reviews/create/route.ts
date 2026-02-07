@@ -7,6 +7,9 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { REVIEW_WINDOW_DAYS } from '@/lib/reviews/constants';
 import { applyReviewDelta, initReviewStats } from '@/lib/reviews/aggregates';
+import { emitAndProcessEventForUser } from '@/lib/notifications';
+import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
+import { getSiteUrl } from '@/lib/site-url';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -112,6 +115,41 @@ export async function POST(request: Request) {
       tx.set(userRef, { sellerReviewStats: nextStats, updatedAt: now }, { merge: true });
       tx.set(publicRef, { sellerReviewStats: nextPublicStats, updatedAt: now }, { merge: true });
     });
+
+    // Notify seller of new review (in-app + email)
+    const orderSnapAfter = await orderRef.get();
+    const orderData = orderSnapAfter.exists ? (orderSnapAfter.data() as any) : null;
+    const sellerId = String(orderData?.sellerId || '');
+    const listingId = String(orderData?.listingId || '');
+    const listingTitle = String(orderData?.listingSnapshot?.title || '').trim() || 'Your listing';
+    const reputationUrl = `${getSiteUrl()}/seller/reputation`;
+
+    if (sellerId) {
+      try {
+        const ev = await emitAndProcessEventForUser({
+          type: 'Review.Received',
+          actorId: decoded.uid,
+          entityType: 'order',
+          entityId: orderId,
+          targetUserId: sellerId,
+          payload: {
+            type: 'Review.Received',
+            orderId,
+            listingId,
+            listingTitle,
+            rating,
+            reviewText: text || null,
+            reputationUrl,
+          },
+          optionalHash: `review:${orderId}`,
+        });
+        if (ev?.ok && ev.created) {
+          void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
+        }
+      } catch {
+        // best-effort; do not fail review creation
+      }
+    }
 
     return json({ ok: true });
   } catch (e: any) {

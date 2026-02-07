@@ -53,6 +53,7 @@ export const NOTIFICATION_EVENT_TYPES = [
   'Order.ComplianceUnlocked', // NEW: Both parties confirmed - fulfillment unlocked
   'Payout.Released',
   'Review.Request',
+  'Review.Received', // Seller notified when a buyer leaves a review
 
   // ONBOARDING / TRUST
   'User.Welcome',
@@ -351,6 +352,15 @@ export type NotificationEventPayload =
       sellerId: string;
       sellerDisplayName: string;
       reviewUrl: string;
+    }
+  | {
+      type: 'Review.Received';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      rating: number;
+      reviewText: string | null;
+      reputationUrl: string;
     }
   | {
       type: 'Order.SlaApproaching';

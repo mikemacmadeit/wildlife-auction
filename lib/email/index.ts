@@ -29,6 +29,7 @@ import {
   getSavedSearchAlertEmail,
   getMessageReceivedEmail,
   getReviewRequestEmail,
+  getReviewReceivedEmail,
   getVerifyEmailEmail,
   getOfferSubmittedEmail,
   getOfferAcceptedEmail,
@@ -70,6 +71,7 @@ import {
   type SavedSearchAlertEmailData,
   type MessageReceivedEmailData,
   type ReviewRequestEmailData,
+  type ReviewReceivedEmailData,
   type VerifyEmailEmailData,
   type OfferSubmittedEmailData,
   type OfferAcceptedEmailData,
@@ -285,6 +287,15 @@ const reviewRequestSchema = z.object({
   listingTitle: z.string().min(1),
   orderId: z.string().min(1),
   reviewUrl: urlSchema,
+});
+
+const reviewReceivedSchema = z.object({
+  sellerName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  orderId: z.string().min(1),
+  rating: z.number().min(1).max(5),
+  reviewText: z.string().optional(),
+  reputationUrl: urlSchema,
 });
 
 const verifyEmailSchema = z.object({
@@ -768,6 +779,24 @@ export const EMAIL_EVENT_REGISTRY = [
     render: (data: ReviewRequestEmailData) => {
       const { subject, html } = getReviewRequestEmail(data);
       return { subject, preheader: `Leave a review`, html };
+    },
+  },
+  {
+    type: 'review_received',
+    displayName: 'Review: Received',
+    description: 'Sent to seller when a buyer leaves a review.',
+    schema: reviewReceivedSchema,
+    samplePayload: {
+      sellerName: 'Jordan Smith',
+      listingTitle: 'Trophy Whitetail Buck',
+      orderId: 'ORD_123456',
+      rating: 5,
+      reviewText: 'Smooth transaction, great communication.',
+      reputationUrl: 'https://agchange.app/seller/reputation',
+    },
+    render: (data: ReviewReceivedEmailData) => {
+      const { subject, html } = getReviewReceivedEmail(data);
+      return { subject, preheader: `New buyer review`, html };
     },
   },
   {

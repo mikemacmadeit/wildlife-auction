@@ -136,6 +136,7 @@ export default function SellerLayout({
     adminNotifications: 0,
     pendingApprovals: 0,
     pendingBreederPermits: 0,
+    supportTickets: 0,
   });
   const [adminEverTrue, setAdminEverTrue] = useState(false);
   const [userNavOpen, setUserNavOpen] = useState(true);
@@ -222,9 +223,15 @@ export default function SellerLayout({
           badge: isAdmin && badges.pendingBreederPermits > 0 ? badges.pendingBreederPermits : undefined,
         };
       }
+      if (item.href === '/dashboard/admin/support') {
+        return {
+          ...item,
+          badge: isAdmin && badges.supportTickets > 0 ? badges.supportTickets : undefined,
+        };
+      }
       return item;
     });
-  }, [badges.pendingApprovals, badges.adminNotifications, badges.pendingBreederPermits, isSuperAdmin, isAdmin]);
+  }, [badges.pendingApprovals, badges.adminNotifications, badges.pendingBreederPermits, badges.supportTickets, isSuperAdmin, isAdmin]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -279,6 +286,11 @@ export default function SellerLayout({
             setBadges((prev) => ({ ...prev, pendingBreederPermits: count || 0 }));
           })
         );
+        unsubs.push(
+          subscribeToUnreadCountByTypes(user.uid, ['admin_support_ticket_submitted'], (count) => {
+            setBadges((prev) => ({ ...prev, supportTickets: count || 0 }));
+          })
+        );
       }
 
       const offerTypes: NotificationType[] = [
@@ -312,6 +324,7 @@ export default function SellerLayout({
         notifications: 0,
         offers: 0,
         sales: 0,
+        supportTickets: 0,
       }));
       return;
     }
@@ -340,15 +353,16 @@ export default function SellerLayout({
   const mobileBottomNavItems = useMemo(() => {
     const byHref = new Map(navItems.map((n) => [n.href, n] as const));
     const pick = (href: string, fallback: SellerNavItem) => byHref.get(href) || fallback;
+    const alertsTotal = badges.notifications + badges.messages + badges.offers;
     const items = [
       { href: '/', label: 'Home', icon: Home, shortLabel: 'Home' },
       { href: '/dashboard/menu', label: 'Dashboard', icon: LayoutGrid, shortLabel: 'Dashboard' },
       { href: '/dashboard/listings/new', label: 'Sell', icon: PlusCircle, shortLabel: 'Sell' },
       { ...pick('/browse', { href: '/browse', label: 'Buy', icon: Compass, shortLabel: 'Buy' }), label: 'Buy', shortLabel: 'Buy' },
-      pick('/dashboard/notifications', { href: '/dashboard/notifications', label: 'Alerts', icon: Bell }),
+      { ...pick('/dashboard/notifications', { href: '/dashboard/notifications', label: 'Alerts', icon: Bell }), badge: alertsTotal > 0 ? alertsTotal : undefined },
     ];
     return items.map((item) => ({ ...item, shortLabel: (item as { shortLabel?: string }).shortLabel ?? item.label }));
-  }, [navItems]);
+  }, [navItems, badges.notifications, badges.messages, badges.offers]);
 
   useEffect(() => {
     setMobileMenuOpen(false);

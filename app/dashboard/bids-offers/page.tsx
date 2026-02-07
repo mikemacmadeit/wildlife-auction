@@ -437,6 +437,13 @@ export default function BidsOffersPage() {
     [user?.uid]
   );
 
+  // On initial visit to this page, clear the current tab's notifications so the sidebar Bids & Offers badge updates
+  useEffect(() => {
+    if (!user?.uid) return;
+    void clearTabNotifs(tab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount with initial tab
+  }, [user?.uid]);
+
   const rows: UnifiedRow[] = useMemo(() => {
     const now = Date.now();
     const bidRows: UnifiedRow[] = bids.map((b) => {

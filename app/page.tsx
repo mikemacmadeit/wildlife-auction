@@ -1326,17 +1326,18 @@ export default function HomePage() {
             </p>
           </motion.div>
 
-          {/* Mobile-only: 2 per row. Compact stacked layout so long labels fit. */}
+          {/* Mobile-only: 2 per row, larger cards with icon, title, and subtext. */}
           <div className="flex justify-center md:hidden">
-            <div className="grid grid-cols-2 gap-2 w-full max-w-2xl">
+            <div className="grid grid-cols-2 gap-4 w-full max-w-2xl">
             {[
-              { href: '/browse?category=whitetail_breeder', label: 'Whitetail Breeder', icon: <div className="w-8 h-8 icon-primary-color mask-icon-whitetail-breeder" /> },
-              { href: '/browse?category=wildlife_exotics', label: 'Specialty Livestock', icon: <div className="w-8 h-8 icon-primary-color mask-icon-fallow" /> },
-              { href: '/browse?category=cattle_livestock', label: 'Cattle', icon: <div className="w-8 h-8 icon-primary-color mask-icon-bull" /> },
-              { href: '/browse?category=farm_animals', label: 'Farm Animals', icon: <div className="w-8 h-8 icon-primary-color mask-icon-fallow" /> },
+              { href: '/browse?category=whitetail_breeder', label: 'Whitetail Breeder', subtext: 'TPWD-permitted breeder deer with verified genetics and health records', icon: <div className="w-8 h-8 icon-primary-color mask-icon-whitetail-breeder" /> },
+              { href: '/browse?category=wildlife_exotics', label: 'Specialty Livestock', subtext: 'Axis deer, blackbuck, fallow deer, and other registered ranch species', icon: <div className="w-8 h-8 icon-primary-color mask-icon-fallow" /> },
+              { href: '/browse?category=cattle_livestock', label: 'Cattle', subtext: 'Bulls, cows, heifers, and steers', icon: <div className="w-8 h-8 icon-primary-color mask-icon-bull" /> },
+              { href: '/browse?category=farm_animals', label: 'Farm Animals', subtext: 'Goats, sheep, pigs, alpacas, and other farm animals', icon: <div className="w-8 h-8 icon-primary-color mask-icon-fallow" /> },
               {
                 href: '/browse?category=horse_equestrian',
                 label: 'Horse & Equestrian',
+                subtext: 'Horses, tack, and equestrian listings with required transfer paperwork',
                 icon: (
                   <div
                     className="w-8 h-8"
@@ -1354,21 +1355,30 @@ export default function HomePage() {
                   />
                 ),
               },
-              { href: '/browse?category=sporting_working_dogs', label: 'Sporting Dogs', icon: <div className="w-8 h-8 icon-primary-color mask-icon-dog" /> },
-              { href: '/browse?category=hunting_outfitter_assets', label: 'Hunting Assets', icon: <div className="w-8 h-8 icon-primary-color mask-icon-hunting-blind" /> },
-              { href: '/browse?category=ranch_equipment', label: 'Ranch Equipment', icon: <div className="w-8 h-8 icon-primary-color mask-icon-tractor" /> },
-              { href: '/browse?category=ranch_vehicles', label: 'Vehicles & Trailers', icon: <div className="w-8 h-8 icon-primary-color mask-icon-top-drive" /> },
+              { href: '/browse?category=sporting_working_dogs', label: 'Sporting Dogs', subtext: 'Bird dogs, hog dogs, tracking dogs, and other working/sporting dogs', icon: <div className="w-8 h-8 icon-primary-color mask-icon-dog" /> },
+              { href: '/browse?category=hunting_outfitter_assets', label: 'Hunting Assets', subtext: 'Camera systems, blinds, and water/well systems', icon: <div className="w-8 h-8 icon-primary-color mask-icon-hunting-blind" /> },
+              { href: '/browse?category=ranch_equipment', label: 'Ranch Equipment', subtext: 'Tractors, skid steers, machinery, and attachments', icon: <div className="w-8 h-8 icon-primary-color mask-icon-tractor" /> },
+              { href: '/browse?category=ranch_vehicles', label: 'Vehicles & Trailers', subtext: 'Trucks, UTVs/ATVs, and trailers', icon: <div className="w-8 h-8 icon-primary-color mask-icon-top-drive" /> },
             ].filter((c) => {
               if (c.href?.includes('cattle_livestock') && HIDE_CATTLE_AS_OPTION) return false;
               if (c.href?.includes('farm_animals') && HIDE_FARM_ANIMALS_AS_OPTION) return false;
               return !/dog|horse|equestrian|ranch_equipment|ranch_vehicles|hunting_outfitter/i.test((c.label || '') + (c.href || ''));
             }).map((c) => (
               <Link key={c.href} href={c.href} className="group">
-                <Card className="border-2 border-border/60 hover:border-primary/40 transition-colors h-full">
-                  <CardContent className="p-2 flex flex-col items-center text-center gap-1.5 min-h-0">
-                    <div className="flex-shrink-0">{c.icon}</div>
-                    <div className="text-[11px] font-extrabold leading-tight line-clamp-2 min-h-[2.5rem] flex items-center justify-center">
-                      {c.label}
+                <Card className="border-2 border-border/60 hover:border-primary/40 transition-colors h-full min-h-[160px]">
+                  <CardContent className="p-5 flex flex-col items-center text-center gap-3 min-h-0">
+                    <div className="flex-shrink-0 w-16 h-16 flex items-center justify-center [&>div]:w-16 [&>div]:h-16">
+                      {c.icon}
+                    </div>
+                    <div className="space-y-1 min-w-0 w-full">
+                      <div className="text-lg font-extrabold leading-tight line-clamp-2">
+                        {c.label}
+                      </div>
+                      {'subtext' in c && c.subtext && (
+                        <p className="text-xs text-muted-foreground line-clamp-2 leading-snug">
+                          {c.subtext}
+                        </p>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

@@ -43,13 +43,17 @@ When a buyer submits an offer, **only the seller** receives a notification (`Off
 **Note:** Bid placement does NOT send a confirmation email to the bidder. This is intentional (eBay-style) - bidders see immediate UI feedback. However, if you want bid confirmation emails, we can add `Bid.Placed` event.
 
 ### ✅ Order Workflow
-- **Order.Confirmed** - ✅ Buyer notification after payment
+- **Order.Confirmed** - ✅ Buyer email when transaction/payment completes (Stripe webhook; immediate dispatch)
 - **Order.Received** - ✅ Seller notification when order is received
 - **Order.Preparing** - ✅ Buyer notification when seller marks as preparing
 - **Order.InTransit** - ✅ Buyer notification when seller marks in transit
 - **Order.DeliveryConfirmed** - ✅ Buyer notification when seller confirms delivery
 - **Order.DeliveryCheckIn** - ✅ Buyer follow-up N days after delivery
 - **Payout.Released** - ✅ Seller notification when payout is released
+
+### ✅ Review Workflow
+- **Review.Request** - ✅ Buyer notification to leave a review (after order completes; from confirm-receipt / checkFulfillmentReminders)
+- **Review.Received** - ✅ Seller email + in-app when a buyer leaves a review (`POST /api/reviews/create`; immediate dispatch)
 
 ### ✅ Listing Workflow
 - **Listing.Approved** - ✅ Seller notification when listing is approved
