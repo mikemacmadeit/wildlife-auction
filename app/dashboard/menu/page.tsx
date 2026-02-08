@@ -29,6 +29,7 @@ import {
   Mail,
   ArrowRight,
   AlertCircle,
+  ListTodo,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
@@ -50,6 +51,7 @@ const BUYING: NavItem[] = [
 
 const SELLING: NavItem[] = [
   { href: '/seller/overview', label: 'Overview', subtext: 'Sales summary and quick actions.', icon: LayoutDashboard },
+  { href: '/seller/todo', label: 'To-Do', subtext: 'Tasks and key dates in one place.', icon: ListTodo },
   { href: '/seller/listings', label: 'My Listings', subtext: 'Active and draft listings you created.', icon: Package },
   { href: '/seller/sales', label: 'Sold', subtext: 'Completed sales and order fulfillment.', icon: DollarSign },
   { href: '/dashboard/messages', label: 'Messages', subtext: 'Conversations with buyers and sellers.', icon: MessageSquare },
@@ -126,6 +128,7 @@ function DashboardMenuPageContent() {
     '/dashboard/bids-offers': badges.offers,
     '/dashboard/notifications': badges.notifications,
     '/dashboard/messages': badges.messages,
+    '/seller/todo': badges.todo ?? 0,
     '/dashboard/admin/listings': badges.pendingApprovals,
     '/dashboard/admin/notifications': isSuperAdmin ? badges.adminNotifications : 0,
     '/dashboard/admin/support': isAdmin ? badges.supportTickets : 0,

@@ -6,6 +6,7 @@ export interface DashboardBadges {
   messages: number;
   notifications: number;
   offers: number;
+  todo: number;
   adminNotifications: number;
   supportTickets: number;
   pendingApprovals: number;
@@ -16,6 +17,7 @@ const defaultBadges: DashboardBadges = {
   messages: 0,
   notifications: 0,
   offers: 0,
+  todo: 0,
   adminNotifications: 0,
   supportTickets: 0,
   pendingApprovals: 0,

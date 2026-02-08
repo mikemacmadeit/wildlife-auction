@@ -20,7 +20,6 @@ import {
   MessageSquare,
   FileCheck,
   Shield,
-  Calendar,
   Activity,
   Loader2,
   X,
@@ -28,6 +27,11 @@ import {
   Mail,
   ShoppingBag,
   Minus,
+  Download,
+  Truck,
+  Gavel,
+  CreditCard,
+  ShieldAlert,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatUserFacingError } from '@/lib/format-user-facing-error';
@@ -47,6 +51,8 @@ import { createStripeAccount, createAccountLink } from '@/lib/stripe/api';
 import type { SellerDashboardData } from '@/lib/seller/getSellerDashboardData';
 import { NotificationSettingsDialog } from '@/components/settings/NotificationSettingsDialog';
 import { BusinessOverviewChart } from '@/components/seller/BusinessOverviewChart';
+import { useDashboardBadges } from '@/contexts/DashboardBadgesContext';
+import { getStripeBalance } from '@/lib/stripe/api';
 
 // Helper functions outside component to prevent recreation
 const getAlertIcon = (type: string) => {
@@ -190,6 +196,14 @@ export default function SellerOverviewPage() {
   const [error, setError] = useState<string | null>(null);
   const [connectingStripe, setConnectingStripe] = useState(false);
   const [sendingVerificationEmail, setSendingVerificationEmail] = useState(false);
+  const [stripeBalance, setStripeBalance] = useState<{
+    availableCents: number;
+    pendingCents: number;
+    nextPayoutArrivalDate: string | null;
+    hasAccount: boolean;
+  } | null>(null);
+  const [timeGreeting, setTimeGreeting] = useState('Welcome back');
+  const badges = useDashboardBadges();
 
   const breederPermitDismissKey = (sellerId: string) => `we:ui:dismissed:breeder_permit_overview:v1:${sellerId}`;
   const payoutReadinessDismissKey = (sellerId: string) => `we:ui:dismissed:payout_readiness_overview:v1:${sellerId}`;
@@ -319,6 +333,37 @@ export default function SellerOverviewPage() {
       .catch(() => {});
   }, [pathname, uid, refreshUser]);
 
+  // Stripe balance / next payout (non-blocking)
+  useEffect(() => {
+    if (!user || !userProfile?.stripeAccountId) {
+      setStripeBalance(null);
+      return;
+    }
+    let cancelled = false;
+    getStripeBalance()
+      .then((res) => {
+        if (!cancelled)
+          setStripeBalance({
+            availableCents: res.availableCents ?? 0,
+            pendingCents: res.pendingCents ?? 0,
+            nextPayoutArrivalDate: res.nextPayoutArrivalDate ?? null,
+            hasAccount: res.hasAccount ?? false,
+          });
+      })
+      .catch(() => {
+        if (!cancelled) setStripeBalance(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, userProfile?.stripeAccountId]);
+
+  // Time-based greeting (must run unconditionally; do not place after early returns)
+  useEffect(() => {
+    const hour = new Date().getHours();
+    setTimeGreeting(hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening');
+  }, []);
+
   // Seller command-center aggregation (server-side; read-only). This complements the client reads above.
   useEffect(() => {
     let cancelled = false;
@@ -412,12 +457,26 @@ export default function SellerOverviewPage() {
     
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
     const revenue30Days = completedOrders
       .filter((o) => {
         const createdAt = toDateSafe((o as any).createdAt);
         return createdAt ? createdAt >= thirtyDaysAgo : false;
       })
       .reduce((sum, o) => sum + (o.sellerAmount || o.amount - o.platformFee), 0);
+    const revenuePrev30 = completedOrders
+      .filter((o) => {
+        const createdAt = toDateSafe((o as any).createdAt);
+        return createdAt ? createdAt >= sixtyDaysAgo && createdAt < thirtyDaysAgo : false;
+      })
+      .reduce((sum, o) => sum + (o.sellerAmount || o.amount - o.platformFee), 0);
+    const revenueTrendPct =
+      revenuePrev30 > 0 ? Math.round(((revenue30Days - revenuePrev30) / revenuePrev30) * 100) : null;
+    const revenueTrendStr =
+      revenueTrendPct !== null
+        ? ` · ${revenueTrendPct >= 0 ? '↑' : '↓'} ${Math.abs(revenueTrendPct)}% vs prior 30d`
+        : '';
 
     const views7Days = activeListings.reduce((sum, l) => sum + (l.metrics?.views || 0), 0);
     const totalViews = activeListings.reduce((sum, l) => sum + (l.metrics?.views || 0), 0);
@@ -437,7 +496,7 @@ export default function SellerOverviewPage() {
       {
         label: 'Total Revenue',
         value: `$${totalRevenue.toLocaleString()}`,
-        subtext: `$${revenue30Days.toLocaleString()} last 30 days`,
+        subtext: `$${revenue30Days.toLocaleString()} last 30d${revenueTrendStr}`,
         icon: DollarSign,
         color: 'text-primary',
         bgColor: 'bg-primary/10',
@@ -618,6 +677,102 @@ export default function SellerOverviewPage() {
     const net = revenue - costs;
     return { revenue, costs, net };
   }, [orders, buyerOrders]);
+
+  // Financial summary: revenue by period, average sale, YTD, refunds, revenue by category, released, buyer stats
+  const financialSummary = useMemo(() => {
+    const completedSeller = orders.filter((o) => {
+      const s = o.status;
+      const hasPaid = !!(o as any).paidAt;
+      return s === 'paid' || s === 'completed' || s === 'paid_held' || s === 'buyer_confirmed' || hasPaid;
+    });
+    const sellerAmount = (o: any) => o.sellerAmount ?? (o.amount ?? 0) - (o.platformFee ?? 0);
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const ninetyDaysAgo = new Date(now);
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+    const revenueThisMonth = completedSeller
+      .filter((o) => toDateSafe((o as any).createdAt) && toDateSafe((o as any).createdAt)! >= startOfMonth)
+      .reduce((sum, o) => sum + sellerAmount(o), 0);
+    const revenueLast30d = completedSeller
+      .filter((o) => toDateSafe((o as any).createdAt) && toDateSafe((o as any).createdAt)! >= thirtyDaysAgo)
+      .reduce((sum, o) => sum + sellerAmount(o), 0);
+    const revenueLast90d = completedSeller
+      .filter((o) => toDateSafe((o as any).createdAt) && toDateSafe((o as any).createdAt)! >= ninetyDaysAgo)
+      .reduce((sum, o) => sum + sellerAmount(o), 0);
+    const revenueYTD = completedSeller
+      .filter((o) => toDateSafe((o as any).createdAt) && toDateSafe((o as any).createdAt)! >= startOfYear)
+      .reduce((sum, o) => sum + sellerAmount(o), 0);
+
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const revenuePrevMonth = completedSeller
+      .filter((o) => {
+        const d = toDateSafe((o as any).createdAt);
+        return d && d >= prevMonthStart && d < startOfMonth;
+      })
+      .reduce((sum, o) => sum + sellerAmount(o), 0);
+    const trendMonth = revenuePrevMonth > 0 ? Math.round(((revenueThisMonth - revenuePrevMonth) / revenuePrevMonth) * 100) : null;
+
+    const avgSale = completedSeller.length > 0
+      ? completedSeller.reduce((sum, o) => sum + sellerAmount(o), 0) / completedSeller.length
+      : 0;
+
+    const refunded = orders.filter((o) => String(o.status) === 'refunded');
+    const refundsThisMonth = refunded.filter(
+      (o) => toDateSafe((o as any).refundedAt) && toDateSafe((o as any).refundedAt)! >= startOfMonth
+    );
+    const refundSumThisMonth = refundsThisMonth.reduce((sum, o) => sum + (o.amount ?? 0), 0);
+
+    const byCategory: Record<string, number> = {};
+    completedSeller.forEach((o) => {
+      const cat = (o as any).listingSnapshot?.category ?? 'Other';
+      const key = typeof cat === 'string' ? cat : 'Other';
+      byCategory[key] = (byCategory[key] ?? 0) + sellerAmount(o);
+    });
+
+    const totalReleased = typeof dashboardData?.totals?.revenue?.released === 'number' ? dashboardData.totals.revenue.released : 0;
+
+    return {
+      revenueThisMonth,
+      revenueLast30d,
+      revenueLast90d,
+      revenueYTD,
+      trendMonth,
+      avgSale,
+      completedCount: completedSeller.length,
+      refundsThisMonth: refundsThisMonth.length,
+      refundSumThisMonth,
+      revenueByCategory: Object.entries(byCategory).sort((a, b) => b[1] - a[1]).slice(0, 6),
+      totalReleased,
+    };
+  }, [orders, dashboardData?.totals?.revenue?.released]);
+
+  // Buyer financial summary: spent by period, top purchases
+  const buyerFinancialSummary = useMemo(() => {
+    const completed = buyerOrders.filter((o) => {
+      const s = o.status;
+      const hasPaid = !!(o as any).paidAt;
+      return s === 'paid' || s === 'completed' || s === 'paid_held' || s === 'buyer_confirmed' || hasPaid;
+    });
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const spentThisMonth = completed
+      .filter((o) => toDateSafe((o as any).createdAt) && toDateSafe((o as any).createdAt)! >= startOfMonth)
+      .reduce((sum, o) => sum + (o.amount ?? 0), 0);
+    const spentLast30d = completed
+      .filter((o) => toDateSafe((o as any).createdAt) && toDateSafe((o as any).createdAt)! >= thirtyDaysAgo)
+      .reduce((sum, o) => sum + (o.amount ?? 0), 0);
+    const topPurchases = [...completed]
+      .sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0))
+      .slice(0, 3)
+      .map((o) => ({ title: (o as any).listingSnapshot?.title ?? 'Purchase', amount: o.amount ?? 0, id: o.id }));
+    return { spentThisMonth, spentLast30d, topPurchases };
+  }, [buyerOrders]);
 
   const setupChecklist = useMemo(() => {
     const profileOk = !!userProfile && isProfileComplete(userProfile);
@@ -852,6 +1007,41 @@ export default function SellerOverviewPage() {
     };
   }, [listings]);
 
+  // Top-performing listing (7d views)
+  const topPerformer = useMemo(() => {
+    const nowMs = Date.now();
+    const activeListings = listings.filter((l) => getEffectiveListingStatus(l, nowMs) === 'active');
+    if (activeListings.length === 0) return null;
+    const sorted = [...activeListings].sort((a, b) => (b.metrics?.views ?? 0) - (a.metrics?.views ?? 0));
+    const top = sorted[0];
+    const views = top?.metrics?.views ?? 0;
+    const bids = top?.metrics?.bidCount ?? 0;
+    if (!top || (views === 0 && bids === 0)) return null;
+    return { listing: top, views, bids };
+  }, [listings]);
+
+  // Auctions ending in next 48h (for compact list)
+  const auctionsEnding48h = useMemo(() => {
+    const list: { id: string; title: string; hoursLeft: number; listingId: string }[] = [];
+    listings.forEach((listing) => {
+      if (listing.type !== 'auction' || listing.status !== 'active') return;
+      const endsAt = toDateSafe((listing as any).endsAt);
+      if (!endsAt) return;
+      const hoursLeft = (endsAt.getTime() - Date.now()) / (1000 * 60 * 60);
+      if (hoursLeft > 0 && hoursLeft <= 48) {
+        list.push({ id: listing.id, title: listing.title, hoursLeft, listingId: listing.id });
+      }
+    });
+    list.sort((a, b) => a.hoursLeft - b.hoursLeft);
+    return list.slice(0, 5);
+  }, [listings]);
+
+  // New seller (no listings and no orders yet)
+  const isNewSeller = useMemo(
+    () => listings.length === 0 && orders.length === 0 && !loading,
+    [listings.length, orders.length, loading]
+  );
+
   // Loading state — use layout-matched skeleton so content loads in the same place (no flash)
   if (authLoading || loading) {
     return <SellerOverviewSkeleton />;
@@ -860,7 +1050,7 @@ export default function SellerOverviewPage() {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen bg-background pb-20 md:pb-6 flex items-center justify-center">
+      <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-8 flex items-center justify-center">
         <div className="text-center max-w-md">
           <AlertCircle className="h-12 w-12 mx-auto text-destructive mb-4" />
           <h2 className="text-xl font-semibold text-foreground mb-2">Error loading overview</h2>
@@ -871,32 +1061,107 @@ export default function SellerOverviewPage() {
     );
   }
 
+  const greetingName = userProfile?.displayName ?? userProfile?.profile?.fullName ?? user?.email?.split('@')[0] ?? 'there';
+  const attentionSummary = alerts.length > 0 ? `${alerts.length} item${alerts.length !== 1 ? 's' : ''} need your attention` : "You're all caught up";
+
+  const handleDownloadSummary = () => {
+    const rows: string[][] = [
+      ['Financial summary', ''],
+      ['Generated', new Date().toLocaleString()],
+      [''],
+      ['Seller revenue', ''],
+      ['This month', `$${financialSummary.revenueThisMonth.toLocaleString()}`],
+      ['Last 30 days', `$${financialSummary.revenueLast30d.toLocaleString()}`],
+      ['Last 90 days', `$${financialSummary.revenueLast90d.toLocaleString()}`],
+      ['YTD gross', `$${financialSummary.revenueYTD.toLocaleString()}`],
+      ['Completed sales (count)', String(financialSummary.completedCount)],
+      ['Average sale', `$${Math.round(financialSummary.avgSale).toLocaleString()}`],
+      ['Released to bank (all-time)', `$${financialSummary.totalReleased.toLocaleString()}`],
+      ['Refunds this month', String(financialSummary.refundsThisMonth)],
+      ['Refund amount this month', `$${financialSummary.refundSumThisMonth.toLocaleString()}`],
+      [''],
+      ['Purchases (buyer)', ''],
+      ['Spent this month', `$${buyerFinancialSummary.spentThisMonth.toLocaleString()}`],
+      ['Spent last 30 days', `$${buyerFinancialSummary.spentLast30d.toLocaleString()}`],
+    ];
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `seller-summary-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-6 overflow-x-hidden">
-      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 max-w-7xl space-y-4 sm:space-y-6 md:space-y-8">
-        {/* Header — mobile: stacked, touch-friendly buttons */}
+    <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-8 overflow-x-hidden">
+      {/* Sticky CTA on mobile when there are alerts */}
+      {alerts.length > 0 && (
+        <div className="md:hidden fixed left-0 right-0 z-40 px-3 pb-safe" style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
+          <Link
+            href="#action-required"
+            className="flex items-center justify-center gap-2 min-h-[48px] px-4 rounded-xl bg-primary text-primary-foreground font-semibold shadow-lg touch-manipulation"
+          >
+            <AlertCircle className="h-5 w-5 shrink-0" />
+            {alerts.length} item{alerts.length !== 1 ? 's' : ''} need attention
+          </Link>
+        </div>
+      )}
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 max-w-7xl space-y-4 sm:space-y-6 md:space-y-8 min-w-0">
+        {/* Header — greeting + attention summary, mobile-friendly */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-foreground mb-1 sm:mb-2">
-              Seller Overview
+              {timeGreeting}, {greetingName}
             </h1>
             <p className="text-sm sm:text-base md:text-lg text-muted-foreground">
-              Daily briefing and action items for your listings
+              {attentionSummary}
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto min-w-0" data-tour="seller-create-listing">
+          <div className="flex flex-row flex-wrap items-center gap-2 w-full sm:w-auto min-w-0" data-tour="seller-create-listing">
             <NotificationSettingsDialog
               triggerLabel="Notifications"
               triggerVariant="outline"
               triggerSize="default"
-              className="min-h-[44px] font-semibold w-full sm:w-auto"
+              className="min-h-[44px] font-semibold flex-1 min-w-0 sm:flex-initial sm:min-w-0"
             />
-            <CreateListingGateButton href="/dashboard/listings/new" className="min-h-[44px] font-semibold gap-2 w-full sm:w-auto">
+            <CreateListingGateButton href="/dashboard/listings/new" className="min-h-[44px] font-semibold gap-2 flex-1 min-w-0 sm:flex-initial sm:min-w-0">
               <Package className="h-4 w-4" />
               Create Listing
             </CreateListingGateButton>
           </div>
         </div>
+
+        {/* New seller: get your first sale */}
+        {isNewSeller && (
+          <Card className="rounded-xl border-2 border-primary/30 bg-primary/5 overflow-hidden">
+            <CardContent className="p-4 sm:p-6">
+              <h2 className="text-lg sm:text-xl font-extrabold text-foreground mb-2">Get your first sale</h2>
+              <p className="text-sm text-muted-foreground mb-4">Complete these steps to list and sell.</p>
+              <ol className="space-y-2 text-sm font-medium text-foreground mb-4">
+                <li className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary text-xs font-bold">1</span>
+                  Create a listing (fixed price or auction)
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary text-xs font-bold">2</span>
+                  Share your listing — buyers can make offers or bid
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary text-xs font-bold">3</span>
+                  Respond to offers and complete the sale
+                </li>
+              </ol>
+              <Button asChild className="min-h-[48px] font-semibold w-full sm:w-auto">
+                <Link href="/dashboard/listings/new">
+                  <Package className="h-4 w-4 mr-2" />
+                  Create your first listing
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* KPI Snapshot — mobile: 2x2, tighter gap, responsive value size */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 min-w-0" data-tour="seller-stats">
@@ -935,6 +1200,226 @@ export default function SellerOverviewPage() {
           })}
         </div>
 
+        {/* Quick status: messages, next payout, disputes — financial/business focus, mobile-friendly */}
+        {(badges.messages > 0 || stripeBalance?.nextPayoutArrivalDate || sellerQueues.ordersWithIssuesCount > 0) && (
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-sm min-w-0">
+            {badges.messages > 0 && (
+              <Button asChild variant="outline" size="sm" className="min-h-[44px] rounded-lg font-medium touch-manipulation">
+                <Link href="/dashboard/messages">
+                  <MessageSquare className="h-4 w-4 mr-1.5 shrink-0" />
+                  {badges.messages} unread message{badges.messages !== 1 ? 's' : ''}
+                </Link>
+              </Button>
+            )}
+            {stripeBalance?.nextPayoutArrivalDate && (
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5 text-muted-foreground min-h-[44px]">
+                <DollarSign className="h-4 w-4 shrink-0" />
+                <span className="text-left">Next payout: {new Date(stripeBalance.nextPayoutArrivalDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+              </span>
+            )}
+            {sellerQueues.ordersWithIssuesCount > 0 && (
+              <Button asChild variant="destructive" size="sm" className="min-h-[44px] rounded-lg font-medium touch-manipulation">
+                <Link href="/seller/sales">
+                  <AlertCircle className="h-4 w-4 mr-1.5 shrink-0" />
+                  {sellerQueues.ordersWithIssuesCount} open dispute{sellerQueues.ordersWithIssuesCount !== 1 ? 's' : ''} — resolve
+                </Link>
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Top performer (7d) — mobile: full width */}
+        {topPerformer && !isNewSeller && (
+          <Card className="rounded-xl border border-border/50 bg-card overflow-hidden">
+            <CardContent className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Best performer (7d)</p>
+                <p className="font-semibold text-foreground truncate">{topPerformer.listing.title}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {topPerformer.views.toLocaleString()} views · {topPerformer.bids} bid{topPerformer.bids !== 1 ? 's' : ''}
+                </p>
+              </div>
+              <Button asChild variant="outline" size="sm" className="min-h-[44px] sm:min-h-9 font-semibold w-full sm:w-auto shrink-0">
+                <Link href={`/listing/${topPerformer.listing.id}`}>View listing</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Auctions ending in 48h — compact list */}
+        {auctionsEnding48h.length > 0 && !isNewSeller && (
+          <Card className="rounded-xl border border-border/50 bg-card overflow-hidden">
+            <CardHeader className="pb-2 px-3 sm:px-4 pt-3 sm:pt-4">
+              <CardTitle className="text-sm sm:text-base font-bold flex items-center gap-2">
+                <Clock className="h-4 w-4 shrink-0" />
+                {auctionsEnding48h.length} auction{auctionsEnding48h.length !== 1 ? 's' : ''} ending in next 48h
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 sm:px-4 pb-3 sm:pb-4">
+              <ul className="space-y-2">
+                {auctionsEnding48h.map((a) => (
+                  <li key={a.id}>
+                    <Link
+                      href={`/listing/${a.listingId}`}
+                      className="flex items-center justify-between gap-2 py-1.5 rounded-md hover:bg-muted/50 text-sm font-medium"
+                    >
+                      <span className="truncate min-w-0">{a.title}</span>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {a.hoursLeft < 1 ? `${Math.round(a.hoursLeft * 60)}m` : `${Math.round(a.hoursLeft)}h`} left
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Financial summary — revenue by period, balance, YTD, refunds, category, download */}
+        <Card className="rounded-xl border border-border/50 bg-card overflow-hidden" data-tour="seller-financial-summary">
+          <CardHeader className="pb-3 px-3 sm:px-6 pt-4 sm:pt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="min-w-0">
+                <CardTitle className="text-lg sm:text-xl font-extrabold">Financial summary</CardTitle>
+                <CardDescription className="text-sm sm:text-base">Revenue, balance, and key numbers at a glance.</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" className="min-h-[44px] font-semibold w-full sm:w-auto shrink-0 touch-manipulation" onClick={handleDownloadSummary}>
+                <Download className="h-4 w-4 mr-2 shrink-0" />
+                Download summary (CSV)
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="px-3 sm:px-6 pb-4 sm:pb-6 space-y-4 sm:space-y-6">
+            {/* Revenue by period */}
+            <div className="min-w-0 overflow-hidden">
+              <h3 className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">Revenue by period</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
+                <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+                  <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase">This month</p>
+                  <p className="text-base sm:text-lg font-extrabold tabular-nums">${financialSummary.revenueThisMonth.toLocaleString()}</p>
+                  {financialSummary.trendMonth !== null && (
+                    <p className={cn('text-xs font-medium', financialSummary.trendMonth >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground')}>
+                      {financialSummary.trendMonth >= 0 ? '↑' : '↓'} {Math.abs(financialSummary.trendMonth)}% vs last month
+                    </p>
+                  )}
+                </div>
+                <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+                  <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase">Last 30 days</p>
+                  <p className="text-base sm:text-lg font-extrabold tabular-nums">${financialSummary.revenueLast30d.toLocaleString()}</p>
+                </div>
+                <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+                  <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase">Last 90 days</p>
+                  <p className="text-base sm:text-lg font-extrabold tabular-nums">${financialSummary.revenueLast90d.toLocaleString()}</p>
+                </div>
+                <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+                  <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase">YTD gross</p>
+                  <p className="text-base sm:text-lg font-extrabold tabular-nums">${financialSummary.revenueYTD.toLocaleString()}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">We&apos;ll send 1099 by Jan 31 if you meet the threshold.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Balance, projected payout, released, average sale */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              {stripeBalance?.hasAccount && (
+                <>
+                  <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+                    <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase">Available now</p>
+                    <p className="text-base sm:text-lg font-extrabold tabular-nums text-emerald-600 dark:text-emerald-400">
+                      ${(stripeBalance.availableCents / 100).toLocaleString()}
+                    </p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">In your Stripe balance</p>
+                  </div>
+                  <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+                    <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase">Pending</p>
+                    <p className="text-base sm:text-lg font-extrabold tabular-nums">${(stripeBalance.pendingCents / 100).toLocaleString()}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">Typically available in 5–7 days</p>
+                  </div>
+                </>
+              )}
+              <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+                <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase">Released to bank</p>
+                <p className="text-base sm:text-lg font-extrabold tabular-nums">${financialSummary.totalReleased.toLocaleString()}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">All-time payouts</p>
+              </div>
+              <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+                <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase">Average sale</p>
+                <p className="text-base sm:text-lg font-extrabold tabular-nums">${Math.round(financialSummary.avgSale).toLocaleString()}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">{financialSummary.completedCount} completed sales</p>
+              </div>
+            </div>
+
+            {/* Projected payout */}
+            {stripeBalance?.nextPayoutArrivalDate && (stripeBalance.pendingCents > 0 || stripeBalance.availableCents > 0) && (
+              <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-3 sm:p-4">
+                <p className="text-xs sm:text-sm font-semibold text-foreground">Projected payout</p>
+                <p className="text-lg sm:text-xl font-extrabold tabular-nums text-primary">
+                  ${((stripeBalance.pendingCents + stripeBalance.availableCents) / 100).toLocaleString()} on{' '}
+                  {new Date(stripeBalance.nextPayoutArrivalDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">If no other changes, this amount is expected to hit your bank.</p>
+              </div>
+            )}
+
+            {/* Revenue by category */}
+            {financialSummary.revenueByCategory.length > 0 && (
+              <div>
+                <h3 className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">Revenue by category</h3>
+                <ul className="space-y-1.5">
+                  {financialSummary.revenueByCategory.map(([cat, amt]) => (
+                    <li key={cat} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="font-medium text-foreground truncate">{cat}</span>
+                      <span className="font-semibold tabular-nums shrink-0">${amt.toLocaleString()}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Refunds this month */}
+            {(financialSummary.refundsThisMonth > 0 || financialSummary.refundSumThisMonth > 0) && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                <p className="text-xs sm:text-sm font-semibold text-foreground">Refunds this month</p>
+                <p className="text-sm text-muted-foreground">
+                  {financialSummary.refundsThisMonth} refund{financialSummary.refundsThisMonth !== 1 ? 's' : ''} · ${financialSummary.refundSumThisMonth.toLocaleString()} total
+                </p>
+              </div>
+            )}
+
+            {/* Buyer: spent by period, top purchases */}
+            {(buyerFinancialSummary.spentThisMonth > 0 || buyerFinancialSummary.spentLast30d > 0 || buyerFinancialSummary.topPurchases.length > 0) && (
+              <div className="pt-3 border-t border-border/50">
+                <h3 className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">Your purchases</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+                    <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase">Spent this month</p>
+                    <p className="text-base sm:text-lg font-extrabold tabular-nums text-emerald-600 dark:text-emerald-400">
+                      ${buyerFinancialSummary.spentThisMonth.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+                    <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase">Spent last 30 days</p>
+                    <p className="text-base sm:text-lg font-extrabold tabular-nums">${buyerFinancialSummary.spentLast30d.toLocaleString()}</p>
+                  </div>
+                </div>
+                {buyerFinancialSummary.topPurchases.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase mb-2">Largest purchases</p>
+                    <ul className="space-y-1.5">
+                      {buyerFinancialSummary.topPurchases.map((p) => (
+                        <li key={p.id} className="flex items-center justify-between gap-2 text-sm">
+                          <span className="truncate text-foreground">{p.title}</span>
+                          <span className="font-semibold tabular-nums shrink-0">${p.amount.toLocaleString()}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Seller command center — mobile: stacked header, touch-friendly buttons */}
         <Card className="rounded-xl border border-border/50 bg-card overflow-hidden">
           <CardHeader className="pb-4 px-3 sm:px-6 pt-4 sm:pt-6">
@@ -943,11 +1428,11 @@ export default function SellerOverviewPage() {
                 <CardTitle className="text-lg sm:text-xl font-extrabold">Today</CardTitle>
                 <CardDescription className="text-sm sm:text-base">Fast links + the key things that can block payout.</CardDescription>
               </div>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                <Button asChild variant="default" size="sm" className="min-h-[44px] sm:min-h-9 font-semibold w-full sm:w-auto">
+              <div className="flex flex-row flex-wrap items-center gap-2">
+                <Button asChild variant="default" size="sm" className="min-h-[44px] sm:min-h-9 font-semibold flex-1 min-w-0 sm:flex-initial sm:min-w-0">
                   <Link href="/seller/sales">Open Sales</Link>
                 </Button>
-                <Button asChild variant="default" size="sm" className="min-h-[44px] sm:min-h-9 font-semibold w-full sm:w-auto">
+                <Button asChild variant="default" size="sm" className="min-h-[44px] sm:min-h-9 font-semibold flex-1 min-w-0 sm:flex-initial sm:min-w-0">
                   <Link href="/seller/payouts">Open Payouts</Link>
                 </Button>
               </div>
@@ -1029,6 +1514,9 @@ export default function SellerOverviewPage() {
                           : '—'}
                       </div>
                       <div className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">From sales via Stripe</div>
+                      {typeof dashboardData?.totals?.revenue?.held === 'number' && dashboardData.totals.revenue.held > 0 && (
+                        <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Funds typically available 5–7 days after sale</p>
+                      )}
                     </div>
                     <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   </div>
@@ -1520,33 +2008,33 @@ export default function SellerOverviewPage() {
           </div>
         ) : null}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 min-w-0">
-          {/* Action Required Panel + Performance — mobile: padded, touch-friendly */}
-          <div className="space-y-4 min-w-0">
-            <Card className="rounded-xl border border-border/50 bg-card overflow-hidden" data-tour="seller-action-required">
-              <CardHeader className="px-3 sm:px-6">
+        {/* lg: Action Required ~70%, Performance fixed (~30%). Height 600px (+25%). */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 lg:h-[600px] lg:grid-rows-[1fr_244px] gap-4 sm:gap-6 md:gap-8 min-w-0">
+          {/* Action Required — left col row 1; extends to fill row so Performance aligns with Recent Activity */}
+          <Card id="action-required" className="rounded-xl border border-border/50 bg-card overflow-hidden scroll-mt-4 min-w-0 flex flex-col lg:h-full" data-tour="seller-action-required">
+              <CardHeader className="px-3 sm:px-4 py-2.5 flex-shrink-0">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" />
-                    <CardTitle className="text-lg sm:text-xl font-extrabold truncate">Action Required</CardTitle>
+                    <AlertCircle className="h-4 w-4 text-primary shrink-0" />
+                    <CardTitle className="text-base font-extrabold truncate">Action Required</CardTitle>
                   </div>
-                  <Badge variant="secondary" className="font-semibold shrink-0">
+                  <Badge variant="secondary" className="font-semibold shrink-0 text-xs">
                     {alerts.length} items
                   </Badge>
                 </div>
-                <CardDescription className="text-sm sm:text-base">
+                <CardDescription className="text-xs sm:text-sm">
                   Items that need your attention
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3 px-3 sm:px-6 pb-4 sm:pb-6">
+              <CardContent className="space-y-2 px-3 sm:px-4 pb-3 flex-1 min-h-0 overflow-y-auto">
                 {alerts.length === 0 ? (
-                  <div className="py-8 sm:py-12 text-center">
-                    <CheckCircle2 className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4 opacity-50" />
-                    <p className="text-muted-foreground font-medium text-sm sm:text-base">No actions required</p>
-                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">You're all caught up!</p>
+                  <div className="py-4 sm:py-6 text-center">
+                    <CheckCircle2 className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground mx-auto mb-2 opacity-50" />
+                    <p className="text-muted-foreground font-medium text-sm">No actions required</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">You're all caught up!</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {alerts.map((alert) => {
                       const Icon = getAlertIcon(alert.type);
                       const isAuctionEnding = alert.type === 'auction_ending';
@@ -1561,7 +2049,7 @@ export default function SellerOverviewPage() {
                           key={alert.id}
                           href={alert.actionUrl}
                           className={cn(
-                            'flex flex-col sm:flex-row items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg border-2 transition-shadow group min-h-[44px] sm:min-h-0',
+                            'flex flex-col sm:flex-row items-start gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg border-2 transition-shadow group min-h-[44px] sm:min-h-0',
                             getAlertColor(alert.priority),
                             'hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2'
                           )}
@@ -1665,102 +2153,95 @@ export default function SellerOverviewPage() {
                   </div>
                 )}
               </CardContent>
-            </Card>
+          </Card>
 
-            {/* Performance (Lightweight) — mobile: padded, touch-friendly */}
-            <Card className="rounded-xl border border-border/50 bg-card overflow-hidden" data-tour="seller-performance">
-              <CardHeader className="px-3 sm:px-6">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" />
-                  <CardTitle className="text-lg sm:text-xl font-extrabold">Performance</CardTitle>
+          {/* Performance — left col row 2; fills row so bottom lines up with Recent Activity */}
+          <Card className="rounded-xl border border-border/50 bg-card overflow-hidden min-w-0 flex flex-col lg:row-start-2 lg:col-start-1 lg:h-full order-3 lg:order-none" data-tour="seller-performance">
+            <CardHeader className="px-3 sm:px-4 py-2 pb-0 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary shrink-0" />
+                <CardTitle className="text-base font-semibold">Performance</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="px-3 sm:px-4 pt-1.5 pb-3 space-y-2 flex-1 flex flex-col justify-center min-h-0">
+              <div className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-muted-foreground">Completion Rate</span>
+                  <span className="text-base font-bold tabular-nums text-foreground">{performanceMetrics.completionRate}%</span>
                 </div>
-                <CardDescription className="text-sm sm:text-base">
-                  Quick metrics overview
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 px-3 sm:px-6 pb-4 sm:pb-6">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-muted-foreground">Response Time</span>
+                  <span className="text-base font-bold text-foreground">{performanceMetrics.responseTime}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-muted-foreground">Verified Animals</span>
+                  <span className="text-base font-bold tabular-nums text-foreground">{performanceMetrics.verifiedAnimals}</span>
+                </div>
+              </div>
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="w-full h-8 font-semibold text-sm touch-manipulation"
+              >
+                <Link href="/seller/reputation">
+                  View Full Stats
+                  <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Recent Activity — right col, spans row 1+2 (same height as left column), list scrolls */}
+          <Card className="rounded-xl border border-border/50 bg-card overflow-hidden flex flex-col min-h-0 min-w-0 lg:col-start-2 lg:row-start-1 lg:row-end-3 lg:h-full" data-tour="seller-recent-activity">
+            <CardHeader className="px-3 sm:px-4 flex-shrink-0 py-2.5">
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4 text-primary shrink-0" />
+                <CardTitle className="text-base font-extrabold">Recent Activity</CardTitle>
+              </div>
+              <CardDescription className="text-xs sm:text-sm">
+                Latest updates on your listings
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 px-3 sm:px-4 pb-3 flex-1 min-h-0 overflow-y-auto">
+              {activities.length === 0 ? (
+                <div className="py-4 sm:py-6 text-center">
+                  <Activity className="h-8 w-8 text-muted-foreground mx-auto mb-2 opacity-50" />
+                  <p className="text-xs sm:text-sm text-muted-foreground font-medium">No recent activity</p>
+                </div>
+              ) : (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Completion Rate</span>
-                    <span className="text-base font-extrabold text-foreground">{performanceMetrics.completionRate}%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Response Time</span>
-                    <span className="text-base font-extrabold text-foreground">{performanceMetrics.responseTime}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Verified Animals</span>
-                    <span className="text-base font-extrabold text-foreground">{performanceMetrics.verifiedAnimals}</span>
-                  </div>
-                </div>
-                <Separator />
-                <Button
-                  asChild
-                  variant="outline"
-                  className="w-full min-h-[44px] font-semibold touch-manipulation"
-                >
-                  <Link href="/seller/reputation">
-                    View Full Stats
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Recent Activity — mobile: padded, touch-friendly */}
-          <div className="space-y-4 min-w-0">
-            <Card className="rounded-xl border border-border/50 bg-card overflow-hidden" data-tour="seller-recent-activity">
-              <CardHeader className="px-3 sm:px-6">
-                <div className="flex items-center gap-2">
-                  <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" />
-                  <CardTitle className="text-lg sm:text-xl font-extrabold">Recent Activity</CardTitle>
-                </div>
-                <CardDescription className="text-sm sm:text-base">
-                  Latest updates on your listings
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 px-3 sm:px-6 pb-4 sm:pb-6">
-                {activities.length === 0 ? (
-                  <div className="py-6 sm:py-8 text-center">
-                    <Activity className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground mx-auto mb-2 sm:mb-3 opacity-50" />
-                    <p className="text-xs sm:text-sm text-muted-foreground font-medium">No recent activity</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {activities.map((activity, index) => {
-                      const Icon = getActivityIcon(activity.type);
-                      const isLast = index === activities.length - 1;
-                      return (
-                        <div key={activity.id}>
-                          <div className="flex items-start gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
-                              <Icon className="h-4 w-4 text-primary" />
-                            </div>
-                            <div className="flex-1 min-w-0 pt-0.5">
-                              <p className="text-sm font-semibold text-foreground mb-0.5">
-                                {activity.title}
-                              </p>
-                              <p className="text-xs text-muted-foreground mb-1">
-                                {activity.description}
-                              </p>
-                              <span className="text-xs text-muted-foreground font-medium">
-                                {formatTimeAgo(activity.timestamp)}
-                              </span>
-                            </div>
+                  {activities.map((activity, index) => {
+                    const Icon = getActivityIcon(activity.type);
+                    const isLast = index === activities.length - 1;
+                    return (
+                      <div key={activity.id}>
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                            <Icon className="h-4 w-4 text-primary" />
                           </div>
-                          {!isLast && (
-                            <Separator className="my-4" />
-                          )}
+                          <div className="flex-1 min-w-0 pt-0.5">
+                            <p className="text-sm font-semibold text-foreground mb-0.5">
+                              {activity.title}
+                            </p>
+                            <p className="text-xs text-muted-foreground mb-1">
+                              {activity.description}
+                            </p>
+                            <span className="text-xs text-muted-foreground font-medium">
+                              {formatTimeAgo(activity.timestamp)}
+                            </span>
+                          </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-          </div>
+                        {!isLast && (
+                          <Separator className="my-3" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

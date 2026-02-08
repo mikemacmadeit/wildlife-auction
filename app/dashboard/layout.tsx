@@ -36,6 +36,7 @@ import {
   LifeBuoy,
   Compass,
   Home,
+  ListTodo,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -71,7 +72,8 @@ import {
 } from '@/lib/firebase/notifications';
 import type { NotificationType } from '@/lib/types';
 import { db } from '@/lib/firebase/config';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, orderBy, limit } from 'firebase/firestore';
+import { filterActionItems, type ActionItemNotification } from '@/lib/notifications/actionItems';
 
 interface SellerNavItem {
   href: string;
@@ -84,6 +86,7 @@ interface SellerNavItem {
 // Base nav items (always visible) - handles both /dashboard/* and /seller/* routes
 const baseNavItems: SellerNavItem[] = [
   { href: '/seller/overview', label: 'Overview', icon: LayoutDashboard },
+  { href: '/seller/todo', label: 'To-Do', icon: ListTodo },
   { href: '/browse', label: 'Browse', icon: Compass },
   { href: '/seller/listings', label: 'My Listings', icon: Package },
   { href: '/dashboard/watchlist', label: 'Watchlist', icon: Heart },
@@ -130,6 +133,7 @@ export default function DashboardLayout({
     messages: 0,
     notifications: 0,
     offers: 0,
+    todo: 0,
     adminNotifications: 0,
     supportTickets: 0,
     pendingApprovals: 0,
@@ -185,9 +189,12 @@ export default function DashboardLayout({
       if (item.href === '/dashboard/bids-offers') {
         return { ...item, badge: badges.offers > 0 ? badges.offers : undefined };
       }
+      if (item.href === '/seller/todo') {
+        return { ...item, badge: badges.todo > 0 ? badges.todo : undefined };
+      }
       return item;
     });
-  }, [badges.messages, badges.notifications, badges.offers]);
+  }, [badges.messages, badges.notifications, badges.offers, badges.todo]);
 
   const adminNavWithBadges = useMemo(() => {
     return adminNavItems.map((item) => {
@@ -242,6 +249,7 @@ export default function DashboardLayout({
         messages: 0,
         notifications: 0,
         offers: 0,
+        todo: 0,
         adminNotifications: 0,
         supportTickets: 0,
         pendingBreederPermits: 0,
@@ -297,6 +305,24 @@ export default function DashboardLayout({
           setBadges((prev) => ({ ...prev, offers: count || 0 }));
         })
       );
+
+      const notificationsRef = collection(db, 'users', user.uid, 'notifications');
+      const notificationsQuery = query(
+        notificationsRef,
+        orderBy('createdAt', 'desc'),
+        limit(100)
+      );
+      unsubs.push(
+        onSnapshot(notificationsQuery, (snap) => {
+          const items = snap.docs.map((d) => ({
+            id: d.id,
+            ...(d.data() as object),
+          })) as ActionItemNotification[];
+          const todoCount = filterActionItems(items, 50).length;
+          setBadges((prev) => ({ ...prev, todo: todoCount }));
+        })
+      );
+
       return () => unsubs.forEach((fn) => fn());
     } catch (e) {
       console.error('Failed to subscribe to unread message count:', e);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -198,7 +198,7 @@ export function BuyerOfferDetailModal(props: {
   };
 
   return (
-    <>
+    <React.Fragment>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
@@ -317,7 +317,7 @@ export function BuyerOfferDetailModal(props: {
                         Decline
                       </Button>
                     </>
-                  ) : null}
+                  )}
 
                   {canWithdraw ? (
                     <Button variant="outline" onClick={doWithdraw} disabled={actionLoading} className="w-full min-h-[48px] font-semibold">
@@ -403,7 +403,7 @@ export function BuyerOfferDetailModal(props: {
           if (offer?.listingId) router.push(`/listing/${offer.listingId}`);
         }}
       />
-    </>
+    </React.Fragment>
   );
 }
 

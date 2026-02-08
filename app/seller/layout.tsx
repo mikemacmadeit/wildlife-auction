@@ -36,6 +36,7 @@ import {
   LifeBuoy,
   Compass,
   Home,
+  ListTodo,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -63,6 +64,7 @@ import { LayoutBottomNav } from '@/components/navigation/LayoutBottomNav';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { ProfileCompletionGate } from '@/components/auth/ProfileCompletionGate';
 import { ProductionErrorBoundary } from '@/components/error-boundary/ProductionErrorBoundary';
+import { DashboardBadgesProvider } from '@/contexts/DashboardBadgesContext';
 import {
   markNotificationsAsReadByTypes,
   subscribeToUnreadCount,
@@ -72,7 +74,8 @@ import {
 } from '@/lib/firebase/notifications';
 import type { NotificationType } from '@/lib/types';
 import { db } from '@/lib/firebase/config';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, orderBy, limit } from 'firebase/firestore';
+import { filterActionItems, type ActionItemNotification } from '@/lib/notifications/actionItems';
 
 interface SellerNavItem {
   href: string;
@@ -85,6 +88,7 @@ interface SellerNavItem {
 // Base nav items (always visible) - handles both /dashboard/* and /seller/* routes
 const baseNavItems: SellerNavItem[] = [
   { href: '/seller/overview', label: 'Overview', icon: LayoutDashboard },
+  { href: '/seller/todo', label: 'To-Do', icon: ListTodo },
   { href: '/browse', label: 'Browse', icon: Compass },
   { href: '/seller/listings', label: 'My Listings', icon: Package },
   { href: '/dashboard/watchlist', label: 'Watchlist', icon: Heart },
@@ -133,6 +137,7 @@ export default function SellerLayout({
     notifications: 0,
     offers: 0,
     sales: 0,
+    todo: 0,
     adminNotifications: 0,
     pendingApprovals: 0,
     pendingBreederPermits: 0,
@@ -202,9 +207,12 @@ export default function SellerLayout({
       if (item.href === '/seller/sales') {
         return { ...item, badge: badges.sales > 0 ? badges.sales : undefined };
       }
+      if (item.href === '/seller/todo') {
+        return { ...item, badge: badges.todo > 0 ? badges.todo : undefined };
+      }
       return item;
     });
-  }, [badges.messages, badges.notifications, badges.offers, badges.sales]);
+  }, [badges.messages, badges.notifications, badges.offers, badges.sales, badges.todo]);
 
   const adminNavWithBadges = useMemo(() => {
     return adminNavItems.map((item) => {
@@ -253,6 +261,7 @@ export default function SellerLayout({
         notifications: 0,
         offers: 0,
         sales: 0,
+        todo: 0,
         adminNotifications: 0,
         pendingBreederPermits: 0,
       }));
@@ -312,6 +321,24 @@ export default function SellerLayout({
       unsubs.push(
         subscribeToUnreadCountByTypes(user.uid, salesTypes, (count) => {
           setBadges((prev) => ({ ...prev, sales: count || 0 }));
+        })
+      );
+
+      // To-Do badge: action-required notifications not yet resolved
+      const notificationsRef = collection(db, 'users', user.uid, 'notifications');
+      const notificationsQuery = query(
+        notificationsRef,
+        orderBy('createdAt', 'desc'),
+        limit(100)
+      );
+      unsubs.push(
+        onSnapshot(notificationsQuery, (snap) => {
+          const items = snap.docs.map((d) => ({
+            id: d.id,
+            ...(d.data() as object),
+          })) as ActionItemNotification[];
+          const todoCount = filterActionItems(items, 50).length;
+          setBadges((prev) => ({ ...prev, todo: todoCount }));
         })
       );
 
@@ -748,9 +775,22 @@ export default function SellerLayout({
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto min-h-0 min-w-0 pb-20 md:pb-0 relative we-scrollbar-hover">
           <ProductionErrorBoundary>
-            <div className="relative">
-              {children}
-            </div>
+            <DashboardBadgesProvider
+              value={{
+                messages: badges.messages,
+                notifications: badges.notifications,
+                offers: badges.offers,
+                todo: badges.todo ?? 0,
+                adminNotifications: badges.adminNotifications ?? 0,
+                supportTickets: badges.supportTickets ?? 0,
+                pendingApprovals: badges.pendingApprovals ?? 0,
+                pendingBreederPermits: badges.pendingBreederPermits ?? 0,
+              }}
+            >
+              <div className="relative">
+                {children}
+              </div>
+            </DashboardBadgesProvider>
           </ProductionErrorBoundary>
         </main>
 

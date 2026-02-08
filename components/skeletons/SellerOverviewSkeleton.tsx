@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
  */
 export function SellerOverviewSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn('min-h-screen bg-background pb-20 md:pb-6', className)}>
+    <div className={cn('min-h-screen bg-background pb-bottom-nav-safe md:pb-8', className)}>
       <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
         {/* Header — same structure as real page */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
