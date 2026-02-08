@@ -348,7 +348,7 @@ export default function SellerTodoPage() {
               </div>
             </div>
             <CardDescription className="text-sm sm:text-base mt-1">
-              Tap a day to see events. Use Today to jump back.
+              Tap a day to see events. Use Today to jump back. On mobile, scroll the calendar horizontally for wider days.
             </CardDescription>
           </CardHeader>
           <CardContent className="px-4 sm:px-6 md:px-8 pb-6 sm:pb-8 md:pb-10 pt-0">
@@ -393,40 +393,42 @@ export default function SellerTodoPage() {
                   Today
                 </Button>
               </div>
-              <div className="grid grid-cols-7 gap-1 sm:gap-2 md:gap-2.5 bg-border/40 rounded-xl p-2 sm:p-3 md:p-4">
-                {WEEKDAY_LABELS.map((label, i) => (
-                  <div
-                    key={i}
-                    className="text-center text-xs sm:text-sm font-semibold text-muted-foreground py-2.5 sm:py-3 md:py-4"
-                  >
-                    {label}
-                  </div>
-                ))}
-                {grid.map((cell, i) => {
-                  if (cell.empty) {
-                    return (
-                      <div
-                        key={`e-${i}`}
-                        className="bg-muted/20 rounded-lg min-h-[72px] sm:min-h-[88px] md:min-h-[100px]"
-                      />
-                    );
-                  }
-                  const dayEvents = cell.events ?? [];
-                  return (
-                    <button
-                      key={cell.dateKey}
-                      type="button"
-                      onClick={() => {
-                        setSelectedDateKey(cell.dateKey);
-                        setDayModalOpen(true);
-                      }}
-                      className={cn(
-                        'min-h-[72px] sm:min-h-[88px] md:min-h-[100px] flex flex-col items-stretch p-1.5 sm:p-2.5 md:p-3 rounded-lg text-left touch-manipulation transition-colors active:scale-[0.98]',
-                        'hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-inset',
-                        cell.isToday && 'ring-2 ring-primary bg-primary/15',
-                        !cell.isToday && 'bg-background/80'
-                      )}
+              {/* Mobile: horizontal scroll so day cells stay wide enough; desktop: normal grid */}
+              <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 overflow-y-visible we-scrollbar-hover">
+                <div className="grid grid-cols-7 gap-1 sm:gap-2 md:gap-2.5 bg-border/40 rounded-xl p-2 sm:p-3 md:p-4 min-w-[364px] sm:min-w-0 w-max sm:w-full">
+                  {WEEKDAY_LABELS.map((label, i) => (
+                    <div
+                      key={i}
+                      className="text-center text-xs sm:text-sm font-semibold text-muted-foreground py-2.5 sm:py-3 md:py-4 min-w-[48px] sm:min-w-0"
                     >
+                      {label}
+                    </div>
+                  ))}
+                  {grid.map((cell, i) => {
+                    if (cell.empty) {
+                      return (
+                        <div
+                          key={`e-${i}`}
+                          className="bg-muted/20 rounded-lg min-h-[72px] sm:min-h-[88px] md:min-h-[100px] min-w-[48px] sm:min-w-0"
+                        />
+                      );
+                    }
+                    const dayEvents = cell.events ?? [];
+                    return (
+                      <button
+                        key={cell.dateKey}
+                        type="button"
+                        onClick={() => {
+                          setSelectedDateKey(cell.dateKey);
+                          setDayModalOpen(true);
+                        }}
+                        className={cn(
+                          'min-h-[72px] sm:min-h-[88px] md:min-h-[100px] min-w-[48px] sm:min-w-0 flex flex-col items-stretch p-1.5 sm:p-2.5 md:p-3 rounded-lg text-left touch-manipulation transition-colors active:scale-[0.98]',
+                          'hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-inset',
+                          cell.isToday && 'ring-2 ring-primary bg-primary/15',
+                          !cell.isToday && 'bg-background/80'
+                        )}
+                      >
                       <span
                         className={cn(
                           'text-sm sm:text-base font-medium shrink-0',
@@ -480,6 +482,7 @@ export default function SellerTodoPage() {
                     </button>
                   );
                 })}
+                </div>
               </div>
               <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3 pt-4 sm:pt-5 border-t border-border/60 mt-4">
                 <span className="text-xs font-medium text-muted-foreground">Legend:</span>
