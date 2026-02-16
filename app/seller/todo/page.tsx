@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -148,12 +148,28 @@ export default function SellerTodoPage() {
     [notifications]
   );
 
+  // Sync stale action items (e.g. bid_outbid for ended auctions) so they disappear from To-Do
+  const runSyncStale = useCallback(() => {
+    if (!user?.uid) return;
+    user
+      .getIdToken()
+      .then((token) =>
+        fetch('/api/notifications/sync-stale', {
+          method: 'GET',
+          headers: { authorization: `Bearer ${token}` },
+        })
+      )
+      .then((res) => (res.ok ? res.json() : null))
+      .catch(() => {});
+  }, [user?.uid]);
+
   useEffect(() => {
     if (!user?.uid) {
       setNotifications([]);
       setLoading(false);
       return;
     }
+    runSyncStale();
     const ref = collection(db, 'users', user.uid, 'notifications');
     const q = query(ref, orderBy('createdAt', 'desc'), limit(100));
     const unsub = onSnapshot(q, (snap) => {
@@ -161,7 +177,7 @@ export default function SellerTodoPage() {
       setNotifications(next);
     });
     return () => unsub();
-  }, [user?.uid]);
+  }, [user?.uid, runSyncStale]);
 
   useEffect(() => {
     let cancelled = false;

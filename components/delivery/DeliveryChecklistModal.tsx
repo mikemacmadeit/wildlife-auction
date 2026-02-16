@@ -5,7 +5,7 @@
  * Use it when delivering, or copy the link to send to a transporter.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription } from '@/components/ui/dialog';
 import { Loader2, Copy, Check } from 'lucide-react';
@@ -29,15 +29,25 @@ export function DeliveryChecklistModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const fetchedForRef = useRef<string | null>(null);
+
+  // Keep callback refs so effect only runs when open/orderId change (one fetch per open).
+  const getAuthTokenRef = useRef(getAuthToken);
+  const onErrorRef = useRef(onError);
+  getAuthTokenRef.current = getAuthToken;
+  onErrorRef.current = onError;
 
   useEffect(() => {
     if (!open || !orderId) return;
+    const key = `${orderId}`;
+    if (fetchedForRef.current === key) return; // already fetched for this open
+    fetchedForRef.current = key;
     let cancelled = false;
     setLoading(true);
     setError(null);
     (async () => {
       try {
-        const token = await getAuthToken();
+        const token = await getAuthTokenRef.current();
         const res = await fetch('/api/delivery/create-session', {
           method: 'POST',
           headers: {
@@ -51,20 +61,37 @@ export function DeliveryChecklistModal({
         if (res.ok && data.driverLink) {
           setDriverLink(data.driverLink);
         } else {
-          setError(data.error || 'Failed to load');
-          onError?.(data.error || 'Failed to load delivery checklist');
+          const msg =
+            res.status === 429
+              ? 'Please wait a moment and try again.'
+              : (data.error || 'Failed to load');
+          setError(msg);
+          onErrorRef.current?.(msg);
         }
       } catch (e: any) {
         if (!cancelled) {
           setError(e?.message || 'Failed');
-          onError?.(e?.message || 'Failed to load');
+          onErrorRef.current?.(e?.message || 'Failed to load');
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     })();
-    return () => { cancelled = true; };
-  }, [open, orderId, getAuthToken, onError]);
+    return () => {
+      cancelled = true;
+    };
+  }, [open, orderId]);
+
+  // Reset so reopening the modal (or opening for another order) fetches again
+  useEffect(() => {
+    if (!open) {
+      fetchedForRef.current = null;
+      setDriverLink(null);
+      setError(null);
+    }
+  }, [open]);
 
   const handleCopy = () => {
     if (driverLink) {

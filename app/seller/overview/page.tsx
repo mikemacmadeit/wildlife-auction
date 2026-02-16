@@ -1103,18 +1103,6 @@ export default function SellerOverviewPage() {
 
   return (
     <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-8 overflow-x-hidden">
-      {/* Sticky CTA on mobile when there are alerts */}
-      {alerts.length > 0 && (
-        <div className="md:hidden fixed left-0 right-0 z-40 px-3 pb-safe" style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
-          <Link
-            href="#action-required"
-            className="flex items-center justify-center gap-2 min-h-[48px] px-4 rounded-xl bg-primary text-primary-foreground font-semibold shadow-lg touch-manipulation"
-          >
-            <AlertCircle className="h-5 w-5 shrink-0" />
-            {alerts.length} item{alerts.length !== 1 ? 's' : ''} need attention
-          </Link>
-        </div>
-      )}
       <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 max-w-7xl space-y-4 sm:space-y-6 md:space-y-8 min-w-0">
         {/* Header — greeting + attention summary, mobile-friendly */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -1139,6 +1127,17 @@ export default function SellerOverviewPage() {
             </CreateListingGateButton>
           </div>
         </div>
+
+        {/* Big "items need attention" button at top (mobile: prominent; desktop: same spot) — no fixed/locked bar */}
+        {alerts.length > 0 && (
+          <Link
+            href="#action-required"
+            className="flex items-center justify-center gap-2 min-h-[52px] w-full px-4 rounded-xl bg-primary text-primary-foreground font-semibold text-base shadow-lg touch-manipulation hover:bg-primary/90 transition-colors md:min-h-[48px]"
+          >
+            <AlertCircle className="h-5 w-5 shrink-0" aria-hidden />
+            {alerts.length} item{alerts.length !== 1 ? 's' : ''} need attention
+          </Link>
+        )}
 
         {/* New seller: get your first sale */}
         {isNewSeller && (

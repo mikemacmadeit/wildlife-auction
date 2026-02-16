@@ -9,7 +9,7 @@
 
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { nanoid } from 'nanoid';
-import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
+import { checkRateLimitByKey, RATE_LIMITS } from '@/lib/rate-limit';
 import { TransactionStatus } from '@/lib/types';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
@@ -19,21 +19,15 @@ import { sanitizeFirestorePayload } from '@/lib/firebase/sanitizeFirestore';
 
 const bodySchema = { orderId: { type: 'string' } };
 
-function json(body: unknown, init?: { status?: number }) {
+function json(body: unknown, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
     status: init?.status ?? 200,
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...(init?.headers || {}) },
   });
 }
 
 export async function POST(request: Request) {
   try {
-    const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.default);
-    const rateLimitResult = await rateLimitCheck(request as any);
-    if (!rateLimitResult.allowed) {
-      return json(rateLimitResult.body, { status: rateLimitResult.status });
-    }
-
     const auth = getAdminAuth();
     const db = getAdminDb() as unknown as ReturnType<typeof getFirestore>;
 
@@ -50,6 +44,18 @@ export async function POST(request: Request) {
     }
 
     const sellerUid = decodedToken.uid;
+
+    // Rate limit per user so opening the delivery checklist isn't blocked by shared IP or other API traffic.
+    const rlKey = `delivery_session:${sellerUid}`;
+    const rl = await checkRateLimitByKey(rlKey, RATE_LIMITS.deliveryCreateSession);
+    if (!rl.allowed) {
+      const headers: Record<string, string> = {};
+      if (rl.retryAfter) headers['Retry-After'] = String(rl.retryAfter);
+      return json(
+        { error: 'Too many requests. Please wait a moment and try again.', retryAfter: rl.retryAfter },
+        { status: rl.status ?? 429, headers }
+      );
+    }
 
     const body = await request.json().catch(() => ({}));
     const orderId = typeof body?.orderId === 'string' ? body.orderId : null;

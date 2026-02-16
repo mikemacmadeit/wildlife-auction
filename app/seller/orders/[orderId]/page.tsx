@@ -717,14 +717,14 @@ export default function SellerOrderDetailPage() {
           <OrderDocumentsPanel orderId={order.id} listing={listing} excludeDocumentTypes={['BILL_OF_SALE']} />
         </div>
 
-        {/* Propose Delivery Dialog (hauling – windows + hauler) */}
+        {/* Propose Delivery Dialog (hauling – windows + hauler) — mobile: fit viewport and scroll */}
         <Dialog open={scheduleDeliveryOpen} onOpenChange={setScheduleDeliveryOpen}>
-          <DialogContent className="flex flex-col max-h-[90dvh] sm:max-h-[90vh] overflow-hidden w-[calc(100vw-2rem)] sm:w-full max-w-2xl p-3 sm:p-4 md:p-6">
-            <DialogHeader className="shrink-0 pb-2 pr-8">
+          <DialogContent className="flex flex-col h-[90dvh] max-h-[90dvh] sm:h-auto sm:max-h-[90vh] overflow-hidden w-[calc(100vw-1rem)] max-w-2xl p-3 sm:p-4 md:p-6 rounded-xl">
+            <DialogHeader className="shrink-0 pb-2 pr-10 sm:pr-8">
               <DialogTitle className="text-base sm:text-lg">Propose delivery date</DialogTitle>
               <DialogDescription className="text-xs sm:text-sm mt-0.5 text-foreground/90">Offer one or more date and time windows. The buyer will pick one that works.</DialogDescription>
             </DialogHeader>
-            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-4 -mx-1 px-1">
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-4 -mx-1 px-1 overscroll-contain we-scrollbar-hover">
               <div>
                 <Label className="text-sm">Delivery windows *</Label>
                 <div className="space-y-3 mt-1">

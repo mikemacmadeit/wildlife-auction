@@ -32,9 +32,8 @@ const toastVariants = cva(
         // Light mode: default toasts should read as a floating card (not blend into sand background).
         default: 'border bg-card/95 text-foreground shadow-xl ring-1 ring-border/40 backdrop-blur-sm',
         destructive:
-          // Light mode: make errors unmistakable (muted destructive bg can blend into warm sand theme)
-          // Dark mode: keep strong destructive background.
-          'destructive group border-destructive border-l-4 bg-destructive/15 text-foreground shadow-xl ring-1 ring-destructive/25 dark:bg-destructive dark:text-destructive-foreground',
+          // Always high-contrast: solid red(ish) background + light text so error copy is legible in both themes.
+          'destructive group border-destructive border-l-4 bg-destructive text-destructive-foreground shadow-xl ring-1 ring-destructive/30 dark:bg-destructive dark:text-destructive-foreground',
       },
     },
     defaultVariants: {
@@ -80,7 +79,7 @@ const ToastClose = React.forwardRef<
   <ToastPrimitives.Close
     ref={ref}
     className={cn(
-      'absolute right-2 top-2 rounded-md p-1 text-foreground/50 opacity-0 transition-opacity hover:text-foreground focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100 group-[.destructive]:text-destructive/70 group-[.destructive]:hover:text-destructive group-[.destructive]:focus:ring-destructive group-[.destructive]:focus:ring-offset-background',
+      'absolute right-2 top-2 rounded-md p-1 text-foreground/50 opacity-0 transition-opacity hover:text-foreground focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100 group-[.destructive]:text-destructive-foreground/80 group-[.destructive]:hover:text-destructive-foreground group-[.destructive]:focus:ring-destructive group-[.destructive]:focus:ring-offset-background',
       className
     )}
     toast-close=""
@@ -109,7 +108,7 @@ const ToastDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Description
     ref={ref}
-    className={cn('text-sm opacity-90', className)}
+    className={cn('text-sm opacity-90 group-[.destructive]:opacity-100', className)}
     {...props}
   />
 ));

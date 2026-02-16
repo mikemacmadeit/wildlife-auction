@@ -374,16 +374,15 @@ export default function DashboardLayout({
   const mobileBottomNavItems = useMemo(() => {
     const byHref = new Map(navItems.map((n) => [n.href, n] as const));
     const pick = (href: string, fallback: SellerNavItem) => byHref.get(href) || fallback;
-    const alertsTotal = badges.notifications + badges.messages + badges.offers;
     const items = [
       { href: '/', label: 'Home', icon: Home, shortLabel: 'Home' },
       { href: '/dashboard/menu', label: 'Dashboard', icon: LayoutGrid, shortLabel: 'Dashboard' },
       { href: '/dashboard/listings/new', label: 'Sell', icon: PlusCircle, shortLabel: 'Sell' },
       { ...pick('/browse', { href: '/browse', label: 'Buy', icon: Compass, shortLabel: 'Buy' }), label: 'Buy', shortLabel: 'Buy' },
-      { ...pick('/dashboard/notifications', { href: '/dashboard/notifications', label: 'Notifications', icon: Bell, shortLabel: 'Notifications' }), badge: alertsTotal > 0 ? alertsTotal : undefined },
+      { ...pick('/seller/todo', { href: '/seller/todo', label: 'To-Do', icon: ListTodo, shortLabel: 'To-Do' }), badge: badges.todo > 0 ? badges.todo : undefined },
     ];
     return items.map((item) => ({ ...item, shortLabel: (item as { shortLabel?: string }).shortLabel ?? item.label }));
-  }, [navItems, badges.notifications, badges.messages, badges.offers]);
+  }, [navItems, badges.todo]);
 
   useEffect(() => {
     setMobileMenuOpen(false);

@@ -134,13 +134,22 @@ function timeLeftTone(ms: number | null): string {
   return '';
 }
 
+/** Minimum required to place/raise a bid: current auction price + required increment (matches server). */
+function getMinRequiredForBidUsd(currentHighestBid: number): { minUsd: number; incrementUsd: number } {
+  const currentCents = Math.max(0, Math.round((Number(currentHighestBid || 0) || 0) * 100));
+  const incrementCents = getMinIncrementCents(currentCents);
+  const minCents = currentCents + incrementCents;
+  return {
+    minUsd: Math.round(minCents) / 100,
+    incrementUsd: Math.round(incrementCents) / 100,
+  };
+}
+
 function suggestNextMaxUsd(params: { currentHighestBid: number; myMaxBid: number }): number {
-  const currentCents = Math.max(0, Math.round((Number(params.currentHighestBid || 0) || 0) * 100));
-  const myMaxCents = Math.max(0, Math.round((Number(params.myMaxBid || 0) || 0) * 100));
-  // We base this off current visible price; server will be authoritative, but this avoids obvious "too low" bids.
-  const minNext = currentCents + getMinIncrementCents(currentCents);
-  const suggested = Math.max(minNext, myMaxCents + 100);
-  return Math.round(suggested) / 100;
+  const { minUsd } = getMinRequiredForBidUsd(params.currentHighestBid || 0);
+  const myMax = Number(params.myMaxBid || 0) || 0;
+  // Suggested = at least minimum to beat current price; if raising, must also be above your current max.
+  return Math.max(minUsd, myMax + 1);
 }
 
 function offerStatusFromRow(o: OfferRow): UnifiedRow['status'] {
@@ -265,6 +274,15 @@ export default function BidsOffersPage() {
   const [raiseTarget, setRaiseTarget] = useState<null | { listingId: string; listingTitle: string; currentHighestBid: number; myMaxBid: number }>(null);
   const [raiseInput, setRaiseInput] = useState('');
   const [raising, setRaising] = useState(false);
+  // Success modal after placing/raising bid
+  const [bidSuccessOpen, setBidSuccessOpen] = useState(false);
+  const [bidSuccessResult, setBidSuccessResult] = useState<{
+    listingTitle: string;
+    yourMaxBid: number;
+    newCurrentBid: number;
+    priceMoved: boolean;
+    newBidderId: string | null;
+  } | null>(null);
 
   // Checkout flow (for accepted offers)
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -553,7 +571,11 @@ export default function BidsOffersPage() {
   const needsAction = useMemo(() => {
     if (!user?.uid) return [];
     let list = rows.filter((r) => {
-      if (r.type === 'bid') return r.status === 'OUTBID';
+      if (r.type === 'bid') {
+        const ended = r.timeLeftMs != null && r.timeLeftMs <= 0;
+        if (ended || r.status === 'LOST' || r.status === 'WON') return false;
+        return r.status === 'OUTBID';
+      }
       // For offers: use buyerId/sellerId to determine role; buyer needs action when countered or accepted
       if (r.type === 'offer') {
         const offerRow = r.raw as OfferRow;
@@ -1681,6 +1703,14 @@ export default function BidsOffersPage() {
                 <div className="text-xs text-muted-foreground mt-1">
                   Current highest: {formatMoney(raiseTarget?.currentHighestBid || 0)} · Your max: {formatMoney(raiseTarget?.myMaxBid || 0)}
                 </div>
+                {raiseTarget && (() => {
+                  const { minUsd, incrementUsd } = getMinRequiredForBidUsd(raiseTarget.currentHighestBid);
+                  return (
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      Minimum to raise: {formatMoney(minUsd)} (current {formatMoney(raiseTarget.currentHighestBid)} + {formatMoney(incrementUsd)} required increment)
+                    </p>
+                  );
+                })()}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="raiseMax">New max bid</Label>
@@ -1689,7 +1719,7 @@ export default function BidsOffersPage() {
                   inputMode="decimal"
                   value={raiseInput}
                   onChange={(e) => setRaiseInput(e.target.value)}
-                  placeholder="Enter amount (USD)"
+                  placeholder={`Min ${raiseTarget ? formatMoney(getMinRequiredForBidUsd(raiseTarget.currentHighestBid).minUsd) : '—'} (USD)`}
                 />
                 <div className="flex items-center gap-2 flex-wrap">
                   <Button
@@ -1737,12 +1767,12 @@ export default function BidsOffersPage() {
                     toast({ title: 'Invalid amount', description: 'Enter a valid max bid amount.', variant: 'destructive' });
                     return;
                   }
-                  // Client-side guard to avoid avoidable 400s (server is authoritative).
+                  const { minUsd, incrementUsd } = raiseTarget ? getMinRequiredForBidUsd(raiseTarget.currentHighestBid) : { minUsd: 0, incrementUsd: 0 };
                   const minAllowed = raiseTarget ? suggestNextMaxUsd({ currentHighestBid: raiseTarget.currentHighestBid, myMaxBid: raiseTarget.myMaxBid }) : 0;
-                  if (minAllowed && amount < minAllowed) {
+                  if (minAllowed > 0 && amount < minAllowed - 0.01) {
                     toast({
                       title: 'Bid too low',
-                      description: `Enter at least $${Number(minAllowed).toLocaleString()} to raise your max bid.`,
+                      description: `Your new max must be at least ${formatMoney(minUsd)} (current highest ${formatMoney(raiseTarget!.currentHighestBid)} + ${formatMoney(incrementUsd)} required increment).`,
                       variant: 'destructive',
                     });
                     return;
@@ -1751,13 +1781,15 @@ export default function BidsOffersPage() {
                     setRaising(true);
                     const res = await placeBidServer({ listingId: raiseTarget.listingId, amount });
                     if (!res.ok) throw new Error(res.error);
-                    toast({
-                      title: 'Max bid updated',
-                      description: res.priceMoved
-                        ? `Current bid is now $${Number(res.newCurrentBid).toLocaleString()}.`
-                        : `Max bid set. Current bid stays $${Number(res.newCurrentBid).toLocaleString()}.`,
-                    });
                     setRaiseDialogOpen(false);
+                    setBidSuccessResult({
+                      listingTitle: raiseTarget.listingTitle || 'Auction',
+                      yourMaxBid: res.yourMaxBid ?? amount,
+                      newCurrentBid: res.newCurrentBid,
+                      priceMoved: res.priceMoved,
+                      newBidderId: res.newBidderId ?? null,
+                    });
+                    setBidSuccessOpen(true);
                     await load();
                   } catch (e: any) {
                     toast({ title: 'Couldn’t update bid', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
@@ -1769,6 +1801,41 @@ export default function BidsOffersPage() {
               >
                 {raising ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                 Update max
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Success modal after placing/raising bid */}
+        <Dialog open={bidSuccessOpen} onOpenChange={setBidSuccessOpen}>
+          <DialogContent className="sm:max-w-md border-2">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-500" />
+                Bid placed successfully
+              </DialogTitle>
+              <DialogDescription>
+                {bidSuccessResult && (
+                  <div className="space-y-2 pt-1 text-left">
+                    <p className="font-semibold text-foreground">{bidSuccessResult.listingTitle}</p>
+                    <ul className="text-sm space-y-1">
+                      <li>Your max bid: {formatMoney(bidSuccessResult.yourMaxBid)}</li>
+                      <li>Current bid: {formatMoney(bidSuccessResult.newCurrentBid)}</li>
+                      <li className="font-medium">
+                        {bidSuccessResult.newBidderId === user?.uid
+                          ? "You're the high bidder."
+                          : bidSuccessResult.priceMoved
+                            ? 'The current bid was updated.'
+                            : 'Your max is set; the visible bid may not change until someone bids against you.'}
+                      </li>
+                    </ul>
+                  </div>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button onClick={() => { setBidSuccessOpen(false); setBidSuccessResult(null); }}>
+                Done
               </Button>
             </DialogFooter>
           </DialogContent>

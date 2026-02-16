@@ -139,9 +139,21 @@ export async function syncStaleActionNotifications(
         const listingSnap = await db.collection('listings').doc(entityId).get();
         if (!listingSnap.exists) stale = true;
         else {
-          const listing = listingSnap.data() as { status?: string } | undefined;
+          const listing = listingSnap.data() as { status?: string; endsAt?: unknown } | undefined;
           const status = listing?.status;
-          stale = !!status && LISTING_END_STATUSES.includes(status);
+          const endsAt = listing?.endsAt;
+          let endsAtMs: number | null = null;
+          if (endsAt != null) {
+            if (typeof (endsAt as { toMillis?: () => number })?.toMillis === 'function') {
+              endsAtMs = (endsAt as { toMillis: () => number }).toMillis();
+            } else if (typeof (endsAt as { seconds?: number }).seconds === 'number') {
+              endsAtMs = (endsAt as { seconds: number }).seconds * 1000;
+            } else if (typeof endsAt === 'number') endsAtMs = endsAt;
+            else if (typeof endsAt === 'string') endsAtMs = new Date(endsAt).getTime();
+          }
+          const auctionEndedByTime = endsAtMs != null && Number.isFinite(endsAtMs) && endsAtMs <= Date.now();
+          stale =
+            auctionEndedByTime || (!!status && LISTING_END_STATUSES.includes(status));
         }
       } catch {}
     }

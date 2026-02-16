@@ -111,6 +111,8 @@ export const RATE_LIMITS = {
   bidsPlace: { windowMs: 10 * 1000, maxRequests: 30, requireRedisInProd: true }, // 30 requests per 10s per user+listing
   // Coarse pre-auth bidding guard (keyed by IP); very generous to avoid blocking real bidders behind shared IPs.
   bidsIp: { windowMs: 10 * 1000, maxRequests: 200, requireRedisInProd: true }, // 200 requests per 10s per IP
+  // Delivery checklist: open modal creates a session; key per user so one user doesn't hit limit from shared IP.
+  deliveryCreateSession: { windowMs: 60 * 1000, maxRequests: 30, requireRedisInProd: false }, // 30/min per user
 } as const;
 
 export async function checkRateLimitByKey(

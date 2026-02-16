@@ -40,9 +40,11 @@ export function LayoutBottomNav({ items }: { items: LayoutBottomNavItem[] }) {
 
   const nav = (
     <nav
+      role="navigation"
+      aria-label="Mobile navigation"
       className={cn(
-        'fixed left-0 right-0 z-[60] md:hidden flex justify-center px-1 pt-2',
-        'bottom-0 pb-[max(env(safe-area-inset-bottom),0.25rem)]', // lower; minimal padding above home indicator
+        'fixed left-0 right-0 z-[100] md:hidden flex justify-center px-1 pt-2',
+        'bottom-0 pb-[max(env(safe-area-inset-bottom),0.25rem)]' // minimal padding above home indicator
       )}
     >
       <div
@@ -51,7 +53,7 @@ export function LayoutBottomNav({ items }: { items: LayoutBottomNavItem[] }) {
           'backdrop-blur-lg',
           'bg-[hsl(90_12%_45%)] border-2 border-[hsl(90_12%_38%)]',
           'shadow-[0_-4px_32px_-4px_rgba(0,0,0,0.5),0_4px_20px_rgba(0,0,0,0.3)]',
-          'grid grid-cols-5 relative overflow-hidden'
+          'grid grid-cols-5 relative overflow-hidden pointer-events-auto'
         )}
       >
         {items.map((item) => {
@@ -67,7 +69,7 @@ export function LayoutBottomNav({ items }: { items: LayoutBottomNavItem[] }) {
               className={cn(
                 'relative flex flex-col items-center justify-center gap-1 transition-colors',
                 'hover:bg-black/10 active:bg-black/15',
-                'min-h-[52px] min-w-[44px] touch-manipulation',
+                'min-h-[52px] min-w-0 w-full touch-manipulation cursor-pointer select-none',
                 active ? 'text-white' : 'text-white dark:text-[hsl(40_30%_93%)]/85'
               )}
             >
