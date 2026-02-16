@@ -240,7 +240,8 @@ export default function AccountPage() {
     return derived.badgeIds;
   }, [publicTrust?.badgeIds, publicTrust?.tpwdBreederPermit, user, userProfile]);
 
-  // If the user returns from a verification link with verified=1, refresh auth state and sync Firestore.
+  // If the user returns from the verification link (verified=1), refresh auth and sync Firestore.
+  // Email is only confirmed when the user clicks the button in the email; Firebase sets emailVerified when they do.
   useEffect(() => {
     const verified = searchParams?.get('verified');
     if (!user || authLoading) return;
@@ -249,20 +250,20 @@ export default function AccountPage() {
     (async () => {
       try {
         await reloadCurrentUser();
-        // Sync Firestore and set "completed our verification flow" so seller checklist only shows verified after they clicked the link.
+        const isVerified = auth.currentUser?.emailVerified === true;
+        // Only write "completed" when Firebase confirms they clicked the verification link.
         await updateUserProfile(user.uid, {
-          emailVerified: auth.currentUser?.emailVerified === true,
-          emailVerificationCompletedAt: new Date(),
+          emailVerified: isVerified,
+          ...(isVerified ? { emailVerificationCompletedAt: new Date() } : {}),
         } as any);
-        // Update app state so UX reflects verified without a full refresh.
         await refreshUser();
         const profile = await getUserProfile(user.uid);
         setUserProfile(profile);
         toast({
-          title: auth.currentUser?.emailVerified ? 'Email verified' : 'Verification pending',
-          description: auth.currentUser?.emailVerified
+          title: isVerified ? 'Email verified' : 'Verification pending',
+          description: isVerified
             ? 'Thanks — your email is verified.'
-            : 'If you just verified, wait a moment and refresh again.',
+            : 'If you just clicked the button in the email, wait a moment and refresh again.',
         });
       } catch (e: any) {
         toast({ title: 'Could not refresh account', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });

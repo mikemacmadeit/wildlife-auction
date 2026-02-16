@@ -328,8 +328,26 @@ export function ProfileCompletionModal({
         description: 'Your profile has been completed.',
       });
 
-      // Show verify-email step instead of closing (smoother flow: send email then continue)
+      // Show verify-email step and send verification email immediately (step right after complete profile)
       setShowVerifyEmailStep(true);
+      setSendingVerification(true);
+      resendVerificationEmail()
+        .then(() => {
+          setVerificationEmailSent(true);
+          toast({
+            title: 'Verification email sent',
+            description: 'Check your inbox and spam folder. Click the button in the email to verify.',
+          });
+          onComplete();
+        })
+        .catch((e: any) => {
+          toast({
+            title: 'Could not send email',
+            description: e?.message || 'Use "Send verification email" or "Try Firebase email" below.',
+            variant: 'destructive',
+          });
+        })
+        .finally(() => setSendingVerification(false));
     } catch (error: any) {
       console.error('Profile update failed:', error);
       toast({
@@ -355,13 +373,13 @@ export function ProfileCompletionModal({
               <DialogDescription className="text-base pt-2">
                 {verificationEmailSent ? (
                   <>
-                    We sent a verification link to <span className="font-semibold text-foreground">{userEmail}</span>.
-                    Check your inbox and spam folder. Click the link in the email to verify. You can send again below if you didn&apos;t get it.
+                    We sent a verification email to <span className="font-semibold text-foreground">{userEmail}</span>.
+                    Check your inbox and spam folder. Click the <strong>button</strong> in the email to verify — we only confirm after you click it. You can send again below if you didn&apos;t get it.
                   </>
                 ) : (
                   <>
-                    Next we need to verify your email address. We&apos;ll send a link to{' '}
-                    <span className="font-semibold text-foreground">{userEmail}</span>. Click the button below to send the email, then check your inbox (and spam folder).
+                    Next we need to verify your email. We&apos;ll send an email to{' '}
+                    <span className="font-semibold text-foreground">{userEmail}</span> with a button to confirm. Click that button to verify; we only confirm after you click it.
                   </>
                 )}
               </DialogDescription>

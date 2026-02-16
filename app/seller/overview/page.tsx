@@ -1223,7 +1223,7 @@ export default function SellerOverviewPage() {
                         </Button>
                         {!emailOk && (
                           <p className="text-xs text-muted-foreground">
-                            Tip: after you click the link in your email, come back here and press &quot;Refresh Status&quot;.
+                            Tip: after you click the <strong>button</strong> in the verification email, come back here and press &quot;Refresh Status&quot;.
                           </p>
                         )}
                       </div>

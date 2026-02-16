@@ -2,8 +2,11 @@
  * POST /api/auth/send-verification-email
  *
  * Sends a branded email verification email to the currently authenticated user.
- * This uses Firebase Admin to generate a verify-email link (ActionCodeSettings),
- * then sends via our email provider (Resend/Brevo) using our email templates.
+ * The email contains a button linking to Firebase's verification URL. Email is
+ * only confirmed when the user clicks that button (Firebase sets emailVerified
+ * server-side). We never mark verified without the user having clicked the link.
+ *
+ * Uses Firebase Admin generateEmailVerificationLink + our email provider (Resend/Brevo).
  */
 import { getAdminAuth } from '@/lib/firebase/admin';
 import { getSiteUrl } from '@/lib/site-url';
