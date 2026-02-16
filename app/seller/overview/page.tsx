@@ -1128,7 +1128,192 @@ export default function SellerOverviewPage() {
           </div>
         </div>
 
-        {/* Big "items need attention" button at top (mobile: prominent; desktop: same spot) — no fixed/locked bar */}
+        {/* Seller Setup Checklist — at very top until completed */}
+        {user && setupChecklist.isComplete !== true && (
+          <Card className="rounded-xl border border-border/50 bg-card overflow-hidden" data-tour="seller-setup-checklist">
+            <CardHeader className="px-3 sm:px-6">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+                <div className="min-w-0">
+                  <CardTitle className="text-lg sm:text-xl font-extrabold">Seller Setup Checklist</CardTitle>
+                  <CardDescription className="text-sm sm:text-base">
+                    Complete these steps to publish listings and get paid. (Buyers can still browse and save listings anytime.)
+                  </CardDescription>
+                </div>
+                <Badge variant="secondary" className="font-semibold shrink-0 w-fit">
+                  {`${setupChecklist.done}/${setupChecklist.total} complete`}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 px-3 sm:px-6 pb-4 sm:pb-6">
+              {(() => {
+                const { profileOk, emailOk, payoutsOk } = setupChecklist;
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+                    {/* 1) Verify Email — matches top-of-page card and profile-completion flow */}
+                    <div className={cn('rounded-lg border-2 p-3 sm:p-4', emailOk ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-background/40')}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-bold text-foreground">1) Verify Email</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Required before publishing and checkout actions.
+                          </p>
+                        </div>
+                        {emailOk ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Clock className="h-5 w-5 text-muted-foreground" />}
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        <Button
+                          variant={emailOk ? 'outline' : 'default'}
+                          className="w-full min-h-[44px] font-semibold touch-manipulation"
+                          disabled={sendingVerificationEmail}
+                          onClick={async () => {
+                            if (emailOk) {
+                              try {
+                                await refreshUser();
+                                const profile = uid ? await getUserProfile(uid) : null;
+                                setUserProfile(profile);
+                                toast({ title: 'Account refreshed', description: 'Your verification status has been refreshed.' });
+                              } catch (e: any) {
+                                toast({ title: 'Refresh failed', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
+                              }
+                              return;
+                            }
+                            setSendingVerificationEmail(true);
+                            try {
+                              const result = await resendVerificationEmail();
+                              if (result?.alreadyVerified) {
+                                // Sync Firestore so checklist shows complete (needed for OAuth and so UI matches API).
+                                if (uid) {
+                                  await updateUserProfile(uid, {
+                                    emailVerified: true,
+                                    emailVerificationCompletedAt: new Date(),
+                                  } as any);
+                                }
+                                await refreshUser();
+                                const profile = uid ? await getUserProfile(uid) : null;
+                                setUserProfile(profile);
+                                toast({ title: 'Already verified', description: 'Your email is already verified. Status updated.' });
+                              } else {
+                                toast({ title: 'Verification email sent', description: 'Check your inbox (and spam folder).' });
+                              }
+                            } catch (e: any) {
+                              toast({
+                                title: 'Could not send verification email',
+                                description: formatUserFacingError(
+                                  e,
+                                  'If you already verified, click "Refresh Status"; otherwise try again in a moment.'
+                                ),
+                                variant: 'destructive',
+                              });
+                            } finally {
+                              setSendingVerificationEmail(false);
+                            }
+                          }}
+                        >
+                          {sendingVerificationEmail ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Sending…
+                            </>
+                          ) : emailOk ? (
+                            'Refresh Status'
+                          ) : (
+                            'Send Verification Email'
+                          )}
+                        </Button>
+                        {!emailOk && (
+                          <p className="text-xs text-muted-foreground">
+                            Tip: after you click the link in your email, come back here and press &quot;Refresh Status&quot;.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className={cn('rounded-lg border-2 p-3 sm:p-4', profileOk ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-background/40')}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-bold text-foreground">2) Profile</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Full name, phone number, and location.
+                          </p>
+                        </div>
+                        {profileOk ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Clock className="h-5 w-5 text-muted-foreground" />}
+                      </div>
+                      <div className="mt-3">
+                        <Button asChild variant={profileOk ? 'outline' : 'default'} className="w-full min-h-[44px] font-semibold touch-manipulation">
+                          <Link href="/dashboard/account">{profileOk ? 'View Profile' : 'Complete Profile'}</Link>
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className={cn('rounded-lg border-2 p-3 sm:p-4', payoutsOk ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-background/40')}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-bold text-foreground">3) Payouts</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Connect Stripe to receive payouts.
+                          </p>
+                        </div>
+                        {payoutsOk ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Clock className="h-5 w-5 text-muted-foreground" />}
+                      </div>
+                      <div className="mt-3">
+                        {payoutsOk ? (
+                          <Button asChild variant="outline" className="w-full min-h-[44px] font-semibold touch-manipulation">
+                            <Link href="/seller/payouts">View Payouts</Link>
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="default"
+                            className="w-full min-h-[44px] font-semibold touch-manipulation"
+                            disabled={connectingStripe}
+                            onClick={async () => {
+                              if (!user) {
+                                toast({
+                                  title: 'Sign in required',
+                                  description: 'Please sign in to connect Stripe payouts.',
+                                  variant: 'destructive',
+                                });
+                                return;
+                              }
+                              try {
+                                setConnectingStripe(true);
+                                if (!userProfile?.stripeAccountId) {
+                                  await createStripeAccount();
+                                }
+                                const { url } = await createAccountLink();
+                                window.location.href = url;
+                              } catch (e: any) {
+                                toast({
+                                  title: 'Could not connect Stripe',
+                                  description: formatUserFacingError(e, 'Please try again.'),
+                                  variant: 'destructive',
+                                });
+                              } finally {
+                                setConnectingStripe(false);
+                              }
+                            }}
+                          >
+                            {connectingStripe ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Redirecting…
+                              </>
+                            ) : (
+                              'Connect Stripe'
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Big "items need attention" button (mobile: prominent; desktop: same spot) */}
         {alerts.length > 0 && (
           <Link
             href="#action-required"
@@ -1139,8 +1324,8 @@ export default function SellerOverviewPage() {
           </Link>
         )}
 
-        {/* New seller: get your first sale */}
-        {isNewSeller && (
+        {/* New seller: get your first sale — only after setup checklist is complete */}
+        {isNewSeller && setupChecklist.isComplete === true && (
           <Card className="rounded-xl border-2 border-primary/30 bg-primary/5 overflow-hidden">
             <CardContent className="p-4 sm:p-6">
               <h2 className="text-lg sm:text-xl font-extrabold text-foreground mb-2">Get your first sale</h2>
@@ -1784,191 +1969,6 @@ export default function SellerOverviewPage() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Seller Setup Checklist — mobile: stacked, touch-friendly buttons */}
-        {user && setupChecklist.isComplete !== true && (
-          <Card className="rounded-xl border border-border/50 bg-card overflow-hidden" data-tour="seller-setup-checklist">
-            <CardHeader className="px-3 sm:px-6">
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
-                <div className="min-w-0">
-                  <CardTitle className="text-lg sm:text-xl font-extrabold">Seller Setup Checklist</CardTitle>
-                  <CardDescription className="text-sm sm:text-base">
-                    Complete these steps to publish listings and get paid. (Buyers can still browse and save listings anytime.)
-                  </CardDescription>
-                </div>
-                <Badge variant="secondary" className="font-semibold shrink-0 w-fit">
-                  {`${setupChecklist.done}/${setupChecklist.total} complete`}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4 px-3 sm:px-6 pb-4 sm:pb-6">
-              {(() => {
-                const { profileOk, emailOk, payoutsOk } = setupChecklist;
-
-                return (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
-                    {/* 1) Verify Email — matches top-of-page card and profile-completion flow */}
-                    <div className={cn('rounded-lg border-2 p-3 sm:p-4', emailOk ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-background/40')}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-bold text-foreground">1) Verify Email</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Required before publishing and checkout actions.
-                          </p>
-                        </div>
-                        {emailOk ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Clock className="h-5 w-5 text-muted-foreground" />}
-                      </div>
-                      <div className="mt-3 space-y-2">
-                        <Button
-                          variant={emailOk ? 'outline' : 'default'}
-                          className="w-full min-h-[44px] font-semibold touch-manipulation"
-                          disabled={sendingVerificationEmail}
-                          onClick={async () => {
-                            if (emailOk) {
-                              try {
-                                await refreshUser();
-                                const profile = uid ? await getUserProfile(uid) : null;
-                                setUserProfile(profile);
-                                toast({ title: 'Account refreshed', description: 'Your verification status has been refreshed.' });
-                              } catch (e: any) {
-                                toast({ title: 'Refresh failed', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
-                              }
-                              return;
-                            }
-                            setSendingVerificationEmail(true);
-                            try {
-                              const result = await resendVerificationEmail();
-                              if (result?.alreadyVerified) {
-                                // Sync Firestore so checklist shows complete (needed for OAuth and so UI matches API).
-                                if (uid) {
-                                  await updateUserProfile(uid, {
-                                    emailVerified: true,
-                                    emailVerificationCompletedAt: new Date(),
-                                  } as any);
-                                }
-                                await refreshUser();
-                                const profile = uid ? await getUserProfile(uid) : null;
-                                setUserProfile(profile);
-                                toast({ title: 'Already verified', description: 'Your email is already verified. Status updated.' });
-                              } else {
-                                toast({ title: 'Verification email sent', description: 'Check your inbox (and spam folder).' });
-                              }
-                            } catch (e: any) {
-                              toast({
-                                title: 'Could not send verification email',
-                                description: formatUserFacingError(
-                                  e,
-                                  'If you already verified, click "Refresh Status"; otherwise try again in a moment.'
-                                ),
-                                variant: 'destructive',
-                              });
-                            } finally {
-                              setSendingVerificationEmail(false);
-                            }
-                          }}
-                        >
-                          {sendingVerificationEmail ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Sending…
-                            </>
-                          ) : emailOk ? (
-                            'Refresh Status'
-                          ) : (
-                            'Send Verification Email'
-                          )}
-                        </Button>
-                        {!emailOk && (
-                          <p className="text-xs text-muted-foreground">
-                            Tip: after you click the link in your email, come back here and press &quot;Refresh Status&quot;.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className={cn('rounded-lg border-2 p-3 sm:p-4', profileOk ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-background/40')}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-bold text-foreground">2) Profile</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Full name, phone number, and location.
-                          </p>
-                        </div>
-                        {profileOk ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Clock className="h-5 w-5 text-muted-foreground" />}
-                      </div>
-                      <div className="mt-3">
-                        <Button asChild variant={profileOk ? 'outline' : 'default'} className="w-full min-h-[44px] font-semibold touch-manipulation">
-                          <Link href="/dashboard/account">{profileOk ? 'View Profile' : 'Complete Profile'}</Link>
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className={cn('rounded-lg border-2 p-3 sm:p-4', payoutsOk ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-background/40')}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-bold text-foreground">3) Payouts</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Connect Stripe to receive payouts.
-                          </p>
-                        </div>
-                        {payoutsOk ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Clock className="h-5 w-5 text-muted-foreground" />}
-                      </div>
-                      <div className="mt-3">
-                        {payoutsOk ? (
-                          <Button asChild variant="outline" className="w-full min-h-[44px] font-semibold touch-manipulation">
-                            <Link href="/seller/payouts">View Payouts</Link>
-                          </Button>
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="default"
-                            className="w-full min-h-[44px] font-semibold touch-manipulation"
-                            disabled={connectingStripe}
-                            onClick={async () => {
-                              if (!user) {
-                                toast({
-                                  title: 'Sign in required',
-                                  description: 'Please sign in to connect Stripe payouts.',
-                                  variant: 'destructive',
-                                });
-                                return;
-                              }
-                              try {
-                                setConnectingStripe(true);
-                                if (!userProfile?.stripeAccountId) {
-                                  await createStripeAccount();
-                                }
-                                const { url } = await createAccountLink();
-                                window.location.href = url;
-                              } catch (e: any) {
-                                toast({
-                                  title: 'Could not connect Stripe',
-                                  description: formatUserFacingError(e, 'Please try again.'),
-                                  variant: 'destructive',
-                                });
-                              } finally {
-                                setConnectingStripe(false);
-                              }
-                            }}
-                          >
-                            {connectingStripe ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Redirecting…
-                              </>
-                            ) : (
-                              'Connect Stripe'
-                            )}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-            </CardContent>
-          </Card>
-        )}
 
         {/* Payout Readiness — mobile: full width, no overflow */}
         {user && userProfile && !hidePayoutReadinessOnOverview && (

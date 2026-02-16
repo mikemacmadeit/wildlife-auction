@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { signIn, resetPassword, signInWithGoogle, getGoogleRedirectResult } from '@/lib/firebase/auth';
+import { signIn, resetPassword, signInWithGoogle, getGoogleRedirectResult, signOutUser } from '@/lib/firebase/auth';
+import { getDocument } from '@/lib/firebase/firestore';
 import {
   getSignInErrorMessage,
   getPasswordResetErrorMessage,
@@ -56,28 +57,37 @@ export default function LoginPage() {
     }
   }, [searchParams, router, toast]);
 
-  // Handle Google redirect result on page load
+  // Handle Google redirect result on page load (sign-in only: must have existing account)
   useEffect(() => {
     getGoogleRedirectResult()
-      .then((result) => {
-        if (result?.user) {
-          createUserDocument(result.user)
-            .then(() => {
-              toast({
-                title: 'Welcome back!',
-                description: 'You have been successfully signed in with Google.',
-              });
-              router.push(getRedirectPath());
-            })
-            .catch((error) => {
-              console.error('Error creating user document after Google redirect:', error);
-              toast({
-                title: 'Google sign-in failed',
-                description: 'Failed to set up user account. Please try again.',
-                variant: 'destructive',
-              });
-            });
+      .then(async (result) => {
+        if (!result?.user) return;
+        const existingUser = await getDocument('users', result.user.uid).catch(() => null);
+        if (!existingUser) {
+          await signOutUser();
+          toast({
+            title: "We don't have an account for you",
+            description: 'Please sign up first, then you can sign in with Google.',
+            variant: 'destructive',
+          });
+          return;
         }
+        createUserDocument(result.user)
+          .then(() => {
+            toast({
+              title: 'Welcome back!',
+              description: 'You have been successfully signed in with Google.',
+            });
+            router.push(getRedirectPath());
+          })
+          .catch((error) => {
+            console.error('Error creating user document after Google redirect:', error);
+            toast({
+              title: 'Google sign-in failed',
+              description: 'Failed to set up user account. Please try again.',
+              variant: 'destructive',
+            });
+          });
       })
       .catch((error: any) => {
         console.error('Error during Google redirect result:', error);
@@ -193,17 +203,29 @@ export default function LoginPage() {
     try {
       const userCredential = await signInWithGoogle();
 
-      // Create user document in Firestore if it doesn't exist (for new users)
-      if (userCredential.user) {
-        await createUserDocument(userCredential.user);
+      if (!userCredential.user) return;
 
+      // Sign-in only: require an existing account (do not create one)
+      const existingUser = await getDocument('users', userCredential.user.uid).catch(() => null);
+      if (!existingUser) {
+        await signOutUser();
         toast({
-          title: 'Welcome back!',
-          description: 'You have been successfully signed in.',
+          title: "We don't have an account for you",
+          description: 'Please sign up first, then you can sign in with Google.',
+          variant: 'destructive',
         });
-
-        router.push(getRedirectPath());
+        setIsLoading(false);
+        return;
       }
+
+      await createUserDocument(userCredential.user);
+
+      toast({
+        title: 'Welcome back!',
+        description: 'You have been successfully signed in.',
+      });
+
+      router.push(getRedirectPath());
     } catch (error: any) {
       // Don't show error if redirect was initiated (page will reload)
       if (error.message === 'REDIRECT_INITIATED') {

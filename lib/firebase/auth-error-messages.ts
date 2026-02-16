@@ -7,7 +7,7 @@ const SIGN_IN_MESSAGES: Record<string, string> = {
   'auth/invalid-credential': 'Wrong email or password. Try again or use Forgot password below.',
   'auth/invalid-credentials': 'Wrong email or password. Try again or use Forgot password below.',
   'auth/invalid-email': 'Please check your email address.',
-  'auth/user-not-found': 'Wrong email or password. Try again or use Forgot password below.',
+  'auth/user-not-found': "We don't have an account for you. Please sign up first.",
   'auth/wrong-password': 'Wrong email or password. Try again or use Forgot password below.',
   'auth/user-disabled': 'This account has been disabled. Please contact support.',
   'auth/too-many-requests': 'Too many failed attempts. Please try again in a few minutes.',

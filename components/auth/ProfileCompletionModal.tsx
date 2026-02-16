@@ -21,7 +21,7 @@ import { updateUserProfile, getUserProfile } from '@/lib/firebase/users';
 import { setCurrentUserAvatarUrl, uploadUserAvatar } from '@/lib/firebase/profile-media';
 import { saveAddress } from '@/lib/firebase/addresses';
 import { useAuth } from '@/hooks/use-auth';
-import { reloadCurrentUser, resendVerificationEmail } from '@/lib/firebase/auth';
+import { reloadCurrentUser, resendVerificationEmail, sendVerificationEmailFirebaseOnly } from '@/lib/firebase/auth';
 import { AvatarCropDialog, type AvatarCropResult } from '@/components/profile/AvatarCropDialog';
 import { AddressSearch } from '@/components/address/AddressSearch';
 import { AddressMapConfirm } from '@/components/address/AddressMapConfirm';
@@ -51,6 +51,8 @@ export function ProfileCompletionModal({
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [showVerifyEmailStep, setShowVerifyEmailStep] = useState(false);
+  const [verificationEmailSent, setVerificationEmailSent] = useState(false);
+  const [sendingVerification, setSendingVerification] = useState(false);
   const [formData, setFormData] = useState({
     fullName: userDisplayName || '',
     phone: '',
@@ -132,7 +134,10 @@ export function ProfileCompletionModal({
 
   // Reset verify-email step when modal opens so we show the form first
   useEffect(() => {
-    if (open) setShowVerifyEmailStep(false);
+    if (open) {
+      setShowVerifyEmailStep(false);
+      setVerificationEmailSent(false);
+    }
   }, [open]);
 
   const validateForm = () => {
@@ -345,43 +350,112 @@ export function ProfileCompletionModal({
           <>
             <DialogHeader>
               <DialogTitle className="text-2xl font-extrabold">
-                Thanks for completing your profile
+                {verificationEmailSent ? 'Check your email' : 'Thanks for completing your profile'}
               </DialogTitle>
               <DialogDescription className="text-base pt-2">
-                Next we need to verify your email address. We&apos;ll send a link to{' '}
-                <span className="font-semibold text-foreground">{userEmail}</span>. Click the button below to send the email, then check your inbox (and spam folder).
+                {verificationEmailSent ? (
+                  <>
+                    We sent a verification link to <span className="font-semibold text-foreground">{userEmail}</span>.
+                    Check your inbox and spam folder. Click the link in the email to verify. You can send again below if you didn&apos;t get it.
+                  </>
+                ) : (
+                  <>
+                    Next we need to verify your email address. We&apos;ll send a link to{' '}
+                    <span className="font-semibold text-foreground">{userEmail}</span>. Click the button below to send the email, then check your inbox (and spam folder).
+                  </>
+                )}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 mt-6">
-              <Button
-                type="button"
-                variant="default"
-                className="w-full min-h-[48px] font-semibold"
-                onClick={async () => {
-                  try {
-                    await resendVerificationEmail();
-                    toast({
-                      title: 'Verification email sent',
-                      description: 'Check your inbox and spam folder. Click the link in the email to verify.',
-                    });
-                    onComplete();
-                    if (typeof window !== 'undefined') {
-                      window.location.href = '/seller/overview';
+              {!verificationEmailSent ? (
+                <Button
+                  type="button"
+                  variant="default"
+                  className="w-full min-h-[48px] font-semibold"
+                  disabled={sendingVerification}
+                  onClick={async () => {
+                    setSendingVerification(true);
+                    try {
+                      await resendVerificationEmail();
+                      setVerificationEmailSent(true);
+                      toast({
+                        title: 'Verification email sent',
+                        description: 'Check your inbox and spam folder. Click the link to verify.',
+                      });
+                      onComplete();
+                    } catch (e: any) {
+                      toast({
+                        title: 'Could not send email',
+                        description: e?.message || 'Please try again or use "Try Firebase email" below.',
+                        variant: 'destructive',
+                      });
+                    } finally {
+                      setSendingVerification(false);
                     }
-                  } catch (e: any) {
-                    toast({
-                      title: 'Could not send email',
-                      description: e?.message || 'Please try again.',
-                      variant: 'destructive',
-                    });
-                  }
-                }}
-              >
-                Send verification email
-              </Button>
-              <p className="text-xs text-muted-foreground text-center">
-                Didn&apos;t get it? You can click Send again anytime until verified. Check spam. After sending, you&apos;ll go to your seller overview.
-              </p>
+                  }}
+                >
+                  {sendingVerification ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Send verification email
+                </Button>
+              ) : null}
+              {verificationEmailSent && (
+                <>
+                  <Button
+                    type="button"
+                    variant="default"
+                    className="w-full min-h-[48px] font-semibold"
+                    disabled={sendingVerification}
+                    onClick={async () => {
+                      setSendingVerification(true);
+                      try {
+                        await resendVerificationEmail();
+                        toast({ title: 'Sent again', description: 'Check your inbox and spam folder.' });
+                      } catch (e: any) {
+                        toast({ title: 'Could not send', description: e?.message || 'Try "Firebase email" below.', variant: 'destructive' });
+                      } finally {
+                        setSendingVerification(false);
+                      }
+                    }}
+                  >
+                    {sendingVerification ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Send again
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full min-h-[44px]"
+                    disabled={sendingVerification}
+                    onClick={async () => {
+                      setSendingVerification(true);
+                      try {
+                        await sendVerificationEmailFirebaseOnly();
+                        toast({ title: 'Firebase email sent', description: 'Check inbox and spam. Different sender than before.' });
+                      } catch (e: any) {
+                        toast({ title: 'Could not send', description: e?.message || 'Please try again.', variant: 'destructive' });
+                      } finally {
+                        setSendingVerification(false);
+                      }
+                    }}
+                  >
+                    Didn&apos;t get it? Try Firebase email
+                  </Button>
+                </>
+              )}
+              <div className="flex flex-col gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') window.location.href = '/seller/overview';
+                  }}
+                >
+                  Continue to dashboard
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  You can verify later from Account & Settings if needed.
+                </p>
+              </div>
             </div>
           </>
         ) : (
@@ -583,11 +657,22 @@ export function ProfileCompletionModal({
             )}
 
             {isMapsAvailable === true && !useManualLocation && !primaryPlace && (
-              <AddressSearch
-                onSelect={(addr) => setPrimaryPlace(addr)}
-                placeholder="Search for your address…"
-                disabled={isLoading}
-              />
+              <div className="space-y-2">
+                <AddressSearch
+                  onSelect={(addr) => setPrimaryPlace(addr)}
+                  placeholder="Search for your address…"
+                  disabled={isLoading}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() => setUseManualLocation(true)}
+                >
+                  Enter address manually instead
+                </Button>
+              </div>
             )}
 
             {isMapsAvailable === true && !useManualLocation && primaryPlace && !primaryMapResult && (

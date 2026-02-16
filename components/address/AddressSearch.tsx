@@ -68,14 +68,17 @@ export function AddressSearch({
     };
   }, []);
 
-  // Fetch suggestions when query changes
+  // Fetch suggestions when query changes (with timeout so we never stay stuck on "Searching…")
+  const SEARCH_TIMEOUT_MS = 8000;
   useEffect(() => {
     if (!query.trim()) {
       setSuggestions([]);
       setOpen(false);
+      setLoading(false);
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     debounceRef.current = setTimeout(() => {
       debounceRef.current = null;
       const svc = autocompleteServiceRef.current;
@@ -85,6 +88,11 @@ export function AddressSearch({
       }
       setLoading(true);
       setError(null);
+      timeoutId = setTimeout(() => {
+        timeoutId = null;
+        setLoading(false);
+        setError('Address search is taking too long. Try "Enter address manually" below or try again.');
+      }, SEARCH_TIMEOUT_MS);
       svc.getPlacePredictions(
         {
           input: query,
@@ -92,18 +100,27 @@ export function AddressSearch({
           types: ['address'],
         },
         (predictions, status) => {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
           setLoading(false);
           if (status === google.maps.places.PlacesServiceStatus.OK && predictions?.length) {
             setSuggestions(predictions);
             setOpen(true);
+            setError(null);
           } else {
             setSuggestions([]);
+            if (status !== google.maps.places.PlacesServiceStatus.OK && status !== google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+              setError('Address search unavailable. Use "Enter address manually" below.');
+            }
           }
         }
       );
     }, DEBOUNCE_MS);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (timeoutId) clearTimeout(timeoutId);
     };
   }, [query]);
 

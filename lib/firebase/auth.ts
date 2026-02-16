@@ -185,6 +185,32 @@ export const resendVerificationEmail = async (): Promise<{ alreadyVerified?: boo
 };
 
 /**
+ * Send verification email using only Firebase (no branded API).
+ * Use when the user didn't receive the branded email (e.g. spam, provider issue).
+ */
+export const sendVerificationEmailFirebaseOnly = async (): Promise<void> => {
+  if (!auth.currentUser) throw new Error('No user is currently signed in');
+  const baseUrl =
+    typeof window !== 'undefined' && window.location?.origin
+      ? window.location.origin
+      : getSiteUrl();
+  const actionCodeSettings = {
+    url: `${baseUrl}/dashboard/account?verified=1`,
+    handleCodeInApp: false,
+  };
+  try {
+    await sendEmailVerification(auth.currentUser, actionCodeSettings as any);
+  } catch (e: any) {
+    const code = String(e?.code || '');
+    if (code === 'auth/unauthorized-continue-uri' || code === 'auth/unauthorized-domain') {
+      await sendEmailVerification(auth.currentUser);
+      return;
+    }
+    throw new Error(getVerificationEmailErrorMessage(code || e?.message));
+  }
+};
+
+/**
  * Force-refresh the currently signed-in user from Firebase Auth.
  * Useful after verifying email in another tab.
  */
