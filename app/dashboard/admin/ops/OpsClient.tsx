@@ -146,6 +146,8 @@ export default function OpsClient() {
   const [loadingOrderAudit, setLoadingOrderAudit] = useState(false);
   const [orderReview, setOrderReview] = useState<any | null>(null);
   const [loadingOrderReview, setLoadingOrderReview] = useState(false);
+  const [orderAdminNoteText, setOrderAdminNoteText] = useState('');
+  const [orderAdminNoteSubmitting, setOrderAdminNoteSubmitting] = useState<string | null>(null);
   const [revenueStats, setRevenueStats] = useState<{
     platformFees: { last30Days: number; allTime: number };
     orders: { last30Days: number };
@@ -1719,6 +1721,17 @@ export default function OpsClient() {
                 </div>
               </div>
 
+              {/* Delivery address (when set) */}
+              {selectedOrder.delivery?.buyerAddress?.line1 && (
+                <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+                  <Label className="text-[10px] text-muted-foreground uppercase mb-1 block">Delivery address</Label>
+                  <p className="text-xs break-words">
+                    {[selectedOrder.delivery.buyerAddress.line1, selectedOrder.delivery.buyerAddress.line2, [selectedOrder.delivery.buyerAddress.city, selectedOrder.delivery.buyerAddress.state, selectedOrder.delivery.buyerAddress.zip].filter(Boolean).join(', ')].filter(Boolean).join(', ')}
+                    {selectedOrder.delivery.buyerAddress.deliveryInstructions ? ` · ${selectedOrder.delivery.buyerAddress.deliveryInstructions}` : ''}
+                  </p>
+                </div>
+              )}
+
               {/* AI Summary - Collapsible */}
               {selectedOrder.id && (
                 <div className="border border-border/50 rounded-lg overflow-hidden">
@@ -1896,6 +1909,72 @@ export default function OpsClient() {
                   )}
                   </div>
                 </details>
+
+                {/* Admin notes — add freeform note to order */}
+                <div className="rounded-xl border border-border/50 bg-muted/20 overflow-hidden p-3 space-y-3">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase">Admin notes</Label>
+                  {(selectedOrder as any).adminActionNotes?.length > 0 && (
+                    <div className="space-y-2 max-h-[160px] overflow-y-auto">
+                      {(selectedOrder as any).adminActionNotes
+                        .filter((n: any) => n.action === 'admin_note' || n.reason === 'Admin note')
+                        .map((n: any, i: number) => (
+                          <div key={i} className="rounded border border-border/40 p-2 text-xs bg-background/50">
+                            <div className="text-muted-foreground mb-0.5">
+                              {n.createdAt?.toDate ? formatDate(n.createdAt.toDate()) : n.createdAt ? formatDate(new Date(n.createdAt)) : '—'}
+                            </div>
+                            <p className="whitespace-pre-wrap">{n.notes}</p>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <Textarea
+                      placeholder="Add a note (e.g. Called buyer, will set address by Friday)"
+                      value={orderAdminNoteText}
+                      onChange={(e) => setOrderAdminNoteText(e.target.value)}
+                      className="min-h-[60px] text-sm"
+                      maxLength={2000}
+                    />
+                    <Button
+                      size="sm"
+                      className="shrink-0 self-end"
+                      disabled={!orderAdminNoteText.trim() || orderAdminNoteSubmitting !== null}
+                      onClick={async () => {
+                        if (!selectedOrder?.id || !orderAdminNoteText.trim() || !user) return;
+                        setOrderAdminNoteSubmitting(selectedOrder.id);
+                        try {
+                          const token = await user.getIdToken();
+                          const res = await fetch(`/api/orders/${selectedOrder.id}/admin-notes`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                            body: JSON.stringify({ notes: orderAdminNoteText.trim() }),
+                          });
+                          const json = await res.json().catch(() => ({}));
+                          if (!res.ok) throw new Error(json?.error || 'Failed to add note');
+                          const newNote = {
+                            reason: 'Admin note',
+                            notes: orderAdminNoteText.trim(),
+                            actorUid: user.uid,
+                            createdAt: new Date(),
+                            action: 'admin_note',
+                          };
+                          setSelectedOrder({
+                            ...selectedOrder,
+                            adminActionNotes: [...((selectedOrder as any).adminActionNotes || []), newNote],
+                          } as OrderWithDetails);
+                          setOrderAdminNoteText('');
+                          toast({ title: 'Note added', description: 'Admin note saved to order.' });
+                        } catch (e: any) {
+                          toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to add note'), variant: 'destructive' });
+                        } finally {
+                          setOrderAdminNoteSubmitting(null);
+                        }
+                      }}
+                    >
+                      {orderAdminNoteSubmitting === selectedOrder?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add note'}
+                    </Button>
+                  </div>
+                </div>
 
                 {/* Review (if any) */}
                 <details className="group rounded-xl border border-border/50 bg-muted/20 overflow-hidden">

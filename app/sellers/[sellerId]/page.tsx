@@ -32,6 +32,7 @@ import { SaveSellerButton } from '@/components/seller/SaveSellerButton';
 import { StarRatingReviewCount } from '@/components/seller/StarRatingReviewCount';
 import { useToast } from '@/hooks/use-toast';
 import { getOrCreateThread } from '@/lib/firebase/messages';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 
 export default function SellerProfilePage() {
   const params = useParams<{ sellerId: string }>();
@@ -54,6 +55,7 @@ export default function SellerProfilePage() {
   const [reviews, setReviews] = useState<any[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
+  const [responseTimeHours, setResponseTimeHours] = useState<number | null>(null);
 
   const fromParam = useMemo(() => {
     const raw = searchParams?.get('from');
@@ -92,7 +94,7 @@ export default function SellerProfilePage() {
         const t = await getPublicSellerTrust(sellerId);
         if (!cancelled) setPublicTrust(t);
       } catch (e: any) {
-        if (!cancelled) setError(e?.message || 'Failed to load seller profile');
+        if (!cancelled) setError(formatUserFacingError(e, 'Failed to load seller profile'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -185,7 +187,7 @@ export default function SellerProfilePage() {
         setActiveListings(active);
         setSoldListings(soldSorted);
       } catch (e: any) {
-        if (!cancelled) setListingsError(e?.message || 'Failed to load seller listings');
+        if (!cancelled) setListingsError(formatUserFacingError(e, 'Failed to load seller listings'));
       } finally {
         if (!cancelled) setListingsLoading(false);
       }
@@ -214,7 +216,7 @@ export default function SellerProfilePage() {
         setReviews(Array.isArray(data.reviews) ? data.reviews : []);
       })
       .catch((e: any) => {
-        if (!cancelled) setReviewsError(e?.message || 'Failed to load reviews');
+        if (!cancelled) setReviewsError(formatUserFacingError(e, 'Failed to load reviews'));
       })
       .finally(() => {
         if (!cancelled) setReviewsLoading(false);
@@ -222,6 +224,26 @@ export default function SellerProfilePage() {
     return () => {
       cancelled = true;
     };
+  }, [sellerId]);
+
+  // Response time (public, from message data)
+  useEffect(() => {
+    if (!sellerId) return;
+    let cancelled = false;
+    fetch(`/api/sellers/${encodeURIComponent(sellerId)}/response-time`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.ok && typeof data.medianHours === 'number' && data.medianHours >= 0) {
+          setResponseTimeHours(data.medianHours);
+        } else {
+          setResponseTimeHours(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setResponseTimeHours(null);
+      });
+    return () => { cancelled = true; };
   }, [sellerId]);
 
   if (authLoading || loading) {
@@ -313,7 +335,7 @@ export default function SellerProfilePage() {
                     } catch (e: any) {
                       toast({
                         title: 'Could not start message',
-                        description: e?.message || 'Please try again.',
+                        description: formatUserFacingError(e, 'Please try again.'),
                         variant: 'destructive',
                       });
                     } finally {
@@ -403,7 +425,7 @@ export default function SellerProfilePage() {
                             } catch (e: any) {
                               toast({
                                 title: 'Could not start message',
-                                description: e?.message || 'Please try again.',
+                                description: formatUserFacingError(e, 'Please try again.'),
                                 variant: 'destructive',
                               });
                             } finally {
@@ -449,6 +471,14 @@ export default function SellerProfilePage() {
                     reviewCount={reviewStats?.reviewCount ?? 0}
                     size="md"
                   />
+                  {responseTimeHours !== null && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+                      <span className="whitespace-nowrap">
+                        Usually responds in {responseTimeHours < 1 ? '<1h' : responseTimeHours < 24 ? `${Math.round(responseTimeHours)}h` : `${Math.round(responseTimeHours / 24)}d`}
+                      </span>
+                    </div>
+                  )}
                   {locationLabel && (
                     <div className="flex items-center gap-1.5 min-w-0 shrink-0">
                       <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />

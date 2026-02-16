@@ -8,10 +8,11 @@
  */
 
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { getAdminDb } from '@/lib/firebase/admin';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
+import { requireAdmin, json } from '@/app/api/admin/_util';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
-import { computeReminderPlan, shouldSendReminder, getReminderTemplate } from '@/lib/reminders/orderReminders';
+import { computeReminderPlan, getReminderTemplate } from '@/lib/reminders/orderReminders';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { createAuditLog } from '@/lib/audit/logger';
@@ -19,24 +20,10 @@ import { captureException } from '@/lib/monitoring/capture';
 import { getSiteUrl } from '@/lib/site-url';
 import { safeUpdate } from '@/lib/firebase/safeFirestore';
 
-const BATCH_SIZE = 5; // Process 5 orders at a time to avoid rate limits
-
-function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
-  return new Response(JSON.stringify(body), {
-    status: init?.status ?? 200,
-    headers: {
-      'content-type': 'application/json',
-      ...(init?.headers || {}),
-    },
-  });
-}
+const BATCH_SIZE = 5;
 
 export async function POST(request: Request) {
   try {
-    const auth = getAdminAuth();
-    const db = getAdminDb() as unknown as ReturnType<typeof getFirestore>;
-
-    // Rate limiting
     const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.admin);
     const rateLimitResult = await rateLimitCheck(request as any);
     if (!rateLimitResult.allowed) {
@@ -48,19 +35,20 @@ export async function POST(request: Request) {
       });
     }
 
-    // Auth check (optional - can be called by cron without auth)
     const authHeader = request.headers.get('authorization');
-    let adminId: string | null = null;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split('Bearer ')[1];
-      try {
-        const decodedToken = await auth.verifyIdToken(token);
-        adminId = decodedToken.uid;
-      } catch (error) {
-        // If auth fails, continue as system-initiated (for cron)
+    let db: ReturnType<typeof getFirestore>;
+    let adminId: string;
+    if (authHeader?.startsWith('Bearer ')) {
+      const admin = await requireAdmin(request);
+      if (admin.ok) {
+        db = admin.ctx.db as unknown as ReturnType<typeof getFirestore>;
+        adminId = admin.ctx.actorUid;
+      } else {
+        db = getAdminDb() as unknown as ReturnType<typeof getFirestore>;
         adminId = 'system';
       }
     } else {
+      db = getAdminDb() as unknown as ReturnType<typeof getFirestore>;
       adminId = 'system';
     }
 
@@ -258,7 +246,7 @@ export async function POST(request: Request) {
     await createAuditLog(db, {
       actorUid: adminId || 'system',
       actorRole: adminId ? 'admin' : 'system',
-      actionType: 'admin_note_added', // TODO: Add 'admin_reminders_run' to AuditActionType
+      actionType: 'admin_reminders_run',
       metadata: {
         ordersProcessed: ordersToProcess.length,
         remindersSent: successCount,

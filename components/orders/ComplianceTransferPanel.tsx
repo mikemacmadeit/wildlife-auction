@@ -17,6 +17,7 @@ import { FileText, Upload, CheckCircle2, XCircle, Loader2, AlertTriangle } from 
 import type { Order } from '@/lib/types';
 import { isRegulatedWhitetailDeal, hasComplianceConfirmations } from '@/lib/compliance/whitetail';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
+import { uploadComplianceDocument } from '@/lib/firebase/storage-documents';
 
 interface ComplianceTransferPanelProps {
   order: Order;
@@ -29,6 +30,7 @@ export function ComplianceTransferPanel({ order, role, onConfirm }: ComplianceTr
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
 
   const txStatus = getEffectiveTransactionStatus(order);
   const isRegulated = isRegulatedWhitetailDeal(order);
@@ -59,6 +61,7 @@ export function ComplianceTransferPanel({ order, role, onConfirm }: ComplianceTr
         body: JSON.stringify({
           role,
           confirmed: true,
+          ...(uploadedUrl ? { uploadUrl: uploadedUrl } : {}),
         }),
       });
 
@@ -85,10 +88,8 @@ export function ComplianceTransferPanel({ order, role, onConfirm }: ComplianceTr
     setError(null);
 
     try {
-      // TODO: Implement file upload to storage (Firebase Storage or similar)
-      // For now, just show a placeholder
-      console.log('File upload not yet implemented:', file.name);
-      setError('File upload will be implemented in next phase');
+      const result = await uploadComplianceDocument('order', order.id, file);
+      setUploadedUrl(result.url);
     } catch (err: any) {
       setError(err.message || 'Failed to upload file');
     } finally {
@@ -176,6 +177,12 @@ export function ComplianceTransferPanel({ order, role, onConfirm }: ComplianceTr
             <p className="text-xs text-gray-500 mb-2">
               While not required, uploading your TPWD transfer permit document helps maintain records.
             </p>
+            {uploadedUrl && (
+              <p className="text-xs text-green-600 mb-2 flex items-center gap-1">
+                <FileText className="h-3 w-3" />
+                Document uploaded. Confirm compliance below to save.
+              </p>
+            )}
             <Button
               type="button"
               variant="outline"

@@ -75,7 +75,14 @@ type AdminHealthResponse = {
   checks?: HealthCheck[];
 };
 
-function statusBadge(s: HealthStatus) {
+function statusBadge(s: HealthStatus, retired?: boolean) {
+  if (retired) {
+    return (
+      <Badge className="bg-muted text-muted-foreground" variant="outline">
+        Retired
+      </Badge>
+    );
+  }
   const cls =
     s === 'OK'
       ? 'bg-emerald-600 text-white'
@@ -349,7 +356,7 @@ export default function OpsHealthPage() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <span className="text-sm font-semibold truncate">{c.title.replace(/ \(.*\)$/, '')}</span>
-                        {statusBadge(c.status)}
+                        {statusBadge(c.status, c.details?.retired)}
                       </div>
                       <p className="text-xs text-muted-foreground line-clamp-2">{c.message}</p>
                       {c.dashboardUrl && (
@@ -481,7 +488,7 @@ export default function OpsHealthPage() {
                         <CardDescription className="mt-1 text-xs md:text-sm break-words">{c.message}</CardDescription>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        {statusBadge(c.status)}
+                        {statusBadge(c.status, c.details?.retired)}
                         <Button size="sm" variant="outline" className="min-h-[36px]" onClick={() => setExpanded((m) => ({ ...m, [c.id]: !m[c.id] }))}>
                           {expanded[c.id] ? 'Hide' : 'Details'}
                         </Button>

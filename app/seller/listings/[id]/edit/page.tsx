@@ -2370,7 +2370,7 @@ function EditListingPageContent() {
         description:
           e?.code === 'MUST_EDIT_BEFORE_RESUBMIT'
             ? 'Please edit and save the listing first, then resubmit.'
-            : e?.message || 'Failed to resubmit listing.',
+            : formatUserFacingError(e, 'Failed to resubmit listing.'),
         variant: 'destructive',
       });
     } finally {
@@ -2578,7 +2578,7 @@ function EditListingPageContent() {
               } catch (e: any) {
                 toast({
                   title: "Couldn't record acceptance",
-                  description: e?.message || 'Please try again.',
+                  description: formatUserFacingError(e, 'Please try again.'),
                   variant: 'destructive',
                 });
               }

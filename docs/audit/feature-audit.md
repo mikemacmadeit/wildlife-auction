@@ -196,9 +196,9 @@ Repo scope audited: `project/` (Next.js app + API routes + Netlify scheduled fun
 - Stripe Connect Express account creation + onboarding link + status check endpoints exist.
   - Evidence: `project/app/api/stripe/connect/create-account/route.ts`, `create-account-link`, `check-status`.
 - Release flow:
-  - Admin endpoint `POST /api/stripe/transfers/release` calls shared `releasePaymentForOrder`.
-  - Scheduled function `autoReleaseProtected` also uses shared release logic.
-  - Evidence: `project/app/api/stripe/transfers/release/route.ts`, `project/lib/stripe/release-payment.ts`, `project/netlify/functions/autoReleaseProtected.ts`.
+  - Admin endpoint `POST /api/stripe/transfers/release` calls shared `releasePaymentForOrder` (for legacy/admin cases).
+  - **autoReleaseProtected:** RETIRED. Payments are direct buyer→seller; no platform release job. Health shows "[RETIRED — informational only]".
+  - Evidence: `project/app/api/stripe/transfers/release/route.ts`, `project/lib/stripe/release-payment.ts`.
 
 ### Production risks
 - **P0**: Connect endpoints use legacy Admin init; likely Netlify fragility.
@@ -336,8 +336,7 @@ Repo scope audited: `project/` (Next.js app + API routes + Netlify scheduled fun
    - Confirm `project/firestore.rules` is deployed to the production Firebase project.
 3) **Netlify scheduled functions actually running**
    - Check Netlify “Scheduled Functions” UI/logs for:
-     - `autoReleaseProtected`
-     - `expireOffers`
+     - `finalizeAuctions`, `expireListings`, `expireOffers`, `checkFulfillmentReminders`, `clearExpiredPurchaseReservations`, `aggregateRevenue`. (Note: `autoReleaseProtected` is retired; direct buyer→seller.)
 4) **Stripe Connect + Transfers viability**
    - Confirm platform Stripe account is allowed to hold funds and later transfer (payout-hold model) and Connect is properly configured.
 5) **Admin role claims**

@@ -287,16 +287,16 @@ export async function GET(request: Request) {
     });
   }
 
-  // opsHealth: autoReleaseProtected job was retired (direct buyer→seller model). Show retired check so dashboard doesn't FAIL forever.
+  // opsHealth: autoReleaseProtected job was retired (direct buyer→seller model). Shown as informational only — not a live check.
   const autoReleaseLastRun = toDateSafe(autoRelease?.lastRunAt);
   checks.push({
     id: 'ops_autoReleaseProtected',
-    title: 'Scheduled job: autoReleaseProtected (retired)',
+    title: 'autoReleaseProtected [RETIRED — informational only]',
     status: 'OK',
     message: autoReleaseLastRun
       ? `Job retired (direct buyer→seller). Last run ${Math.round((Date.now() - autoReleaseLastRun.getTime()) / (1000 * 60))} min ago (historical).`
       : 'Job retired. Payments are direct buyer→seller; no platform release.',
-    details: autoReleaseLastRun ? { lastRunAt: autoReleaseLastRun.toISOString() } : undefined,
+    details: autoReleaseLastRun ? { lastRunAt: autoReleaseLastRun.toISOString(), retired: true } : { retired: true },
     category: 'jobs',
   });
 

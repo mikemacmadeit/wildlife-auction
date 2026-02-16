@@ -159,6 +159,8 @@ export default function ListingDetailClient() {
   }>(null);
   const [animalAckOpen, setAnimalAckOpen] = useState(false);
   const [animalRiskAcked, setAnimalRiskAcked] = useState(false);
+  const [sidebarSellerReviewStats, setSidebarSellerReviewStats] = useState<{ avgRating: number; reviewCount: number } | null>(null);
+  const [similarListings, setSimilarListings] = useState<Array<{ id: string; title: string; type: string; price: number | null; primaryImageUrl: string | null; url: string }>>([]);
   const { toast } = useToast();
   const { user, initialized: authInitialized } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -405,6 +407,60 @@ export default function ListingDetailClient() {
       cancelled = true;
     };
   }, [listing?.id, listing?.category, listing?.location?.state, compsWindowDays]);
+
+  useEffect(() => {
+    const sellerId = listing?.sellerId;
+    if (!sellerId) {
+      setSidebarSellerReviewStats(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/reviews/seller?sellerId=${encodeURIComponent(sellerId)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.ok && data?.stats) {
+          const s = data.stats;
+          setSidebarSellerReviewStats({
+            avgRating: Number(s.avgRating ?? 0),
+            reviewCount: Number(s.reviewCount ?? 0),
+          });
+        } else {
+          setSidebarSellerReviewStats(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setSidebarSellerReviewStats(null);
+      });
+    return () => { cancelled = true; };
+  }, [listing?.sellerId]);
+
+  useEffect(() => {
+    const id = listing?.id;
+    if (!id) {
+      setSimilarListings([]);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/listings/similar?listingId=${encodeURIComponent(id)}&limit=6`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const items = Array.isArray(data?.items) ? data.items : [];
+        setSimilarListings(items.map((it: any) => ({
+          id: it.id,
+          title: it.title || '',
+          type: it.type || 'fixed',
+          price: it.price != null ? it.price : it.currentBid ?? it.startingBid ?? null,
+          primaryImageUrl: it.primaryImageUrl || null,
+          url: it.url || `/listing/${it.id}`,
+        })));
+      })
+      .catch(() => {
+        if (!cancelled) setSimilarListings([]);
+      });
+    return () => { cancelled = true; };
+  }, [listing?.id]);
 
   const minBidUsd = useMemo(() => {
     if (!listing) return 0;
@@ -1458,6 +1514,18 @@ export default function ListingDetailClient() {
                       >
                         {(listing as any)?.sellerSnapshot?.displayName || (listing as any)?.seller?.name || 'Seller'}
                       </Link>
+                      {sidebarSellerReviewStats && (sidebarSellerReviewStats.reviewCount ?? 0) > 0 && (
+                        <Link
+                          href={`/sellers/${listing!.sellerId}#seller-reviews`}
+                          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary mt-1"
+                        >
+                          <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                          <span className="font-semibold text-foreground">{sidebarSellerReviewStats.avgRating.toFixed(1)}</span>
+                          <span>·</span>
+                          <span>{sidebarSellerReviewStats.reviewCount} review{sidebarSellerReviewStats.reviewCount !== 1 ? 's' : ''}</span>
+                          <span className="underline underline-offset-1">See reviews</span>
+                        </Link>
+                      )}
                     </div>
                     <Button
                       type="button"
@@ -2432,6 +2500,60 @@ export default function ListingDetailClient() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Similar listings (server) */}
+        {similarListings.length > 0 && (
+          <div className="col-span-full">
+            <Card className="border-border/60 overflow-hidden">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  More like this
+                </CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Similar active listings in the same category.</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+                  {similarListings.map((it) => (
+                    <Link
+                      key={it.id}
+                      href={it.url.startsWith('http') ? it.url : `/listing/${it.id}`}
+                      className="group rounded-xl border border-border/60 bg-card overflow-hidden hover:border-primary/40 transition-colors"
+                    >
+                      <div className="aspect-square relative bg-muted">
+                        {it.primaryImageUrl ? (
+                          <Image
+                            src={it.primaryImageUrl}
+                            alt={it.title}
+                            fill
+                            className="object-cover group-hover:scale-[1.02] transition-transform"
+                            sizes="(max-width: 640px) 50vw, 16vw"
+                            unoptimized
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <ImageIcon className="h-10 w-10 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-2.5 min-w-0">
+                        <div className="text-sm font-semibold line-clamp-2 truncate">{it.title}</div>
+                        <div className="text-xs font-semibold text-primary mt-0.5">
+                          {it.price != null ? `$${Number(it.price).toLocaleString()}` : '—'}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+                <div className="mt-3">
+                  <Button asChild variant="outline" size="sm" className="font-semibold">
+                    <Link href={similarBrowseUrl}>View all in {listing?.category?.replace(/_/g, ' ')}</Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
       </div>
 

@@ -37,6 +37,7 @@ import {
   Compass,
   Home,
   ListTodo,
+  ImageIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -89,6 +90,7 @@ const baseNavItems: SellerNavItem[] = [
   { href: '/seller/todo', label: 'To-Do', icon: ListTodo },
   { href: '/browse', label: 'Browse', icon: Compass },
   { href: '/seller/listings', label: 'My Listings', icon: Package },
+  { href: '/dashboard/uploads', label: 'Photo library', icon: ImageIcon },
   { href: '/dashboard/watchlist', label: 'Watchlist', icon: Heart },
   { href: '/dashboard/saved-searches', label: 'Saved Searches', icon: Search },
   { href: '/dashboard/notifications', label: 'Notifications', icon: Bell },
@@ -133,6 +135,7 @@ export default function DashboardLayout({
     messages: 0,
     notifications: 0,
     offers: 0,
+    sales: 0,
     todo: 0,
     adminNotifications: 0,
     supportTickets: 0,
@@ -189,12 +192,15 @@ export default function DashboardLayout({
       if (item.href === '/dashboard/bids-offers') {
         return { ...item, badge: badges.offers > 0 ? badges.offers : undefined };
       }
+      if (item.href === '/seller/sales') {
+        return { ...item, badge: badges.sales > 0 ? badges.sales : undefined };
+      }
       if (item.href === '/seller/todo') {
         return { ...item, badge: badges.todo > 0 ? badges.todo : undefined };
       }
       return item;
     });
-  }, [badges.messages, badges.notifications, badges.offers, badges.todo]);
+  }, [badges.messages, badges.notifications, badges.offers, badges.sales, badges.todo]);
 
   const adminNavWithBadges = useMemo(() => {
     return adminNavItems.map((item) => {
@@ -306,6 +312,13 @@ export default function DashboardLayout({
         })
       );
 
+      const salesTypes: NotificationType[] = ['order_created', 'order_paid'];
+      unsubs.push(
+        subscribeToUnreadCountByTypes(user.uid, salesTypes, (count) => {
+          setBadges((prev) => ({ ...prev, sales: count || 0 }));
+        })
+      );
+
       const notificationsRef = collection(db, 'users', user.uid, 'notifications');
       const notificationsQuery = query(
         notificationsRef,
@@ -331,6 +344,7 @@ export default function DashboardLayout({
         messages: 0,
         notifications: 0,
         offers: 0,
+        sales: 0,
         supportTickets: 0,
       }));
       return;

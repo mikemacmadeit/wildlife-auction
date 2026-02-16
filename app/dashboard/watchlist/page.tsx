@@ -798,8 +798,8 @@ export default function WatchlistPage() {
         <EmptyState
           icon={Heart}
           title="Your watchlist is empty"
-          description="Save listings you're interested in."
-          action={{ label: 'Browse listings', href: '/browse' }}
+          description="Save listings you're interested in to track them and get alerts."
+          action={{ label: 'Browse and add items', href: '/browse' }}
           className="py-12"
         />
       )}

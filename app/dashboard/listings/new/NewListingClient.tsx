@@ -54,6 +54,7 @@ import { LegalDocsModal } from '@/components/legal/LegalDocsModal';
 import { LEGAL_VERSIONS } from '@/lib/legal/versions';
 import { getIdToken } from '@/lib/firebase/auth-helper';
 import { ALLOWED_DURATION_DAYS, isValidDurationDays } from '@/lib/listings/duration';
+import { MARKETPLACE_FEE_PERCENT } from '@/lib/pricing/plans';
 // Seller Tiers model: no listing limits.
 
 // Helper function to format number with commas for display
@@ -2418,6 +2419,22 @@ function NewListingPageContent() {
                     </div>
                   )}
                 </div>
+
+                {(() => {
+                  const amount = formData.type === 'auction'
+                    ? Number(parseFloat(parsePriceString(formData.startingBid || '0') || '0') || 0)
+                    : Number(parseFloat(parsePriceString(formData.price || '0') || '0') || 0);
+                  if (amount <= 0) return null;
+                  const estimatedNet = amount * (1 - MARKETPLACE_FEE_PERCENT);
+                  return (
+                    <div className="rounded-lg bg-primary/10 border border-primary/20 p-3 mt-3">
+                      <div className="text-sm font-semibold text-primary">You&apos;ll get ~{formatPriceWithCommas(estimatedNet.toFixed(2))} after fees</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        Estimated from {formData.type === 'auction' ? 'starting bid' : 'list price'} ({(MARKETPLACE_FEE_PERCENT * 100).toFixed(0)}% marketplace fee).
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {formData.category === 'whitetail_breeder' && (
                   <>

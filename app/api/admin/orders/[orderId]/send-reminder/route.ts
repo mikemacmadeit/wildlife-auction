@@ -5,9 +5,9 @@
  * Uses templated messages via SendGrid.
  */
 
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
+import { requireAdmin, json } from '@/app/api/admin/_util';
 import { z } from 'zod';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
@@ -20,28 +20,14 @@ import { assertInt32 } from '@/lib/debug/int32Tripwire';
 
 const sendReminderSchema = z.object({
   role: z.enum(['buyer', 'seller']),
-  message: z.string().optional(), // Optional custom message
+  message: z.string().optional(),
 });
-
-function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
-  return new Response(JSON.stringify(body), {
-    status: init?.status ?? 200,
-    headers: {
-      'content-type': 'application/json',
-      ...(init?.headers || {}),
-    },
-  });
-}
 
 export async function POST(
   request: Request,
-  { params }: { params: { orderId: string } }
+  ctx: { params: Promise<{ orderId: string }> | { orderId: string } }
 ) {
   try {
-    const auth = getAdminAuth();
-    const db = getAdminDb() as unknown as ReturnType<typeof getFirestore>;
-
-    // Rate limiting
     const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.admin);
     const rateLimitResult = await rateLimitCheck(request as any);
     if (!rateLimitResult.allowed) {
@@ -53,21 +39,12 @@ export async function POST(
       });
     }
 
-    // Auth check
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const admin = await requireAdmin(request);
+    if (!admin.ok) return admin.response;
+    const db = admin.ctx.db as unknown as ReturnType<typeof getFirestore>;
+    const adminId = admin.ctx.actorUid;
 
-    const token = authHeader.split('Bearer ')[1];
-    let decodedToken;
-    try {
-      decodedToken = await auth.verifyIdToken(token);
-    } catch (error) {
-      return json({ error: 'Invalid token' }, { status: 401 });
-    }
-
-    const adminId = decodedToken.uid;
+    const params = typeof (ctx.params as any)?.then === 'function' ? await (ctx.params as Promise<{ orderId: string }>) : (ctx.params as { orderId: string });
     const orderId = params.orderId;
 
     // Parse and validate request body
@@ -226,7 +203,7 @@ export async function POST(
           context: 'email-dispatch',
           eventType: 'Order.Reminder',
           jobId: ev.eventId,
-          orderId: params.orderId,
+          orderId,
           role: validation.data.role,
           endpoint: '/api/admin/orders/[orderId]/send-reminder',
         });
@@ -237,7 +214,7 @@ export async function POST(
     await createAuditLog(db, {
       actorUid: adminId,
       actorRole: 'admin',
-      actionType: 'admin_note_added', // TODO: Add 'admin_reminder_sent' to AuditActionType
+      actionType: 'admin_reminder_sent',
       orderId: orderId,
       targetUserId: targetUserId,
       metadata: {

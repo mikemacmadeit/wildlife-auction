@@ -7,7 +7,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { CreditCard, Landmark, Banknote, Lock } from 'lucide-react';
+import { HelpTooltip } from '@/components/help/HelpTooltip';
+import { CreditCard, Landmark, Banknote, Lock, ShieldCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { getRecommendationCopy, getRecommendedPaymentMethod } from '@/lib/payments/recommendation';
 import { getEligiblePaymentMethods, type SupportedPaymentMethod } from '@/lib/payments/gating';
@@ -54,22 +55,30 @@ export function PaymentMethodDialog(props: {
         <DialogHeader className="shrink-0 space-y-1.5 text-left pr-10">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div className="min-w-0 flex-1">
-              <DialogTitle className="text-base sm:text-lg">Choose payment method</DialogTitle>
+              <div className="flex items-center gap-2 flex-wrap">
+                <DialogTitle className="text-base sm:text-lg">Choose payment method</DialogTitle>
+                <HelpTooltip
+                  text="Pay with card (fastest), bank account, or wire. All payments are encrypted and secured by Stripe."
+                  side="top"
+                />
+              </div>
               <DialogDescription className="text-xs mt-0.5 sm:mt-0.5">
-                Select how you&apos;d like to pay. All payments are encrypted and processed securely.
+                Select how you&apos;d like to pay. Your payment is encrypted and processed securely by Stripe.
               </DialogDescription>
             </div>
             <Badge variant="secondary" className="font-semibold shrink-0 w-fit tabular-nums text-xs">
               {amountLabel}
             </Badge>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1">
-              <Lock className="h-3 w-3 shrink-0" aria-hidden />
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[11px] sm:text-xs rounded-lg bg-muted/30 border border-border/50 px-2.5 py-1.5 w-fit">
+            <span className="inline-flex items-center gap-1.5 font-medium text-foreground/90">
+              <Lock className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
               Secure checkout
             </span>
-            <span className="hidden sm:inline">·</span>
-            <span>Secured by Stripe</span>
+            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Secured by Stripe
+            </span>
           </div>
         </DialogHeader>
 

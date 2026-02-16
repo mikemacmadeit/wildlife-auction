@@ -24,6 +24,7 @@ import { PLAN_CONFIG } from '@/lib/pricing/plans';
 import { useAuth } from '@/hooks/use-auth';
 import { createSubscription } from '@/lib/stripe/api';
 import { useToast } from '@/hooks/use-toast';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 
 export default function PricingPage() {
   const { user } = useAuth();
@@ -142,7 +143,7 @@ export default function PricingPage() {
     } catch (e: any) {
       toast({
         title: 'Could not start checkout',
-        description: e?.message || 'Please try again.',
+        description: formatUserFacingError(e, 'Please try again.'),
         variant: 'destructive',
       });
     }

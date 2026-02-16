@@ -790,7 +790,7 @@ export default function SellerOrderDetailPage() {
                     const refreshed = await getOrderById(order.id);
                     if (refreshed) setOrder(refreshed);
                   } catch (e: any) {
-                    toast({ title: 'Error', description: e?.message || 'Failed to propose delivery', variant: 'destructive' });
+                    toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to propose delivery'), variant: 'destructive' });
                   } finally {
                     setProcessing(null);
                   }

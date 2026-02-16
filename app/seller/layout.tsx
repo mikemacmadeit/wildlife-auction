@@ -37,6 +37,7 @@ import {
   Compass,
   Home,
   ListTodo,
+  ImageIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -91,6 +92,7 @@ const baseNavItems: SellerNavItem[] = [
   { href: '/seller/todo', label: 'To-Do', icon: ListTodo },
   { href: '/browse', label: 'Browse', icon: Compass },
   { href: '/seller/listings', label: 'My Listings', icon: Package },
+  { href: '/dashboard/uploads', label: 'Photo library', icon: ImageIcon },
   { href: '/dashboard/watchlist', label: 'Watchlist', icon: Heart },
   { href: '/dashboard/saved-searches', label: 'Saved Searches', icon: Search },
   { href: '/dashboard/notifications', label: 'Notifications', icon: Bell },
@@ -104,16 +106,16 @@ const baseNavItems: SellerNavItem[] = [
   { href: '/dashboard/account', label: 'Settings', icon: Settings },
 ];
 
-// Admin nav items (only visible to admins)
+// Admin nav items (only visible to admins) — order must match dashboard/layout.tsx for consistent UX
 const adminNavItems: SellerNavItem[] = [
   { href: '/dashboard/admin/users', label: 'Users', icon: Users },
+  { href: '/dashboard/admin/listings', label: 'Approve Listings', icon: CheckCircle },
+  { href: '/dashboard/admin/messages', label: 'Flagged Messages', icon: MessageSquare },
   { href: '/dashboard/admin/health', label: 'System Health', icon: HeartPulse },
   { href: '/dashboard/admin/ops', label: 'Admin Ops', icon: Shield },
   { href: '/dashboard/admin/compliance', label: 'Compliance', icon: Shield },
   { href: '/dashboard/admin/reconciliation', label: 'Reconciliation', icon: Search },
   { href: '/dashboard/admin/revenue', label: 'Revenue', icon: DollarSign },
-  { href: '/dashboard/admin/listings', label: 'Approve Listings', icon: CheckCircle },
-  { href: '/dashboard/admin/messages', label: 'Flagged Messages', icon: MessageSquare },
   { href: '/dashboard/admin/support', label: 'Support', icon: HelpCircle },
   { href: '/dashboard/admin/email-templates', label: 'Email Templates', icon: Mail },
   { href: '/dashboard/admin/notifications', label: 'Notifications', icon: Bell },

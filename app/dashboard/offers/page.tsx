@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -169,7 +170,13 @@ export default function MyOffersPage() {
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
               ) : offers.length === 0 ? (
-                <div className="py-10 text-center text-sm text-muted-foreground">{emptyCopy}</div>
+                <EmptyState
+                  icon={Handshake}
+                  title={tab === 'open' ? 'No open offers' : tab === 'countered' ? 'No countered offers' : tab === 'accepted' ? 'No accepted offers' : tab === 'declined' ? 'No declined offers' : 'No expired offers'}
+                  description="Make an offer on a listing from a listing page to see it here."
+                  action={{ label: 'Browse listings', href: '/browse' }}
+                  className="py-10"
+                />
               ) : (
                 <div className="divide-y">
                   {offers.map((o) => (

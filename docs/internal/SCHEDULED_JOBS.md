@@ -34,10 +34,8 @@
 - **Purpose:** present in repo; confirm operational behavior in production logs.
 - **Evidence:** **present in repo** (see file); production enablement is not provable from repo alone.
 
-### `autoReleaseProtected`
-- **File:** `netlify/functions/autoReleaseProtected.ts`
-- **Purpose:** optional safety net; primary payout flow is manual admin release.
-- **Evidence:** **present in repo**; release logic path exists in `lib/stripe/release-payment.ts` for `releasedBy === 'system'`.
+### ~~`autoReleaseProtected`~~ [RETIRED]
+- **Status:** Retired. Payments are direct buyer→seller (destination charges); there is no platform-held escrow or delayed payout release. The scheduled function and `opsHealth/autoReleaseProtected` doc may still exist for historical reference; System Health shows this check as "[RETIRED — informational only]" and does not treat it as a live job.
 
 ---
 

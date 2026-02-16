@@ -7,6 +7,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -1268,7 +1269,13 @@ export default function BidsOffersPage() {
 
                   <TabsContent value="bids" className="mt-0 data-[state=inactive]:hidden" forceMount>
                   {bidRows.length === 0 ? (
-                    <div className="py-10 text-center text-sm text-muted-foreground">No bids match your filters.</div>
+                    <EmptyState
+                      icon={Gavel}
+                      title="No bids yet"
+                      description="Place bids on auctions to see them here."
+                      action={{ label: 'Browse auctions', href: '/browse?type=auction' }}
+                      className="py-10"
+                    />
                   ) : (
                     <div className="space-y-3 lg:space-y-4">
                       {bidRows.map((r) => (
@@ -1466,7 +1473,13 @@ export default function BidsOffersPage() {
 
                   <TabsContent value="offers" className="mt-0 data-[state=inactive]:hidden" forceMount>
                   {offerRows.length === 0 ? (
-                    <div className="py-10 text-center text-sm text-muted-foreground">No offers match your filters.</div>
+                    <EmptyState
+                      icon={Handshake}
+                      title="No offers yet"
+                      description="Make an offer on a listing to see it here."
+                      action={{ label: 'Browse listings', href: '/browse' }}
+                      className="py-10"
+                    />
                   ) : (
                     <div className="space-y-4 sm:space-y-3">
                       {offerRows.map((r) => {
@@ -1609,7 +1622,13 @@ export default function BidsOffersPage() {
 
                   <TabsContent value="history" className="mt-0 data-[state=inactive]:hidden" forceMount>
                   {filtered.length === 0 ? (
-                    <div className="py-10 text-center text-sm text-muted-foreground">No history yet.</div>
+                    <EmptyState
+                      icon={TrendingUp}
+                      title="No history yet"
+                      description="Your bid and offer activity will appear here."
+                      action={{ label: 'Browse listings', href: '/browse' }}
+                      className="py-10"
+                    />
                   ) : (
                     <div className="space-y-3">
                       {filtered.map((r) => (

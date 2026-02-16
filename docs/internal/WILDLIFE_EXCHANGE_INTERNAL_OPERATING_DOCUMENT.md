@@ -350,9 +350,7 @@ Shared payout release gates:
 - Enforces whitetail TPWD transfer approval doc existence and updates transfer status: `lib/stripe/release-payment.ts:L148-L186`
 - Enforces policy-driven docs/admin approval for non-whitetail categories: `lib/stripe/release-payment.ts:L189-L239` and policy: `lib/compliance/policy.ts:L65-L149`
 
-Scheduled fallback auto-release (OFF by default): `netlify/functions/autoReleaseProtected.ts`
-- Disabled unless `AUTO_RELEASE_ENABLED=true`: `netlify/functions/autoReleaseProtected.ts:L43-L55` and env: `env.example:L51-L56`
-- Uses `releasePaymentForOrder` and writes health metrics: `netlify/functions/autoReleaseProtected.ts:L174-L211`, `L225-L235`
+Scheduled fallback auto-release: **RETIRED**. Payments are direct buyer→seller; no platform-held escrow or release job. System Health shows "autoReleaseProtected [RETIRED — informational only]" for historical opsHealth data only.
 
 ---
 
@@ -476,8 +474,7 @@ Admin actions that write audits include:
   - Evidence: `app/api/stripe/webhook/route.ts:L153-L200`
 - `auditLogs/{auditId}`: audit trail.  
   - Evidence: `lib/audit/logger.ts:L144-L168`
-- `opsHealth/{docId}`: operational health snapshots (auto-release).  
-  - Evidence: `netlify/functions/autoReleaseProtected.ts:L225-L235`
+- `opsHealth/{docId}`: operational health snapshots (e.g. stripeWebhook, aggregateRevenue, finalizeAuctions; autoReleaseProtected doc is historical/retired).
 
 ### 9.2 Least-privilege enforcement (rules)
 - Orders cannot be client-created; clients must use API/webhooks.  
@@ -531,7 +528,7 @@ The likelihood/impact ratings below are internal assessments; mitigations are ti
 - Compliance doc upload + admin verification + audit logs: listing docs `app/api/listings/[id]/documents/upload/route.ts:L66-L107`, admin verify `app/api/admin/listings/[id]/documents/verify/route.ts:L75-L110`; order docs `app/api/orders/[orderId]/documents/upload/route.ts:L62-L100`, admin verify `app/api/admin/orders/[orderId]/documents/verify/route.ts:L132-L163`
 
 ### 11.2 Partially implemented / operationally dependent
-- Auto-release scheduled function exists but is OFF by default: `netlify/functions/autoReleaseProtected.ts:L43-L55`, `env.example:L51-L56`
+- Auto-release scheduled function: **RETIRED**. Direct buyer→seller payments; no platform release job.
 - Seller “verified” concept exists in snapshots and affects publish gating, but the process for verifying sellers is **UNKNOWN** without a documented SOP.  
   - Evidence of usage: publish gating uses `sellerVerified`: `app/api/listings/publish/route.ts:L441-L488`
 

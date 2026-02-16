@@ -59,7 +59,8 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
           </div>
           <CardTitle className="text-2xl">Something went wrong</CardTitle>
           <CardDescription className="mt-2">
-            We ran into an unexpected problem. Try again, or go back and try a different action. If the problem keeps happening, please contact support.
+            We ran into an unexpected problem. Try again, or go back and try a different action. If the problem keeps happening,{' '}
+            <Link href="/dashboard/support" className="underline underline-offset-2 text-foreground hover:no-underline">contact support</Link>.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

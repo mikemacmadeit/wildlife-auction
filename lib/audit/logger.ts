@@ -113,6 +113,10 @@ export type AuditActionType =
   | 'admin_order_document_rejected'
   // Admin: order notes and review
   | 'admin_note_added'
+  | 'admin_reminder_sent'
+  | 'admin_reminders_run'
+  | 'compliance_reminder_sent'
+  | 'compliance_transfer_confirmed'
   | 'order_reviewed'
   | 'review_moderated'
   // Seller: breeder permit submission + admin review (seller-level compliance)

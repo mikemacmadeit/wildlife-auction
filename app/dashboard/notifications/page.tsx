@@ -17,6 +17,9 @@ import { useRouter } from 'next/navigation';
 import { collection, doc, onSnapshot, orderBy, query, limit, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
 import { Button } from '@/components/ui/button';
@@ -321,9 +324,11 @@ function styleForNotification(n: UserNotification): {
 export default function NotificationsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [filter, setFilter] = useState<UiFilter>('all');
   const [items, setItems] = useState<UserNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const autoMarkedReadRef = useRef(false);
   const syncStaleCalledRef = useRef(false);
@@ -338,6 +343,7 @@ export default function NotificationsPage() {
     }
 
     setLoading(true);
+    setLoadError(null);
     const ref = collection(db, 'users', user.uid, 'notifications');
     const q = query(ref, orderBy('createdAt', 'desc'), limit(100));
     const unsub = onSnapshot(
@@ -347,6 +353,7 @@ export default function NotificationsPage() {
         setItems(next);
         setLastSyncedAt(new Date());
         setLoading(false);
+        setLoadError(null);
 
         // UX: once user is on the notifications page, mark non–action-required unread as read (one-time per visit).
         // Do NOT mark action-required types — they stay until user completes the action or dismisses.
@@ -372,13 +379,16 @@ export default function NotificationsPage() {
           }
         }
       },
-      () => {
+      (err: any) => {
+        const msg = formatUserFacingError(err, 'Failed to load notifications');
+        setLoadError(msg);
         setItems([]);
         setLoading(false);
+        toast({ title: 'Could not load notifications', description: msg, variant: 'destructive' });
       }
     );
     return () => unsub();
-  }, [user?.uid, authLoading]);
+  }, [user?.uid, authLoading, toast]);
 
   // Sync stale action-required notifications (mark completed when order/offer/listing is already past that step).
   // Run on mount and when user returns to the tab so "Pay now" etc. clear after they complete the action elsewhere.
@@ -593,6 +603,12 @@ export default function NotificationsPage() {
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6 max-md:pb-[max(5rem,calc(env(safe-area-inset-bottom)+4rem))]">
       <div className="container mx-auto px-3 py-4 sm:px-4 md:py-8 max-w-7xl space-y-4 md:space-y-8">
+        {loadError && (
+          <Alert variant="destructive" className="rounded-xl">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{loadError}</AlertDescription>
+          </Alert>
+        )}
       <Card className="border border-border/60 overflow-hidden shadow-warm">
         <CardContent className="p-4 md:p-6">
           <div className="flex flex-col gap-4">

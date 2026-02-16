@@ -36,7 +36,8 @@ import {
   MessageSquare,
   PhoneCall,
   ListChecks,
-  ExternalLink
+  ExternalLink,
+  ImageIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
@@ -94,11 +95,16 @@ export default function AccountPage() {
   const [pwNext, setPwNext] = useState('');
   const [pwConfirm, setPwConfirm] = useState('');
   const [pwSaving, setPwSaving] = useState(false);
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<{
+    totalListings: number;
+    activeSales: number;
+    totalRevenue: number;
+    responseRate: number | null;
+  }>({
     totalListings: 0,
     activeSales: 0,
     totalRevenue: 0,
-    responseRate: 0,
+    responseRate: null,
   });
 
   // Initialize form data from user profile
@@ -188,14 +194,14 @@ export default function AccountPage() {
             totalListings: listings.length,
             activeSales,
             totalRevenue,
-            responseRate: 0, // TODO: Calculate from message response times
+            responseRate: null as number | null, // Future: compute from message response times
           });
         }
       } catch (err) {
         console.error('Error fetching user data:', err);
         toast({
           title: 'Error loading profile',
-          description: err instanceof Error ? err.message : 'Failed to load your profile data.',
+          description: formatUserFacingError(err, 'Failed to load your profile data.'),
           variant: 'destructive',
         });
       } finally {
@@ -553,7 +559,7 @@ export default function AccountPage() {
     { label: 'Total Listings', value: stats.totalListings.toString(), icon: Package, color: 'text-primary' },
     { label: 'Active Sales', value: stats.activeSales.toString(), icon: TrendingUp, color: 'text-primary' },
     { label: 'Total Revenue', value: `$${stats.totalRevenue.toLocaleString()}`, icon: Award, color: 'text-primary' },
-    { label: 'Response Rate', value: `${stats.responseRate}%`, icon: CheckCircle2, color: 'text-primary' },
+    { label: 'Response Rate', value: stats.responseRate != null ? `${stats.responseRate}%` : '—', icon: CheckCircle2, color: 'text-primary' },
   ];
 
   // Loading state
@@ -772,6 +778,25 @@ export default function AccountPage() {
                     )}
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Listings & media — Photo library */}
+            <Card className="border-2 border-border/50 bg-card">
+              <CardContent className="pt-6 pb-6 px-6">
+                <Link
+                  href="/dashboard/uploads"
+                  className="flex items-center gap-4 rounded-lg p-3 -m-3 hover:bg-muted/50 transition-colors group"
+                >
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <ImageIcon className="h-6 w-6" />
+                  </div>
+                  <div className="min-w-0 flex-1 text-left">
+                    <p className="font-semibold text-foreground group-hover:text-primary">Photo library</p>
+                    <p className="text-sm text-muted-foreground">Upload once, reuse across listings.</p>
+                  </div>
+                  <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
+                </Link>
               </CardContent>
             </Card>
 

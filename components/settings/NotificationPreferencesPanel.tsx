@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
-import { Loader2, Bell, Mail, Smartphone, ShieldCheck } from 'lucide-react';
+import { Loader2, Bell, Mail, Smartphone, ShieldCheck, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Format hour (0-23) to user-friendly time (e.g., "9:00 PM")
@@ -306,6 +306,20 @@ export function NotificationPreferencesPanel(props: { embedded?: boolean }) {
                         setPrefs((p) => ({ ...p, channels: { ...p.channels, push: false } }));
                       }
                     }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/40 p-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-semibold">Text (SMS)</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Order and delivery updates via text. Add a phone number in Profile to receive SMS.</div>
+                  </div>
+                  <Switch
+                    checked={prefs.channels.sms}
+                    onCheckedChange={(v) => setPrefs((p) => ({ ...p, channels: { ...p.channels, sms: v } }))}
                   />
                 </div>
 

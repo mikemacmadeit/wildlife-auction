@@ -71,6 +71,9 @@ export class ProductionErrorBoundary extends React.Component<Props, State> {
             <p className="text-sm text-muted-foreground">
               This section couldn't load properly. Try refreshing the page.
             </p>
+            <p className="text-xs text-muted-foreground">
+              If it keeps happening, <a href="/dashboard/support" className="underline underline-offset-2 hover:text-foreground">contact support</a>.
+            </p>
             <Button
               variant="outline" 
               size="sm"

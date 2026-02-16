@@ -28,6 +28,7 @@ import { getSellerReputation } from '@/lib/users/getSellerReputation';
 import type { UserProfile } from '@/lib/types';
 import { BreederPermitCard } from '@/components/seller/BreederPermitCard';
 import { getSellerStats } from '@/lib/firebase/sellerStats';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 
 export default function SellerReputationPage() {
   const { user } = useAuth();
@@ -99,7 +100,7 @@ export default function SellerReputationPage() {
         setReviews(Array.isArray(data.reviews) ? data.reviews : []);
       })
       .catch((e: any) => {
-        if (!cancelled) setReviewsError(e?.message || 'Failed to load reviews');
+        if (!cancelled) setReviewsError(formatUserFacingError(e, 'Failed to load reviews'));
       })
       .finally(() => {
         if (!cancelled) setReviewsLoading(false);

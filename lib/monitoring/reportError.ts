@@ -1,26 +1,19 @@
 /**
  * Error reporting utility
- * 
- * Centralized error reporting for future integration with monitoring services
- * (e.g., Sentry, LogRocket, etc.)
- * 
+ *
+ * Centralized error reporting. Wired to Sentry (client and server) when
+ * SENTRY_DSN / NEXT_PUBLIC_SENTRY_DSN is set.
+ *
  * Safe to use in both server and client contexts.
  */
 
-interface ErrorReport {
-  error: Error;
-  context?: Record<string, unknown>;
-  severity?: 'low' | 'medium' | 'high' | 'critical';
-}
+import { captureException, captureMessage } from '@/lib/monitoring/capture';
 
 /**
  * Report an error to monitoring services
- * 
- * Currently logs to console. In production, this should integrate with:
- * - Sentry (recommended for Next.js)
- * - LogRocket
- * - Custom error tracking service
- * 
+ *
+ * Logs to console and sends to Sentry when configured (server and client).
+ *
  * @param error - The error object to report
  * @param context - Additional context about the error
  * @param severity - Error severity level
@@ -30,12 +23,10 @@ export function reportError(
   context?: Record<string, unknown>,
   severity: 'low' | 'medium' | 'high' | 'critical' = 'medium'
 ): void {
-  // Normalize error to Error object
-  const errorObj = error instanceof Error 
-    ? error 
+  const errorObj = error instanceof Error
+    ? error
     : new Error(String(error));
 
-  // Log to console (always, for development)
   console.error('[Error Report]', {
     message: errorObj.message,
     stack: errorObj.stack,
@@ -44,20 +35,7 @@ export function reportError(
     timestamp: new Date().toISOString(),
   });
 
-  // Sentry integration available in lib/monitoring/sentry.ts
-  // Import and use reportError from that file when Sentry is installed
-  // if (typeof window !== 'undefined' && window.Sentry) {
-  //   window.Sentry.captureException(errorObj, {
-  //     level: severity === 'critical' ? 'error' : 'warning',
-  //     contexts: { custom: context },
-  //   });
-  // }
-
-  // TODO: Integrate with server-side monitoring
-  // In server context, you might want to send to a logging service
-  // if (typeof window === 'undefined') {
-  //   // Server-side logging
-  // }
+  captureException(errorObj, context as Record<string, any>);
 }
 
 /**
@@ -73,5 +51,5 @@ export function reportWarning(
     timestamp: new Date().toISOString(),
   });
 
-  // TODO: Integrate with monitoring service for warnings
+  captureMessage(message, 'warning', context as Record<string, any>);
 }

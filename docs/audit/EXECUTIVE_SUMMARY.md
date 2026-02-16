@@ -15,8 +15,7 @@ Scope: `project/` (Next.js App Router + Netlify Functions + Firebase + Stripe + 
   Evidence: `project/app/api/offers/*`, `project/netlify/functions/expireOffers.ts`.
 - **Checkout session creation** for fixed/auction, with Best Offer metadata support and payout-hold flow (no destination charge).
   Evidence: `project/app/api/stripe/checkout/create-session/route.ts`.
-- **Auto-release cron** exists for protected transactions and uses shared payout release logic.  
-  Evidence: `project/netlify/functions/autoReleaseProtected.ts`, `project/lib/stripe/release-payment.ts`.
+- **Auto-release cron:** RETIRED. Payments are direct buyer→seller; no platform-held escrow or release job. Release logic remains in `project/lib/stripe/release-payment.ts` for admin/manual cases.
 - **Newsletter (Brevo)** subscription endpoint exists and is wired to Brevo contacts + list.  
   Evidence: `project/app/api/marketing/newsletter/subscribe/route.ts`, `project/components/marketing/EmailCapturePopup.tsx`.
 

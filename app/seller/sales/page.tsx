@@ -597,7 +597,7 @@ export default function SellerSalesPage() {
 
                             <div className="shrink-0 flex flex-col sm:items-end gap-2 w-full sm:w-auto">
                               <div className="text-left sm:text-right">
-                                <div className="text-xs sm:text-sm text-muted-foreground">Net proceeds</div>
+                                <div className="text-xs sm:text-sm text-muted-foreground">You received</div>
                                 <div className="text-base sm:text-lg font-extrabold tracking-tight">{formatMoney(net)}</div>
                               </div>
                               <Button asChild size="default" variant="outline" className="font-semibold w-full sm:w-auto min-h-10 border-primary text-primary hover:bg-primary/10">
@@ -643,7 +643,7 @@ export default function SellerSalesPage() {
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                                         <div>
                                           <div className="text-2xl md:text-3xl font-extrabold tracking-tight">{formatMoney(net)}</div>
-                                          <div className="text-sm text-muted-foreground mt-1">Net proceeds</div>
+                                          <div className="text-sm text-muted-foreground mt-1">You received</div>
                                         </div>
                                         <div className="text-sm text-muted-foreground md:pt-1">
                                           Seller receives funds immediately upon successful payment via Stripe Connect destination charges. No payout release needed.

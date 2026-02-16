@@ -276,11 +276,26 @@ export function EnhancedSellerProfile({
             
             {/* Star rating + review count, location + reputation */}
             <div className="flex items-center gap-3 flex-wrap">
-              <StarRatingReviewCount
-                avgRating={reviewStats?.avgRating ?? 0}
-                reviewCount={reviewStats?.reviewCount ?? 0}
-                size="sm"
-              />
+              {reviewStats && (reviewStats.reviewCount ?? 0) > 0 ? (
+                <Link
+                  href={`${sellerProfileHref}#seller-reviews`}
+                  className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors"
+                  aria-label="See seller reviews"
+                >
+                  <StarRatingReviewCount
+                    avgRating={reviewStats.avgRating}
+                    reviewCount={reviewStats.reviewCount}
+                    size="sm"
+                  />
+                  <span className="text-xs font-medium underline underline-offset-2">See reviews</span>
+                </Link>
+              ) : (
+                <StarRatingReviewCount
+                  avgRating={reviewStats?.avgRating ?? 0}
+                  reviewCount={reviewStats?.reviewCount ?? 0}
+                  size="sm"
+                />
+              )}
               {publicTxCount !== null && (
                 <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                   <TrendingUp className="h-3 w-3" />

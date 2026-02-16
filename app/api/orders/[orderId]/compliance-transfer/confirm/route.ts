@@ -150,7 +150,7 @@ export async function POST(
     await createAuditLog(db, {
       actorUid: userId,
       actorRole: role === 'buyer' ? 'buyer' : 'seller',
-      actionType: 'admin_note_added', // TODO: Add 'compliance_transfer_confirmed' to AuditActionType
+      actionType: 'compliance_transfer_confirmed',
       orderId: params.orderId,
       metadata: {
         role,

@@ -184,9 +184,9 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     if (error?.message?.includes('DELIVERY_TOKEN_SECRET')) {
-      return json({ error: 'Server misconfigured', details: error.message }, { status: 503 });
+      return json({ error: 'Server misconfigured' }, { status: 503 });
     }
     console.error('[create-session]', error);
-    return json({ error: 'Failed to create session', message: error?.message }, { status: 500 });
+    return json({ error: 'Failed to create session' }, { status: 500 });
   }
 }

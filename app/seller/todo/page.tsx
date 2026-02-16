@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
@@ -29,7 +30,9 @@ import {
   ListTodo,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
 import { listSellerListings } from '@/lib/firebase/listings';
 import { getOrdersForUser, filterSellerRelevantOrders } from '@/lib/firebase/orders';
 import { getUserProfile } from '@/lib/firebase/users';
@@ -137,6 +140,8 @@ export default function SellerTodoPage() {
   const [selectedEvent, setSelectedEvent] = useState<KeyDateEvent | null>(null);
   const [dayModalOpen, setDayModalOpen] = useState(false);
   const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const actionItems = useMemo(
     () => filterActionItems(notifications, 20),
@@ -168,6 +173,7 @@ export default function SellerTodoPage() {
       return;
     }
     setLoading(true);
+    setLoadError(null);
     Promise.all([
       listSellerListings(user.uid),
       getOrdersForUser(user.uid, 'seller'),
@@ -189,8 +195,13 @@ export default function SellerTodoPage() {
             : null
         );
       })
-      .catch(() => {
-        if (!cancelled) setDashboardData(null);
+      .catch((err: any) => {
+        if (!cancelled) {
+          const msg = formatUserFacingError(err, 'Failed to load To-Do data');
+          setLoadError(msg);
+          toast({ title: 'Could not load To-Do', description: msg, variant: 'destructive' });
+          setDashboardData(null);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -267,6 +278,13 @@ export default function SellerTodoPage() {
             Tasks and key dates in one place. Do what’s next, then plan ahead.
           </p>
         </div>
+
+        {loadError && (
+          <Alert variant="destructive" className="rounded-xl">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{loadError}</AlertDescription>
+          </Alert>
+        )}
 
         {/* Do next — actionable tasks from notifications */}
         <Card className="rounded-xl border border-border/50 bg-card overflow-hidden min-w-0">

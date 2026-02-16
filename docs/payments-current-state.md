@@ -98,8 +98,7 @@ Buyer → (Listing page “Buy Now” / “Pay Now”) → `createCheckoutSessio
   - File: `project/app/api/stripe/webhook/route.ts`
 - **Manual release (admin-only)**: `POST /api/stripe/transfers/release`
   - File: `project/app/api/stripe/transfers/release/route.ts`
-- **Auto-release job (Netlify scheduled function)**: `netlify/functions/autoReleaseProtected.ts`
-  - Calls shared release logic in `project/lib/stripe/release-payment.ts`
+- **Auto-release job:** RETIRED. Payments are direct buyer→seller; no platform release. (Historical: `autoReleaseProtected` was removed; health check is informational only.)
 - **Refund processing (admin-only)**: `POST /api/stripe/refunds/process`
   - File: `project/app/api/stripe/refunds/process/route.ts`
 
@@ -264,10 +263,7 @@ Evidence (Transfer creation to connected account):
 
 - **Buyer accept** sets status to `ready_to_release` for protected transactions (buyer confirmation step):
   - File: `project/app/api/orders/[orderId]/accept/route.ts` (sets `status = 'ready_to_release'` under conditions).
-- **Time-based auto-release**:
-  - If protected transaction: after `protectionEndsAt <= now` AND `deliveryConfirmedAt` exists.
-  - Otherwise: after `disputeDeadlineAt <= now` and status is eligible.
-  - File: `project/netlify/functions/autoReleaseProtected.ts`
+- **Time-based auto-release:** RETIRED. Current model is direct buyer→seller; no platform-held funds or release job.
 
 ## E) Webhooks
 

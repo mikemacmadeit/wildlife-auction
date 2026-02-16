@@ -29,7 +29,7 @@
 
 | Item | What to do |
 |------|------------|
-| **Obsolete health check** | The System Health page still has a check for “Scheduled job: autoReleaseProtected,” which was removed (Stripe escrow removal). It will always show FAIL or very stale. **Fix:** Remove or retire this check so the dashboard doesn’t show a permanent failure. |
+| **Obsolete health check** | **FIXED.** System Health now shows "autoReleaseProtected [RETIRED — informational only]" with a "Retired" badge; it is not treated as a live check and does not show FAIL. (Previously: The System Health page still had a check for “Scheduled job: autoReleaseProtected,” which was removed (Stripe escrow removal). It will always show FAIL or very stale. **Fix:** Remove or retire this check so the dashboard doesn’t show a permanent failure. |
 | **Production env** | In Netlify, set and verify: Firebase (client + service account or `FIREBASE_SERVICE_ACCOUNT_JSON_BASE64`), Stripe (secret, publishable, webhook secret), Upstash Redis (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`), Sentry (`SENTRY_DSN` and optionally `NEXT_PUBLIC_SENTRY_DSN`), email (Brevo or Resend). Use **live** Stripe keys and webhook URL in production. |
 | **Stripe webhook** | In Stripe Dashboard, ensure the production webhook endpoint points to your live URL and includes all events you handle (e.g. `checkout.session.completed`, `charge.dispute.*`, etc.). |
 | **Security checklist** | Run through `SECURITY_AUDIT_CHECKLIST.md` and tick off each item (auth, API, Firestore, payments, secrets). |

@@ -122,7 +122,7 @@ const ListingRowActions = memo(function ListingRowActions({
           className="flex items-center gap-2 font-semibold"
         >
           <Copy className="h-4 w-4" />
-          Duplicate
+          Sell another like this
         </DropdownMenuItem>
 
         {status === 'draft' && (

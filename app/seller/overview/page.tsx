@@ -32,6 +32,7 @@ import {
   Gavel,
   CreditCard,
   ShieldAlert,
+  Lightbulb,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatUserFacingError } from '@/lib/format-user-facing-error';
@@ -49,6 +50,7 @@ import { useToast } from '@/hooks/use-toast';
 import { resendVerificationEmail } from '@/lib/firebase/auth';
 import { createStripeAccount, createAccountLink } from '@/lib/stripe/api';
 import type { SellerDashboardData } from '@/lib/seller/getSellerDashboardData';
+import { getSellerInsights } from '@/lib/seller/getSellerInsights';
 import { NotificationSettingsDialog } from '@/components/settings/NotificationSettingsDialog';
 import { BusinessOverviewChart } from '@/components/seller/BusinessOverviewChart';
 import { useDashboardBadges } from '@/contexts/DashboardBadgesContext';
@@ -375,13 +377,18 @@ export default function SellerOverviewPage() {
         const res = await fetch('/api/seller/dashboard', { headers: { authorization: `Bearer ${token}` } });
         const json = await res.json().catch(() => null);
         if (!res.ok) {
-          // Non-fatal: overview remains usable.
-          if (!cancelled) setDashboardData(null);
+          if (!cancelled) {
+            setDashboardData(null);
+            toast({ title: 'Overview data unavailable', description: json?.error || 'Could not load dashboard data. You can still use the page.', variant: 'destructive' });
+          }
           return;
         }
         if (!cancelled) setDashboardData((json?.data || null) as any);
-      } catch {
-        if (!cancelled) setDashboardData(null);
+      } catch (err: any) {
+        if (!cancelled) {
+          setDashboardData(null);
+          toast({ title: 'Overview data unavailable', description: formatUserFacingError(err, 'Could not load dashboard data.'), variant: 'destructive' });
+        }
       } finally {
         if (!cancelled) setDashboardLoading(false);
       }
@@ -390,7 +397,7 @@ export default function SellerOverviewPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, user]);
+  }, [authLoading, user, toast]);
 
   const sellerQueues = useMemo(() => {
     const pendingReviewListings = listings.filter(
@@ -1002,7 +1009,7 @@ export default function SellerOverviewPage() {
 
     return {
       completionRate,
-      responseTime: '< 2 hours', // TODO: Calculate from actual response times
+      responseTime: 'Target: < 2 hours', // Display target; future: compute from message response times
       verifiedAnimals: verifiedCount,
     };
   }, [listings]);
@@ -1531,6 +1538,38 @@ export default function SellerOverviewPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Seller tips (rule-based insights) */}
+        {dashboardData && (() => {
+          const tips = getSellerInsights(dashboardData);
+          if (tips.length === 0) return null;
+          return (
+            <Card className="rounded-xl border border-border/50 bg-card overflow-hidden">
+              <CardHeader className="pb-2 px-3 sm:px-6">
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <Lightbulb className="h-5 w-5 text-primary" />
+                  Seller tips
+                </CardTitle>
+                <CardDescription className="text-sm">Quick improvements for your listings and offers.</CardDescription>
+              </CardHeader>
+              <CardContent className="px-3 sm:px-6 pb-4">
+                <ul className="space-y-3">
+                  {tips.slice(0, 5).map((tip) => (
+                    <li key={tip.id} className={cn('rounded-lg border p-3', tip.severity === 'warning' ? 'border-amber-500/40 bg-amber-500/5' : 'border-border/60 bg-muted/20')}>
+                      <div className="font-semibold text-sm text-foreground">{tip.title}</div>
+                      <p className="text-xs text-muted-foreground mt-1">{tip.description}</p>
+                      {tip.actionUrl && (
+                        <Button asChild variant="outline" size="sm" className="mt-2 font-semibold">
+                          <Link href={tip.actionUrl}>{tip.actionLabel ?? 'View'}</Link>
+                        </Button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* Business overview: what you sell and what you buy */}
         <Card className="rounded-xl border border-border/50 bg-card overflow-hidden" data-tour="seller-business-overview">

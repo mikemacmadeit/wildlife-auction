@@ -6,8 +6,8 @@
  */
 
 import { getFirestore } from 'firebase-admin/firestore';
-import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
+import { requireAdmin, json } from '@/app/api/admin/_util';
 import { z } from 'zod';
 import { isRegulatedWhitetailDeal, hasComplianceConfirmations } from '@/lib/compliance/whitetail';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
@@ -19,25 +19,11 @@ const remindSchema = z.object({
   target: z.enum(['buyer', 'seller']),
 });
 
-function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
-  return new Response(JSON.stringify(body), {
-    status: init?.status ?? 200,
-    headers: {
-      'content-type': 'application/json',
-      ...(init?.headers || {}),
-    },
-  });
-}
-
 export async function POST(
   request: Request,
-  { params }: { params: { orderId: string } }
+  ctx: { params: Promise<{ orderId: string }> | { orderId: string } }
 ) {
   try {
-    const auth = getAdminAuth();
-    const db = getAdminDb() as unknown as ReturnType<typeof getFirestore>;
-
-    // Rate limiting
     const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.admin);
     const rateLimitResult = await rateLimitCheck(request as any);
     if (!rateLimitResult.allowed) {
@@ -49,28 +35,15 @@ export async function POST(
       });
     }
 
-    // Get auth token
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const admin = await requireAdmin(request);
+    if (!admin.ok) return admin.response;
+    const { ctx: adminCtx } = admin;
+    const db = adminCtx.db as unknown as ReturnType<typeof getFirestore>;
+    const actorUid = adminCtx.actorUid;
 
-    const token = authHeader.substring(7);
-    let decodedToken;
-    try {
-      decodedToken = await auth.verifyIdToken(token);
-    } catch (error: any) {
-      return json({ error: 'Invalid token' }, { status: 401 });
-    }
+    const params = typeof (ctx.params as any)?.then === 'function' ? await (ctx.params as Promise<{ orderId: string }>) : (ctx.params as { orderId: string });
+    const orderId = params.orderId;
 
-    // Verify admin
-    const userDoc = await db.collection('users').doc(decodedToken.uid).get();
-    const userData = userDoc.data();
-    if (!userData?.isAdmin && !userData?.admin) {
-      return json({ error: 'Admin access required' }, { status: 403 });
-    }
-
-    // Parse request body
     const body = await request.json().catch(() => ({}));
     const parsed = remindSchema.safeParse(body);
     if (!parsed.success) {
@@ -79,8 +52,7 @@ export async function POST(
 
     const { target } = parsed.data;
 
-    // Get order
-    const orderRef = db.collection('orders').doc(params.orderId);
+    const orderRef = db.collection('orders').doc(orderId);
     const orderSnap = await orderRef.get();
     if (!orderSnap.exists) {
       return json({ error: 'Order not found' }, { status: 404 });
@@ -101,9 +73,9 @@ export async function POST(
 
     // Determine target user
     const targetUserId = target === 'buyer' ? orderData.buyerId : orderData.sellerId;
-    const orderUrl = target === 'buyer' 
-      ? `${getSiteUrl()}/dashboard/orders/${params.orderId}`
-      : `${getSiteUrl()}/seller/orders/${params.orderId}`;
+    const orderUrl = target === 'buyer'
+      ? `${getSiteUrl()}/dashboard/orders/${orderId}`
+      : `${getSiteUrl()}/seller/orders/${orderId}`;
 
     // Check current confirmations
     const confirmations = hasComplianceConfirmations(orderData);
@@ -114,14 +86,14 @@ export async function POST(
 
     // Emit reminder notification
     await emitAndProcessEventForUser({
-      type: 'Order.TransferComplianceRequired', // Reuse the required event for reminders
-      actorId: decodedToken.uid,
+      type: 'Order.TransferComplianceRequired',
+      actorId: actorUid,
       entityType: 'order',
-      entityId: params.orderId,
+      entityId: orderId,
       targetUserId: targetUserId,
       payload: {
         type: 'Order.TransferComplianceRequired',
-        orderId: params.orderId,
+        orderId,
         listingId: orderData.listingId,
         listingTitle: orderData.listingTitle || orderData.listingSnapshot?.title || 'Listing',
         orderUrl,
@@ -130,10 +102,10 @@ export async function POST(
 
     // Log audit
     await createAuditLog(db, {
-      actorUid: decodedToken.uid,
+      actorUid,
       actorRole: 'admin',
-      actionType: 'admin_note_added', // TODO: Add 'compliance_reminder_sent' to AuditActionType
-      orderId: params.orderId,
+      actionType: 'compliance_reminder_sent',
+      orderId,
       targetUserId: targetUserId,
       metadata: {
         target,

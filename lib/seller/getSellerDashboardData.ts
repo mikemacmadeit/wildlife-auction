@@ -16,6 +16,8 @@ export interface SellerDashboardListing {
   updatedAt?: string | null;
   bidCount: number;
   watcherCount: number;
+  /** Number of photos/images (for tips: "Add a photo") */
+  imageCount?: number;
 }
 
 export interface SellerDashboardOrder {
@@ -137,6 +139,8 @@ export async function getSellerDashboardData(params: {
         ? data.watcherCount
         : Number(data?.metrics?.favorites || 0) || 0;
     const bidCount = Number(data?.metrics?.bidCount || 0) || 0;
+    const images = Array.isArray(data.images) ? data.images : Array.isArray(data.photos) ? data.photos : [];
+    const imageCount = images.length;
     return {
       id: d.id,
       title: String(data.title || ''),
@@ -153,6 +157,7 @@ export async function getSellerDashboardData(params: {
       updatedAt: toIso(data.updatedAt),
       bidCount,
       watcherCount,
+      imageCount,
     };
   });
 

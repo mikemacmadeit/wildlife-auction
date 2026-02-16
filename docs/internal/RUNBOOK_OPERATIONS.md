@@ -89,3 +89,15 @@ If a critical incident requires pausing payouts and/or checkout:
 
 **External comms rules:** **FOUNDER POLICY REQUIRED** (see `docs/internal/FOUNDER_INPUTS.md`).
 
+---
+
+## 9) Firestore backup strategy
+
+**Documented in:** `docs/runbooks/firestore-backups.md`.
+
+- **RPO:** 24 hours (daily exports).
+- **RTO:** 4–8 hours (full restore); 1–2 hours for collection-level restore.
+- **Automation:** Daily scheduled exports to GCS (env-scoped: dev/staging/prod); optional GitHub Actions workflow; verify script checks age and `_SUCCESS` marker.
+- **Restore:** Never restore directly to prod; use isolated test project and follow `docs/RESTORE_DRILL_FIRESTORE.md` for drills.
+- **Scripts:** `scripts/backup-firestore.sh`, `scripts/verify-firestore-backup.sh`. See `FIRESTORE_BACKUP_IMPLEMENTATION_SUMMARY.md` for setup.
+
