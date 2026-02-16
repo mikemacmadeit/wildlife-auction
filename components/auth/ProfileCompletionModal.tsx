@@ -692,6 +692,22 @@ export function ProfileCompletionModal({
               <p className="text-sm text-destructive font-medium">{errors.location}</p>
             )}
 
+            {/* Always show manual entry so users can complete profile if address search is blocked (e.g. RefererNotAllowedMapError) */}
+            {isMapsAvailable === true && !useManualLocation && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="font-medium"
+                  onClick={() => setUseManualLocation(true)}
+                >
+                  Enter address manually
+                </Button>
+                <span className="text-xs text-muted-foreground">or search below</span>
+              </div>
+            )}
+
             {isMapsAvailable === true && !useManualLocation && !primaryPlace && (
               <div className="space-y-2">
                 <AddressSearch
