@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { signUp, signInWithGoogle, getGoogleRedirectResult } from '@/lib/firebase/auth';
+import { signUp, signInWithGoogleRedirectOnly, getGoogleRedirectResult } from '@/lib/firebase/auth';
 import { getRegisterErrorMessage, getGoogleSignInErrorMessage } from '@/lib/firebase/auth-error-messages';
 import { createUserDocument, getUserProfile } from '@/lib/firebase/users';
 import { saveAddress, setCheckoutDeliveryAddress } from '@/lib/firebase/addresses';
@@ -292,61 +292,12 @@ export default function RegisterPage() {
 
   const handleGoogleSignUp = async () => {
     setIsLoading(true);
-
     try {
-      // No terms check here - allow Google sign up to proceed
-      // Terms acceptance will be required after sign up completes
-      const userCredential = await signInWithGoogle();
-
-      // Create user document in Firestore if it doesn't exist
-      if (userCredential.user) {
-        await createUserDocument(userCredential.user);
-
-        // Check if user has accepted terms by checking their profile
-        try {
-          const profile = await getUserProfile(userCredential.user.uid);
-          const requiredVersion = LEGAL_VERSIONS.tos.version;
-          const hasAcceptedTerms = profile?.legal?.tos?.version === requiredVersion;
-
-          if (!hasAcceptedTerms) {
-            // User hasn't accepted terms - redirect to acceptance page (same as email sign-up)
-            const nextUrl = getRedirectPath();
-            toast({
-              title: 'Account created',
-              description: 'Please accept the terms to continue.',
-            });
-            router.push(`/legal/accept?next=${encodeURIComponent(nextUrl)}`);
-            setIsLoading(false);
-            return;
-          }
-
-          // User has accepted terms - proceed normally
-          toast({
-            title: 'Welcome to Agchange!',
-            description: 'Your account has been created successfully.',
-          });
-
-          // Redirect to saved path or dashboard after successful registration
-          router.push(getRedirectPath());
-        } catch (error) {
-          console.error('Error checking user profile after Google sign up:', error);
-          // If we can't check profile, redirect to terms acceptance to be safe (same as email)
-          const nextUrl = getRedirectPath();
-          toast({
-            title: 'Account created',
-            description: 'Please accept the terms to continue.',
-          });
-          router.push(`/legal/accept?next=${encodeURIComponent(nextUrl)}`);
-        }
-      }
+      // Redirect-only avoids COOP blocking window.closed/window.close; result handled by getGoogleRedirectResult() on return
+      await signInWithGoogleRedirectOnly();
+      // Page navigates away to Google; success is handled in useEffect via getGoogleRedirectResult()
     } catch (error: any) {
-      // Don't show error if redirect was initiated (page will reload)
-      if (error.message === 'REDIRECT_INITIATED') {
-        return; // Page will reload after redirect
-      }
-
       const errorMessage = getGoogleSignInErrorMessage(error?.code);
-
       toast({
         title: 'Google sign-up failed',
         description: errorMessage,

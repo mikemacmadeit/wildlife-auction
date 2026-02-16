@@ -286,6 +286,28 @@ function withCenteredPopup<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /**
+ * Sign in with Google using redirect only (no popup).
+ * Use this on /login and /register to avoid COOP blocking window.closed/window.close.
+ * After redirect, handle the result with getGoogleRedirectResult() on page load.
+ */
+export const signInWithGoogleRedirectOnly = async (): Promise<void> => {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({
+    prompt: 'select_account',
+  });
+  if (typeof window !== 'undefined') {
+    const currentUrl = window.location.href;
+    try {
+      sessionStorage.setItem('we:google-signin-init-url', currentUrl);
+    } catch {
+      // Ignore storage errors
+    }
+  }
+  await signInWithRedirect(auth, provider);
+  // Page will navigate away to Google; result is handled by getGoogleRedirectResult() on return
+};
+
+/**
  * Sign in with Google using popup
  * Falls back to redirect if popup is blocked
  */
@@ -359,27 +381,24 @@ export const signInWithGoogle = async (): Promise<UserCredential> => {
  */
 export const getGoogleRedirectResult = async (): Promise<UserCredential | null> => {
   try {
-    // Log URL info for debugging URL mismatch issues
-    if (typeof window !== 'undefined') {
-      console.log('[Google Sign-In] Checking redirect result on URL:', window.location.href);
-      console.log('[Google Sign-In] URL components:', {
-        href: window.location.href,
-        origin: window.location.origin,
-        pathname: window.location.pathname,
-        search: window.location.search,
-        hash: window.location.hash,
-      });
-    }
-    
     const result = await getRedirectResult(auth);
     if (result) {
-      console.log('[Google Sign-In] Redirect result found:', {
-        email: result.user.email,
-        uid: result.user.uid,
-        operationType: result.operationType,
-      });
-    } else {
-      console.log('[Google Sign-In] No redirect result found (null returned)');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[Google Sign-In] Redirect result found:', {
+          email: result.user.email,
+          uid: result.user.uid,
+          operationType: result.operationType,
+        });
+      }
+      return result;
+    }
+    // Only log when we were expecting a redirect (user had clicked "Sign in with Google" and was sent to Google)
+    if (typeof window !== 'undefined') {
+      const hadInitiated = sessionStorage.getItem('we:google-signin-init-url');
+      if (hadInitiated) {
+        sessionStorage.removeItem('we:google-signin-init-url');
+        console.warn('[Google Sign-In] No redirect result found after return from Google (URL or storage mismatch).');
+      }
     }
     return result;
   } catch (error: any) {

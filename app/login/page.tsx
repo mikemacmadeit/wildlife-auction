@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { signIn, resetPassword, signInWithGoogle, getGoogleRedirectResult, signOutUser } from '@/lib/firebase/auth';
+import { signIn, resetPassword, signInWithGoogleRedirectOnly, getGoogleRedirectResult, signOutUser } from '@/lib/firebase/auth';
 import { getDocument } from '@/lib/firebase/firestore';
 import {
   getSignInErrorMessage,
@@ -199,33 +199,10 @@ export default function LoginPage() {
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
-
     try {
-      const userCredential = await signInWithGoogle();
-
-      if (!userCredential.user) return;
-
-      // Sign-in only: require an existing account (do not create one)
-      const existingUser = await getDocument('users', userCredential.user.uid).catch(() => null);
-      if (!existingUser) {
-        await signOutUser();
-        toast({
-          title: "We don't have an account for you",
-          description: 'Please sign up first, then you can sign in with Google.',
-          variant: 'destructive',
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      await createUserDocument(userCredential.user);
-
-      toast({
-        title: 'Welcome back!',
-        description: 'You have been successfully signed in.',
-      });
-
-      router.push(getRedirectPath());
+      // Redirect-only avoids COOP blocking window.closed/window.close; result handled by getGoogleRedirectResult() on return
+      await signInWithGoogleRedirectOnly();
+      // Page navigates away to Google; success is handled in useEffect via getGoogleRedirectResult()
     } catch (error: any) {
       // Don't show error if redirect was initiated (page will reload)
       if (error.message === 'REDIRECT_INITIATED') {

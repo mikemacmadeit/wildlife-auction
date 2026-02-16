@@ -13,7 +13,7 @@ This app sends transactional/notification emails via a provider router in `lib/e
 
 ### Sender identity
 
-- `EMAIL_FROM` (example: `notify@wildlife.exchange`)
+- `EMAIL_FROM` (example: `notify@wildlife.exchange`) — use an address on a **verified** domain in SendGrid to avoid spam; see [Email deliverability](EMAIL_DELIVERABILITY.md).
 - `EMAIL_FROM_NAME` (example: `Wildlife Exchange`)
 - `EMAIL_REPLY_TO` (optional)
 
