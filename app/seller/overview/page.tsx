@@ -1193,6 +1193,11 @@ export default function SellerOverviewPage() {
                                 const profile = uid ? await getUserProfile(uid) : null;
                                 setUserProfile(profile);
                                 toast({ title: 'Already verified', description: 'Your email is already verified. Status updated.' });
+                              } else if (result && 'sentVia' in result && result.sentVia === 'firebase') {
+                                toast({
+                                  title: 'Verification email sent (via Firebase)',
+                                  description: 'Check your inbox and spam folder. If you don’t see it, add this site’s domain to Firebase Auth authorized domains.',
+                                });
                               } else {
                                 toast({ title: 'Verification email sent', description: 'Check your inbox (and spam folder).' });
                               }

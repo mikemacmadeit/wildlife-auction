@@ -6,7 +6,7 @@
  * only confirmed when the user clicks that button (Firebase sets emailVerified
  * server-side). We never mark verified without the user having clicked the link.
  *
- * Uses Firebase Admin generateEmailVerificationLink + our email provider (Resend/Brevo).
+ * Uses Firebase Admin generateEmailVerificationLink + our email provider (SendGrid/Resend/Brevo).
  */
 import { getAdminAuth } from '@/lib/firebase/admin';
 import { getSiteUrl } from '@/lib/site-url';
@@ -44,9 +44,22 @@ export async function POST(request: Request) {
   if (!uid) return json({ ok: false, error: 'Unauthorized' }, { status: 401 });
 
   const emailEnabled = isEmailEnabled();
+  const provider = getEmailProvider();
+  if (process.env.NODE_ENV !== 'test') {
+    console.info('[send-verification-email]', { uid, emailEnabled, provider: provider === 'none' ? 'none' : provider });
+  }
   if (!emailEnabled) {
+    console.error(
+      '[send-verification-email] No email provider configured. Set RESEND_API_KEY, SENDGRID_API_KEY, or BREVO_API_KEY (and verify FROM_EMAIL domain). Provider:',
+      provider
+    );
     return json(
-      { ok: false, error: 'Verification email service not configured', code: 'EMAIL_NOT_CONFIGURED' },
+      {
+        ok: false,
+        error: 'Verification email service not configured',
+        code: 'EMAIL_NOT_CONFIGURED',
+        message: 'Set RESEND_API_KEY, SENDGRID_API_KEY, or BREVO_API_KEY in server environment.',
+      },
       { status: 503 }
     );
   }
@@ -84,6 +97,7 @@ export async function POST(request: Request) {
     if (!sent.success) {
       const provider = getEmailProvider();
       const isNotConfigured = sent.error?.toLowerCase().includes('not configured') ?? false;
+      console.error('[send-verification-email] Send failed:', sent.error, { provider, to: email.replace(/(.{2}).*@(.*)/, '$1…@$2') });
       return json(
         {
           ok: false,
@@ -96,7 +110,9 @@ export async function POST(request: Request) {
       );
     }
 
-    return json({ ok: true, sent: true });
+    const masked = email.replace(/(.{2}).*@(.*)/, '$1…@$2');
+    console.info('[send-verification-email] Sent to', masked, 'via', getEmailProvider(), 'messageId:', sent.messageId ?? '—');
+    return json({ ok: true, sent: true, provider: getEmailProvider() });
   } catch (e: any) {
     console.error('[send-verification-email]', e?.message || e);
     return json(

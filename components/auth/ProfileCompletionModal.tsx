@@ -328,17 +328,24 @@ export function ProfileCompletionModal({
         description: 'Your profile has been completed.',
       });
 
-      // Show verify-email step and send verification email immediately (step right after complete profile)
+      // Show verify-email step (modal stays open) and send verification email immediately
       setShowVerifyEmailStep(true);
       setSendingVerification(true);
       resendVerificationEmail()
-        .then(() => {
+        .then((result) => {
           setVerificationEmailSent(true);
-          toast({
-            title: 'Verification email sent',
-            description: 'Check your inbox and spam folder. Click the button in the email to verify.',
-          });
-          onComplete();
+          if (result && 'sentVia' in result && result.sentVia === 'firebase') {
+            toast({
+              title: 'Verification email sent (via Firebase)',
+              description: 'Check your inbox and spam folder. Click the button in the email to verify.',
+            });
+          } else {
+            toast({
+              title: 'Verification email sent',
+              description: 'Check your inbox and spam folder. Click the button in the email to verify.',
+            });
+          }
+          // Do NOT call onComplete() here — keep modal open so user sees the verify step
         })
         .catch((e: any) => {
           toast({
@@ -394,13 +401,20 @@ export function ProfileCompletionModal({
                   onClick={async () => {
                     setSendingVerification(true);
                     try {
-                      await resendVerificationEmail();
+                      const res = await resendVerificationEmail();
                       setVerificationEmailSent(true);
-                      toast({
-                        title: 'Verification email sent',
-                        description: 'Check your inbox and spam folder. Click the link to verify.',
-                      });
-                      onComplete();
+                      if (res && 'sentVia' in res && res.sentVia === 'firebase') {
+                        toast({
+                          title: 'Verification email sent (via Firebase)',
+                          description: 'Check your inbox and spam folder. Click the button in the email to verify.',
+                        });
+                      } else {
+                        toast({
+                          title: 'Verification email sent',
+                          description: 'Check your inbox and spam folder. Click the button in the email to verify.',
+                        });
+                      }
+                      // Stay on verify step; user closes via "Continue to dashboard"
                     } catch (e: any) {
                       toast({
                         title: 'Could not send email',
@@ -426,8 +440,12 @@ export function ProfileCompletionModal({
                     onClick={async () => {
                       setSendingVerification(true);
                       try {
-                        await resendVerificationEmail();
-                        toast({ title: 'Sent again', description: 'Check your inbox and spam folder.' });
+                        const res = await resendVerificationEmail();
+                        if (res && 'sentVia' in res && res.sentVia === 'firebase') {
+                          toast({ title: 'Sent again (via Firebase)', description: 'Check your inbox and spam folder.' });
+                        } else {
+                          toast({ title: 'Sent again', description: 'Check your inbox and spam folder.' });
+                        }
                       } catch (e: any) {
                         toast({ title: 'Could not send', description: e?.message || 'Try "Firebase email" below.', variant: 'destructive' });
                       } finally {
@@ -462,16 +480,16 @@ export function ProfileCompletionModal({
               <div className="flex flex-col gap-2">
                 <Button
                   type="button"
-                  variant="ghost"
-                  className="w-full"
+                  variant="default"
+                  className="w-full min-h-[48px] font-semibold"
                   onClick={() => {
-                    if (typeof window !== 'undefined') window.location.href = '/seller/overview';
+                    onComplete();
                   }}
                 >
                   Continue to dashboard
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
-                  You can verify later from Account & Settings if needed.
+                  You can verify later from Account & Settings or the seller checklist if needed.
                 </p>
               </div>
             </div>

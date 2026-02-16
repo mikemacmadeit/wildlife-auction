@@ -125,7 +125,9 @@ const VERIFICATION_EMAIL_FETCH_TIMEOUT_MS = 15000;
  * Uses app API first (branded email), then Firebase sendEmailVerification as fallback.
  * @returns { alreadyVerified: true } if the user is already verified (no email sent).
  */
-export const resendVerificationEmail = async (): Promise<{ alreadyVerified?: boolean } | void> => {
+export type ResendVerificationResult = { alreadyVerified?: boolean } | { sentVia: 'firebase' } | void;
+
+export const resendVerificationEmail = async (): Promise<ResendVerificationResult> => {
   if (!auth.currentUser) {
     throw new Error('No user is currently signed in');
   }
@@ -169,12 +171,13 @@ export const resendVerificationEmail = async (): Promise<{ alreadyVerified?: boo
   };
   try {
     await sendEmailVerification(auth.currentUser, actionCodeSettings as any);
+    return { sentVia: 'firebase' };
   } catch (e: any) {
     const code = String(e?.code || '');
     if (code === 'auth/unauthorized-continue-uri' || code === 'auth/unauthorized-domain') {
       try {
         await sendEmailVerification(auth.currentUser);
-        return;
+        return { sentVia: 'firebase' };
       } catch (e2: any) {
         throw new Error(apiErrorMessage || getVerificationEmailErrorMessage(code || e2?.message));
       }

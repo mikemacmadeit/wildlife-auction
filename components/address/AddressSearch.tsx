@@ -35,6 +35,7 @@ export function AddressSearch({
   const placesDivRef = useRef<HTMLDivElement | null>(null);
   const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectingRef = useRef(false);
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onSelectRef = useRef(onSelect);
@@ -69,18 +70,27 @@ export function AddressSearch({
   }, []);
 
   // Fetch suggestions when query changes (with timeout so we never stay stuck on "Searching…")
-  const SEARCH_TIMEOUT_MS = 8000;
+  const SEARCH_TIMEOUT_MS = 18000; // 18s so slow networks / first-load Places API can respond
   useEffect(() => {
     if (!query.trim()) {
       setSuggestions([]);
       setOpen(false);
       setLoading(false);
+      setError(null);
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     debounceRef.current = setTimeout(() => {
       debounceRef.current = null;
+      // Cancel any previous request’s timeout so we don’t show "taking too long" for an old query
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
       const svc = autocompleteServiceRef.current;
       if (!svc) return;
       if (!sessionTokenRef.current) {
@@ -88,21 +98,22 @@ export function AddressSearch({
       }
       setLoading(true);
       setError(null);
-      timeoutId = setTimeout(() => {
-        timeoutId = null;
+      searchTimeoutRef.current = setTimeout(() => {
+        searchTimeoutRef.current = null;
         setLoading(false);
         setError('Address search is taking too long. Try "Enter address manually" below or try again.');
       }, SEARCH_TIMEOUT_MS);
+      const currentQuery = query;
       svc.getPlacePredictions(
         {
-          input: query,
+          input: currentQuery,
           sessionToken: sessionTokenRef.current,
           types: ['address'],
         },
         (predictions, status) => {
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-            timeoutId = null;
+          if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+            searchTimeoutRef.current = null;
           }
           setLoading(false);
           if (status === google.maps.places.PlacesServiceStatus.OK && predictions?.length) {
@@ -120,7 +131,10 @@ export function AddressSearch({
     }, DEBOUNCE_MS);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      if (timeoutId) clearTimeout(timeoutId);
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
     };
   }, [query]);
 
