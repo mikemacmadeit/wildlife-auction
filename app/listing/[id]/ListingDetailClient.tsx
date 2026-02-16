@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ListingDetailSkeleton } from '@/components/skeletons/ListingDetailSkeleton';
 import { CHECKOUT_DEPOSIT_PERCENT } from '@/lib/pricing/plans';
 import { Separator } from '@/components/ui/separator';
