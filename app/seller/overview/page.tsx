@@ -1181,7 +1181,7 @@ export default function SellerOverviewPage() {
                             setSendingVerificationEmail(true);
                             try {
                               const result = await resendVerificationEmail();
-                              if (result?.alreadyVerified) {
+                              if (result && typeof result === 'object' && 'alreadyVerified' in result && result.alreadyVerified) {
                                 // Sync Firestore so checklist shows complete (needed for OAuth and so UI matches API).
                                 if (uid) {
                                   await updateUserProfile(uid, {
