@@ -530,7 +530,7 @@ export default function SellerOverviewPage() {
     ];
   }, [listings, orders]);
 
-  // Seller financials for Business overview — what you're making (dollars first)
+  // Seller financials for Business overview — earnings (dollars first)
   const sellerFinancialStats = useMemo(() => {
     const completedOrders = orders.filter((o) => {
       const status = o.status;
@@ -594,7 +594,7 @@ export default function SellerOverviewPage() {
     ];
   }, [listings, orders]);
 
-  // Buyer-side financials for Business overview — what you're spending (dollars first)
+  // Buyer-side financials for Business overview — fees & payouts (dollars first)
   const buyerStats = useMemo(() => {
     const completedBuyerOrders = buyerOrders.filter((o) => {
       const status = o.status;
@@ -1328,32 +1328,60 @@ export default function SellerOverviewPage() {
           </Link>
         )}
 
-        {/* New seller: get your first sale — only after verification process is complete */}
+        {/* New seller: first sale or first purchase — only after verification process is complete */}
         {isNewSeller && setupChecklist.isComplete === true && (
           <Card className="rounded-xl border-2 border-primary/30 bg-primary/5 overflow-hidden">
             <CardContent className="p-4 sm:p-6">
-              <h2 className="text-lg sm:text-xl font-extrabold text-foreground mb-2">Get your first sale</h2>
-              <p className="text-sm text-muted-foreground mb-4">Complete these steps to list and sell.</p>
-              <ol className="space-y-2 text-sm font-medium text-foreground mb-4">
-                <li className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary text-xs font-bold">1</span>
-                  Create a listing (fixed price or auction)
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary text-xs font-bold">2</span>
-                  Share your listing — buyers can make offers or bid
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary text-xs font-bold">3</span>
-                  Respond to offers and complete the sale
-                </li>
-              </ol>
-              <Button asChild className="min-h-[48px] font-semibold w-full sm:w-auto">
-                <Link href="/dashboard/listings/new">
-                  <Package className="h-4 w-4 mr-2" />
-                  Create your first listing
-                </Link>
-              </Button>
+              <h2 className="text-lg sm:text-xl font-extrabold text-foreground mb-2">Get your first sale or first purchase</h2>
+              <p className="text-sm text-muted-foreground mb-4">List something to sell, or browse and buy — complete your first transaction either way.</p>
+              <div className="grid sm:grid-cols-2 gap-6 mb-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground mb-2">Make your first sale</h3>
+                  <ol className="space-y-2 text-sm font-medium text-foreground mb-3">
+                    <li className="flex items-center gap-2">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary text-xs font-bold">1</span>
+                      Create a listing (fixed price or auction)
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary text-xs font-bold">2</span>
+                      Share your listing — buyers can make offers or bid
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary text-xs font-bold">3</span>
+                      Respond to offers and complete the sale
+                    </li>
+                  </ol>
+                  <Button asChild className="min-h-[44px] font-semibold w-full">
+                    <Link href="/dashboard/listings/new">
+                      <Package className="h-4 w-4 mr-2" />
+                      Create your first listing
+                    </Link>
+                  </Button>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground mb-2">Make your first purchase</h3>
+                  <ol className="space-y-2 text-sm font-medium text-foreground mb-3">
+                    <li className="flex items-center gap-2">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary text-xs font-bold">1</span>
+                      Browse listings for livestock, equipment, and more
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary text-xs font-bold">2</span>
+                      Place a bid or make an offer
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary text-xs font-bold">3</span>
+                      Complete checkout and arrange delivery
+                    </li>
+                  </ol>
+                  <Button asChild variant="outline" className="min-h-[44px] font-semibold w-full border-primary/50 hover:bg-primary/10">
+                    <Link href="/browse">
+                      <ShoppingBag className="h-4 w-4 mr-2" />
+                      Browse to buy
+                    </Link>
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -1764,7 +1792,7 @@ export default function SellerOverviewPage() {
           <CardHeader className="pb-4 px-3 sm:px-6">
             <CardTitle className="text-lg sm:text-xl font-extrabold">Business overview</CardTitle>
             <CardDescription className="text-sm sm:text-base max-w-xl">
-              What you&apos;re making (selling) and what you&apos;re spending (buying) — business financials at a glance
+              Earnings from sales and fees or payouts — business financials at a glance
             </CardDescription>
           </CardHeader>
           <CardContent className="px-3 sm:px-6 pb-4 sm:pb-8 overflow-x-hidden">
@@ -1861,12 +1889,12 @@ export default function SellerOverviewPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 min-w-0">
-              {/* Selling (outs) — what you're making: dollars first */}
+              {/* Selling — earnings: dollars first */}
               <div className="space-y-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <Package className="h-5 w-5 text-primary shrink-0" />
-                    <h3 className="font-semibold text-foreground truncate">What you&apos;re making</h3>
+                    <h3 className="font-semibold text-foreground truncate">Earnings</h3>
                   </div>
                   <div className="flex gap-2 w-full sm:w-auto shrink-0">
                     <Button asChild variant="outline" size="sm" className="flex-1 sm:flex-initial min-h-[44px] sm:min-h-9 font-semibold">
@@ -1922,7 +1950,7 @@ export default function SellerOverviewPage() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <ShoppingBag className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                    <h3 className="font-semibold text-foreground truncate">What you&apos;re spending</h3>
+                    <h3 className="font-semibold text-foreground truncate">Fees & payouts</h3>
                   </div>
                   <Button asChild variant="outline" size="sm" className="w-full sm:w-auto min-h-[44px] sm:min-h-9 font-semibold shrink-0">
                     <Link href="/dashboard/orders">

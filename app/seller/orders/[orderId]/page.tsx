@@ -20,7 +20,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, AlertTriangle, ArrowLeft, Truck, Calendar, MapPin, Clock, CheckCircle2, ClipboardList } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, Truck, Calendar as CalendarIcon, MapPin, Clock, CheckCircle2, ClipboardList, Plus } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
 import type { ComplianceDocument, Listing, Order, TransactionStatus } from '@/lib/types';
 import { getOrderById, subscribeToOrder } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
@@ -42,6 +43,35 @@ import { cn, formatDate } from '@/lib/utils';
 import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { OrderDetailSkeleton } from '@/components/skeletons/OrderDetailSkeleton';
 import { AddressMapModal } from '@/components/address/AddressMapModal';
+
+/** Day = 6am–6pm, Night = 6pm–6am (next day) */
+const DELIVERY_DAY_NIGHT_SLOTS: { id: number; label: string; startHour: number; startMin: number; endHour: number; endMin: number; endNextDay: boolean }[] = [
+  { id: 0, label: 'Daytime', startHour: 6, startMin: 0, endHour: 18, endMin: 0, endNextDay: false },  // 6am–6pm
+  { id: 1, label: 'Night', startHour: 18, startMin: 0, endHour: 6, endMin: 0, endNextDay: true },     // 6pm–6am
+];
+
+function buildWindowsFromDateSlots(dateSlots: Array<{ date: string; slots: number[] }>): Array<{ start: string; end: string }> {
+  const out: Array<{ start: string; end: string }> = [];
+  for (const row of dateSlots) {
+    if (!row.date || row.slots.length === 0) continue;
+    const [y, m, d] = row.date.split('-').map(Number);
+    for (const slotId of row.slots) {
+      const slot = DELIVERY_DAY_NIGHT_SLOTS.find(s => s.id === slotId);
+      if (!slot) continue;
+      const start = new Date(y, m - 1, d, slot.startHour, slot.startMin, 0, 0);
+      const end = slot.endNextDay
+        ? new Date(y, m - 1, d + 1, slot.endHour, slot.endMin, 0, 0)
+        : new Date(y, m - 1, d, slot.endHour, slot.endMin, 0, 0);
+      out.push({ start: start.toISOString(), end: end.toISOString() });
+    }
+  }
+  return out;
+}
+
+function formatSlotLabel(slot: typeof DELIVERY_DAY_NIGHT_SLOTS[0]): string {
+  const fmt = (h: number) => h === 0 ? '12am' : h === 12 ? '12pm' : h < 12 ? `${h}am` : `${h - 12}pm`;
+  return slot.endNextDay ? `${fmt(slot.startHour)} – ${fmt(slot.endHour)}` : `${fmt(slot.startHour)} – ${fmt(slot.endHour)}`;
+}
 
 async function postAuthJson(path: string, body?: any): Promise<any> {
   const { auth } = await import('@/lib/firebase/config');
@@ -78,7 +108,7 @@ export default function SellerOrderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState<'preparing' | 'in_transit' | 'delivered' | null>(null);
   const [scheduleDeliveryOpen, setScheduleDeliveryOpen] = useState(false);
-  const [deliveryWindows, setDeliveryWindows] = useState<Array<{ start: string; end: string }>>([{ start: '', end: '' }]);
+  const [deliveryDateSlots, setDeliveryDateSlots] = useState<Array<{ date: string; slots: number[] }>>([{ date: '', slots: [] }]);
   const [deliveryProposalNotes, setDeliveryProposalNotes] = useState('');
   const [markOutForDeliveryOpen, setMarkOutForDeliveryOpen] = useState(false);
   const [deliveryChecklistOpen, setDeliveryChecklistOpen] = useState(false);
@@ -357,7 +387,7 @@ export default function SellerOrderDetailPage() {
                       className="mt-3 w-full sm:w-auto min-h-[44px] touch-manipulation bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
                       onClick={() => setScheduleDeliveryOpen(true)}
                     >
-                      <Calendar className="h-4 w-4 mr-2" />
+                      <CalendarIcon className="h-4 w-4 mr-2" />
                       Propose delivery date
                     </Button>
                   </div>
@@ -717,56 +747,137 @@ export default function SellerOrderDetailPage() {
           <OrderDocumentsPanel orderId={order.id} listing={listing} excludeDocumentTypes={['BILL_OF_SALE']} />
         </div>
 
-        {/* Propose Delivery Dialog (hauling – windows + hauler) — mobile: fit viewport and scroll */}
-        <Dialog open={scheduleDeliveryOpen} onOpenChange={setScheduleDeliveryOpen}>
+        {/* Propose Delivery Dialog — date + day/night time, mobile-friendly */}
+        <Dialog open={scheduleDeliveryOpen} onOpenChange={(open) => {
+          setScheduleDeliveryOpen(open);
+          if (open) {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            setDeliveryDateSlots([{ date: `${yyyy}-${mm}-${dd}`, slots: [] }]);
+          }
+        }}>
           <DialogContent className="flex flex-col h-[90dvh] max-h-[90dvh] sm:h-auto sm:max-h-[90vh] overflow-hidden w-[calc(100vw-1rem)] max-w-2xl p-3 sm:p-4 md:p-6 rounded-xl">
             <DialogHeader className="shrink-0 pb-2 pr-10 sm:pr-8">
               <DialogTitle className="text-base sm:text-lg">Propose delivery date</DialogTitle>
-              <DialogDescription className="text-xs sm:text-sm mt-0.5 text-foreground/90">Offer one or more date and time windows. The buyer will pick one that works.</DialogDescription>
+              <DialogDescription className="text-xs sm:text-sm mt-0.5 text-muted-foreground">
+                Pick a date and daytime or night delivery. The buyer will choose one that works.
+              </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-4 -mx-1 px-1 overscroll-contain we-scrollbar-hover">
-              <div>
-                <Label className="text-sm">Delivery windows *</Label>
-                <div className="space-y-3 mt-1">
-                  {deliveryWindows.map((w, idx) => (
-                    <div key={idx} className="flex flex-col sm:flex-row gap-2 sm:items-end">
-                      <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
-                        <div className="min-w-0">
-                          <Label className="text-xs">Start</Label>
-                          <Input type="datetime-local" className="w-full min-w-0" value={w.start} onChange={(e) => {
-                            const n = [...deliveryWindows];
-                            n[idx] = { ...n[idx], start: e.target.value };
-                            setDeliveryWindows(n);
-                          }} />
-                        </div>
-                        <div className="min-w-0">
-                          <Label className="text-xs">End</Label>
-                          <Input type="datetime-local" className="w-full min-w-0" value={w.end} onChange={(e) => {
-                            const n = [...deliveryWindows];
-                            n[idx] = { ...n[idx], end: e.target.value };
-                            setDeliveryWindows(n);
-                          }} />
-                        </div>
-                      </div>
-                      {deliveryWindows.length > 1 && (
-                        <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto shrink-0" onClick={() => setDeliveryWindows(deliveryWindows.filter((_, i) => i !== idx))}>
-                          Remove
-                        </Button>
-                      )}
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-5 -mx-1 px-1 overscroll-contain we-scrollbar-hover">
+              {deliveryDateSlots.map((row, rowIdx) => (
+                <div key={rowIdx} className="rounded-lg border border-border bg-card p-4 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <Label className="text-sm font-medium text-foreground">Date</Label>
+                    {deliveryDateSlots.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0 text-muted-foreground hover:text-destructive min-h-[44px] sm:min-h-9"
+                        onClick={() => setDeliveryDateSlots(deliveryDateSlots.filter((_, i) => i !== rowIdx))}
+                      >
+                        Remove day
+                      </Button>
+                    )}
+                  </div>
+                  <div className="rounded-lg border border-border bg-muted/20 p-3 w-full min-w-0">
+                    <Calendar
+                      mode="single"
+                      selected={row.date ? new Date(row.date + 'T12:00:00') : undefined}
+                      onSelect={(d) => {
+                        if (!d) return;
+                        const yyyy = d.getFullYear();
+                        const mm = String(d.getMonth() + 1).padStart(2, '0');
+                        const dd = String(d.getDate()).padStart(2, '0');
+                        const n = [...deliveryDateSlots];
+                        n[rowIdx] = { ...n[rowIdx], date: `${yyyy}-${mm}-${dd}` };
+                        setDeliveryDateSlots(n);
+                      }}
+                      disabled={{ before: (() => { const t = new Date(); t.setHours(0, 0, 0, 0); return t; })() }}
+                      className="w-full p-0"
+                      classNames={{
+                        months: 'w-full',
+                        month: 'w-full space-y-3',
+                        table: 'w-full border-collapse',
+                        head_row: 'flex w-full',
+                        head_cell: 'flex-1 text-muted-foreground text-[0.8rem] font-normal text-center',
+                        row: 'flex w-full mt-2',
+                        cell: 'flex-1 min-w-0 p-0.5 relative text-center',
+                        day: 'w-full aspect-square min-h-9 rounded-md font-normal aria-selected:opacity-100 flex items-center justify-center hover:bg-accent hover:text-accent-foreground',
+                        day_selected: 'bg-primary text-white font-semibold hover:bg-primary/90 hover:text-white',
+                        day_today: 'ring-2 ring-primary/40 text-foreground font-medium',
+                        day_outside: 'text-muted-foreground opacity-50',
+                        day_disabled: 'text-muted-foreground opacity-50',
+                        caption: 'flex justify-center pt-1 relative items-center',
+                        caption_label: 'text-sm font-medium',
+                        nav: 'space-x-1 flex items-center',
+                        nav_button: 'h-8 w-8 rounded-md border border-input bg-background p-0 opacity-70 hover:opacity-100',
+                        nav_button_previous: 'absolute left-1',
+                        nav_button_next: 'absolute right-1',
+                      }}
+                    />
+                  </div>
+                  {row.date && (
+                    <p className="text-sm text-muted-foreground">
+                      Selected: <span className="font-medium text-foreground">{new Date(row.date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                    </p>
+                  )}
+                  <div>
+                    <Label className="text-sm font-medium text-foreground">Delivery time</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5 mb-2">Daytime is same day. Night runs 6pm to 6am the next morning.</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {DELIVERY_DAY_NIGHT_SLOTS.map((slot) => {
+                        const selected = row.slots.includes(slot.id);
+                        const isNight = slot.endNextDay;
+                        return (
+                          <button
+                            key={slot.id}
+                            type="button"
+                            onClick={() => {
+                              const n = [...deliveryDateSlots];
+                              const slots = n[rowIdx].slots.includes(slot.id)
+                                ? n[rowIdx].slots.filter((id) => id !== slot.id)
+                                : [...n[rowIdx].slots, slot.id].sort((a, b) => a - b);
+                              n[rowIdx] = { ...n[rowIdx], slots };
+                              setDeliveryDateSlots(n);
+                            }}
+                            className={cn(
+                              'rounded-lg border-2 min-h-[52px] px-3 py-2.5 text-left text-sm font-medium transition-colors touch-manipulation',
+                              selected
+                                ? 'border-primary bg-primary/15 text-foreground'
+                                : 'border-border bg-muted/30 text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/50'
+                            )}
+                          >
+                            <span className="block font-semibold text-foreground">{slot.label}</span>
+                            <span className={cn('text-xs mt-0.5', selected ? 'text-foreground/90' : 'text-muted-foreground')}>
+                              {isNight ? '6pm – 6am (next morning)' : formatSlotLabel(slot)}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
-                  ))}
-                  <Button type="button" variant="outline" size="sm" onClick={() => setDeliveryWindows([...deliveryWindows, { start: '', end: '' }])}>
-                    Add additional delivery window
-                  </Button>
+                  </div>
                 </div>
-              </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full min-h-[52px] border-2 border-primary/50 text-primary font-semibold hover:bg-primary/10 hover:border-primary"
+                onClick={() => setDeliveryDateSlots([...deliveryDateSlots, { date: '', slots: [] }])}
+              >
+                <Plus className="h-4 w-4 mr-2 shrink-0" />
+                Add another day
+              </Button>
               <div>
-                <Label className="text-sm">Notes (optional)</Label>
+                <Label className="text-sm font-medium text-foreground">Notes (optional)</Label>
                 <Textarea
                   value={deliveryProposalNotes}
                   onChange={(e) => setDeliveryProposalNotes(e.target.value)}
                   placeholder="Any details for the buyer (e.g. hauling info, special instructions)"
-                  className="mt-1 min-h-[80px] resize-y"
+                  className="mt-1.5 min-h-[80px] resize-y text-foreground border-border"
                   rows={3}
                 />
               </div>
@@ -774,18 +885,20 @@ export default function SellerOrderDetailPage() {
             <DialogFooter className="shrink-0 pt-3 border-t mt-2">
               <Button variant="outline" onClick={() => setScheduleDeliveryOpen(false)}>Cancel</Button>
               <Button
-                disabled={processing !== null || deliveryWindows.some(w => !w.start || !w.end)}
+                disabled={processing !== null || buildWindowsFromDateSlots(deliveryDateSlots).length === 0}
                 onClick={async () => {
+                  const windows = buildWindowsFromDateSlots(deliveryDateSlots);
+                  if (windows.length === 0) return;
                   try {
                     setProcessing('delivered');
                     const body = {
-                      windows: deliveryWindows.filter(w => w.start && w.end).map(w => ({ start: new Date(w.start).toISOString(), end: new Date(w.end).toISOString() })),
+                      windows: windows.map((w) => ({ start: w.start, end: w.end })),
                       ...(deliveryProposalNotes.trim() ? { notes: deliveryProposalNotes.trim() } : {}),
                     };
                     await postAuthJson(`/api/orders/${order.id}/fulfillment/schedule-delivery`, body);
                     toast({ title: 'Success', description: 'Delivery windows proposed. Buyer will agree to one.' });
                     setScheduleDeliveryOpen(false);
-                    setDeliveryWindows([{ start: '', end: '' }]);
+                    setDeliveryDateSlots([{ date: '', slots: [] }]);
                     setDeliveryProposalNotes('');
                     const refreshed = await getOrderById(order.id);
                     if (refreshed) setOrder(refreshed);

@@ -739,6 +739,7 @@ export default function BuyerOrderDetailPage() {
                       {o.delivery.windows.map((w: any, idx: number) => {
                         const start = w?.start?.toDate ? w.start.toDate() : new Date(w?.start);
                         const end = w?.end?.toDate ? w.end.toDate() : new Date(w?.end);
+                        const sameDay = start.toDateString() === end.toDateString();
                         return (
                           <button
                             key={idx}
@@ -760,8 +761,17 @@ export default function BuyerOrderDetailPage() {
                             }}
                           >
                             <div className="min-w-0">
-                              <div className="font-medium text-foreground">{start.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div>
-                              <div className="text-sm text-muted-foreground mt-0.5">{start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })} – {end.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</div>
+                              {sameDay ? (
+                                <>
+                                  <div className="font-medium text-foreground">{start.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+                                  <div className="text-sm text-muted-foreground mt-0.5">{start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })} – {end.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="font-medium text-foreground">Night delivery (spans 2 days)</div>
+                                  <div className="text-sm text-muted-foreground mt-0.5">{start.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} – {end.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
+                                </>
+                              )}
                             </div>
                             <div className="shrink-0">
                               {processing ? (
