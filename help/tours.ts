@@ -24,7 +24,7 @@ export const TOURS: Partial<Record<HelpKey, TourDefinition>> = {
     steps: [
       {
         id: 'setup-checklist',
-        title: 'Seller setup checklist',
+        title: 'Complete Verification Process',
         body: 'Complete these steps (profile, email verification, payouts) to publish and get paid.',
         selector: '[data-tour="seller-setup-checklist"]',
         placement: 'bottom',

@@ -7,7 +7,7 @@ export async function enqueueReviewRequest(params: {
   orderId: string;
   order: any;
   force?: boolean;
-}): Promise<{ ok: boolean; created: boolean }> {
+}): Promise<{ ok: boolean; created: boolean; eventId?: string }> {
   const orderId = String(params.orderId || '').trim();
   const order = params.order || {};
   if (!orderId) return { ok: false, created: false };
@@ -53,5 +53,5 @@ export async function enqueueReviewRequest(params: {
     optionalHash,
   });
 
-  return { ok: res.ok, created: res.created };
+  return { ok: res.ok, created: res.created, eventId: res.eventId };
 }

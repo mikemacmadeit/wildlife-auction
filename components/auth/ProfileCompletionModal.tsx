@@ -376,7 +376,7 @@ export function ProfileCompletionModal({
   return (
     <>
       <Dialog open={open} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90dvh] sm:max-h-[90vh] flex flex-col overflow-hidden p-4 sm:p-6">
+        <DialogContent className="sm:max-w-[500px] max-h-[90dvh] sm:max-h-[90vh] overflow-y-auto overflow-x-hidden p-4 sm:p-6 pb-24 sm:pb-6">
         {showVerifyEmailStep ? (
           <>
             <DialogHeader>
@@ -511,12 +511,7 @@ export function ProfileCompletionModal({
           </DialogDescription>
         </DialogHeader>
 
-        <form id="profile-completion-form" onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 mt-4">
-          {/* Scrollable form body so location section + button are both usable on mobile */}
-          <div
-            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-6 -mx-1 px-1 overscroll-contain"
-            style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
-          >
+        <form onSubmit={handleSubmit} className="space-y-6 mt-4">
           {/* Optional: profile photo / logo */}
           <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-3">
             <div className="flex items-start justify-between gap-3">
@@ -950,26 +945,22 @@ export function ProfileCompletionModal({
             )}
           </div>
 
-          </div>
-          {/* Footer: button always visible at bottom on mobile (no need to scroll to find it) */}
-          <div className="pt-4 pb-2 mt-2 bg-background border-t shrink-0">
-            <Button
-              type="submit"
-              form="profile-completion-form"
-              className="w-full min-h-[52px] text-base font-semibold gap-2 shadow-lg hover:shadow-xl transition-shadow"
-              size="lg"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <div className="h-4 w-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
-                  Saving...
-                </>
-              ) : (
-                'Complete Profile'
-              )}
-            </Button>
-          </div>
+          {/* Submit button at bottom of form – scroll to reach it; extra pb on dialog clears bottom nav on mobile */}
+          <Button
+            type="submit"
+            className="w-full min-h-[52px] text-base font-semibold gap-2 shadow-lg hover:shadow-xl transition-shadow"
+            size="lg"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <div className="h-4 w-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
+                Saving...
+              </>
+            ) : (
+              'Complete Profile'
+            )}
+          </Button>
         </form>
           </>
         )}

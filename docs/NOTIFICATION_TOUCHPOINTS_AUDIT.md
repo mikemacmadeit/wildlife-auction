@@ -8,7 +8,7 @@
 | Event | Trigger | Recipient | Channels | Immediate email? |
 |-------|---------|-----------|----------|------------------|
 | **Order.Confirmed** | Stripe `checkout.session.completed` (payment success) | Buyer | in-app, email | ✅ `tryDispatchEmailJobNow` |
-| **Review.Request** | Confirm receipt, fulfillment reminders | Buyer | in-app, email | Via scheduler or dispatch |
+| **Review.Request** | Confirm receipt, confirm-pickup, complete-delivery, submit-signature, reminders | Buyer | in-app, email | ✅ `tryDispatchEmailJobNow` (confirm-receipt, confirm-pickup, complete-delivery, submit-signature when created); scheduler for reminders |
 | **Order.Preparing** | Seller marks preparing | Buyer | in-app, email | ✅ |
 | **Order.InTransit** | Seller marks in transit | Buyer | in-app, email | ✅ |
 | **Order.Delivered** | Seller/driver marks delivered | Buyer | in-app, email | ✅ |
@@ -42,10 +42,10 @@
 | **Order.DeliveryAddressSet** | Buyer sets address | Seller | in-app, email | ✅ |
 | **Order.DeliveryTrackingStarted** | Seller starts tracking | Buyer | in-app, email | ✅ |
 | **Order.Delivered** | Seller/driver marks delivered | Buyer | in-app, email | ✅ |
-| **Listing.Approved** | Admin/moderation approves | Seller | in-app, email | Scheduled |
-| **Listing.Rejected** | Admin/moderation rejects | Seller | in-app, email | Scheduled |
-| **Listing.ComplianceApproved** | Compliance approved | Seller | in-app, email | ✅ |
-| **Listing.ComplianceRejected** | Compliance rejected | Seller | in-app, email | ✅ |
+| **Listing.Approved** | Admin/moderation approves | Seller | in-app, email | ✅ `tryDispatchEmailJobNow` (approve, compliance approve when published, try-ai-auto-approve) |
+| **Listing.Rejected** | Admin/moderation rejects | Seller | in-app, email | ✅ `tryDispatchEmailJobNow` (admin reject) |
+| **Listing.ComplianceApproved** | Compliance approved (in-app); when published, also **Listing.Approved** email | Seller | in-app, email | ✅ |
+| **Listing.ComplianceRejected** | Compliance rejected | Seller | in-app, email | ✅ `tryDispatchEmailJobNow` + email template (listing_rejected) |
 
 ## Admin
 

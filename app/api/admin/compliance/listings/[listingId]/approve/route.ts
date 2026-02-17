@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 import { Timestamp } from 'firebase-admin/firestore';
 import { requireAdmin, requireRateLimit, json } from '@/app/api/admin/_util';
 import { emitAndProcessEventForUser, emitEventToUsers } from '@/lib/notifications';
+import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
 import { getSiteUrl } from '@/lib/site-url';
 import { createAuditLog } from '@/lib/audit/logger';
@@ -74,7 +75,7 @@ export async function POST(request: Request, ctx: { params: { listingId: string 
     // ignore
   }
 
-  // Seller notification through canonical pipeline (idempotent, best-effort).
+  // Seller: in-app ComplianceApproved; when we publish, also send "Listing approved" email.
   try {
     const origin = getSiteUrl();
     await emitAndProcessEventForUser({
@@ -92,6 +93,25 @@ export async function POST(request: Request, ctx: { params: { listingId: string 
       },
       optionalHash: `compliance_approved:${listingId}`,
     });
+    if (shouldPublish) {
+      const sellerRes = await emitAndProcessEventForUser({
+        type: 'Listing.Approved',
+        actorId: actorUid,
+        entityType: 'listing',
+        entityId: listingId,
+        targetUserId: sellerId,
+        payload: {
+          type: 'Listing.Approved',
+          listingId,
+          listingTitle: title,
+          listingUrl: `${origin}/listing/${listingId}`,
+        },
+        optionalHash: `listing_approved:${listingId}`,
+      });
+      if (sellerRes?.eventId) {
+        void tryDispatchEmailJobNow({ db: db as any, jobId: sellerRes.eventId, waitForJob: true }).catch(() => {});
+      }
+    }
   } catch {
     // ignore
   }

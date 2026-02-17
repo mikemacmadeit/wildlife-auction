@@ -11,6 +11,7 @@ export const dynamic = 'force-dynamic';
 import { Timestamp } from 'firebase-admin/firestore';
 import { requireAdmin, json } from '@/app/api/admin/_util';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
+import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { getSiteUrl } from '@/lib/site-url';
 import { createAuditLog } from '@/lib/audit/logger';
 import { coerceDurationDays, computeEndAt } from '@/lib/listings/duration';
@@ -141,7 +142,7 @@ export async function POST(req: Request, routeCtx: { params: Promise<{ id: strin
 
   try {
     const origin = getSiteUrl();
-    await emitAndProcessEventForUser({
+    const sellerRes = await emitAndProcessEventForUser({
       type: 'Listing.Approved',
       actorId: uid,
       entityType: 'listing',
@@ -155,6 +156,9 @@ export async function POST(req: Request, routeCtx: { params: Promise<{ id: strin
       },
       optionalHash: `listing_approved:${listingId}`,
     });
+    if (sellerRes?.eventId) {
+      void tryDispatchEmailJobNow({ db: db as any, jobId: sellerRes.eventId, waitForJob: true }).catch(() => {});
+    }
   } catch {
     // Non-blocking
   }

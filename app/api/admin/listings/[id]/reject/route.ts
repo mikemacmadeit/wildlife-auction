@@ -9,6 +9,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { isAdminUid } from '@/app/api/admin/notifications/_admin';
 import { emitAndProcessEventForUser, emitEventToUsers } from '@/lib/notifications';
+import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
 import { getSiteUrl } from '@/lib/site-url';
 import { createAuditLog } from '@/lib/audit/logger';
@@ -111,10 +112,10 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
     ? `Your listing “${title}” was rejected. Reason: ${reason}`
     : `Your listing “${title}” was rejected.`;
 
-  // Seller notification through canonical pipeline (idempotent).
+  // Seller notification through canonical pipeline (idempotent); dispatch email immediately.
   try {
     const origin = getSiteUrl();
-    await emitAndProcessEventForUser({
+    const sellerRes = await emitAndProcessEventForUser({
       type: 'Listing.Rejected',
       actorId: uid,
       entityType: 'listing',
@@ -129,6 +130,9 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
       },
       optionalHash: `listing_rejected:${listingId}`,
     });
+    if (sellerRes?.eventId) {
+      void tryDispatchEmailJobNow({ db: db as any, jobId: sellerRes.eventId, waitForJob: true }).catch(() => {});
+    }
   } catch (e: any) {
     // Notification failures shouldn't block moderation action.
     console.warn('[admin.listings.reject] Failed to emit event', {

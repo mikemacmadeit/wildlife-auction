@@ -10,6 +10,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { requireAdmin, requireRateLimit, json } from '@/app/api/admin/_util';
 import { emitAndProcessEventForUser, emitEventToUsers } from '@/lib/notifications';
+import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
 import { getSiteUrl } from '@/lib/site-url';
 import { createAuditLog } from '@/lib/audit/logger';
@@ -75,10 +76,10 @@ export async function POST(request: Request, ctx: { params: { listingId: string 
     // ignore
   }
 
-  // Seller notification through canonical pipeline (idempotent, best-effort).
+  // Seller notification through canonical pipeline (idempotent, best-effort); dispatch email immediately.
   try {
     const origin = getSiteUrl();
-    await emitAndProcessEventForUser({
+    const sellerRes = await emitAndProcessEventForUser({
       type: 'Listing.ComplianceRejected',
       actorId: actorUid,
       entityType: 'listing',
@@ -93,6 +94,9 @@ export async function POST(request: Request, ctx: { params: { listingId: string 
       },
       optionalHash: `compliance_rejected:${listingId}`,
     });
+    if (sellerRes?.eventId) {
+      void tryDispatchEmailJobNow({ db: db as any, jobId: sellerRes.eventId, waitForJob: true }).catch(() => {});
+    }
   } catch {
     // ignore
   }

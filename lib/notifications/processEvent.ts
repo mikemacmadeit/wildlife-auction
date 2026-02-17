@@ -811,6 +811,18 @@ function buildEmailJobPayload(params: {
         },
       };
     }
+    case 'Listing.ComplianceRejected': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Listing.ComplianceRejected' }>;
+      return {
+        template: 'listing_rejected',
+        templatePayload: {
+          userName: recipientName,
+          listingTitle: p.listingTitle,
+          editUrl: p.editUrl,
+          reason: (p as any).reason || undefined,
+        },
+      };
+    }
     case 'Admin.Listing.Submitted': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Admin.Listing.Submitted' }>;
       return {

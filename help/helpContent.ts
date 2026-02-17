@@ -51,7 +51,7 @@ export const HELP_CONTENT: Record<HelpKey, HelpContent> = {
   seller_overview: {
     key: 'seller_overview',
     title: 'Seller Overview',
-    oneLiner: 'Your command center: setup checklist, listings status, and action items.',
+    oneLiner: 'Your command center: verification process, listings status, and action items.',
     checklist: ['Complete your profile (name, phone, location)', 'Verify your email', 'Connect Stripe payouts', 'Create a draft listing, then publish'],
     commonMistakes: ['Trying to publish before Stripe payouts are connected', 'Ignoring email verification (blocks publish/checkout/actions)'],
     quickActions: [
@@ -74,7 +74,7 @@ export const HELP_CONTENT: Record<HelpKey, HelpContent> = {
     commonMistakes: [
       'Pricing too low/high without enough detail',
       'Not adding location (buyers need it)',
-      'Publishing without completing seller setup (profile, email verification, payouts)',
+      'Publishing without completing verification (profile, email verification, payouts)',
     ],
     quickActions: [
       { label: 'Seller overview', href: '/seller/overview' },

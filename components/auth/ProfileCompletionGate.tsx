@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { createUserDocument, getUserProfile, isProfileComplete, updateUserProfile } from '@/lib/firebase/users';
 import { ProfileCompletionModal } from '@/components/auth/ProfileCompletionModal';
@@ -18,6 +18,7 @@ import { ProfileCompletionModal } from '@/components/auth/ProfileCompletionModal
  */
 export function ProfileCompletionGate() {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, loading, initialized } = useAuth();
 
   const [open, setOpen] = useState(false);
@@ -117,8 +118,9 @@ export function ProfileCompletionGate() {
         } catch {
           // ignore
         }
-        // Re-check in background to ensure the Firestore doc is now complete.
         refresh();
+        // Redirect to seller overview (same on desktop and mobile).
+        router.replace('/seller/overview');
       }}
     />
   );

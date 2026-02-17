@@ -1127,13 +1127,13 @@ export default function SellerOverviewPage() {
           </div>
         </div>
 
-        {/* Seller Setup Checklist — at very top until completed */}
+        {/* Complete Verification Process — at very top until completed */}
         {user && setupChecklist.isComplete !== true && (
           <Card className="rounded-xl border border-border/50 bg-card overflow-hidden" data-tour="seller-setup-checklist">
             <CardHeader className="px-3 sm:px-6">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                 <div className="min-w-0">
-                  <CardTitle className="text-lg sm:text-xl font-extrabold">Seller Setup Checklist</CardTitle>
+                  <CardTitle className="text-lg sm:text-xl font-extrabold">Complete Verification Process</CardTitle>
                   <CardDescription className="text-sm sm:text-base">
                     Complete these steps to publish listings and get paid. (Buyers can still browse and save listings anytime.)
                   </CardDescription>
@@ -1328,7 +1328,7 @@ export default function SellerOverviewPage() {
           </Link>
         )}
 
-        {/* New seller: get your first sale — only after setup checklist is complete */}
+        {/* New seller: get your first sale — only after verification process is complete */}
         {isNewSeller && setupChecklist.isComplete === true && (
           <Card className="rounded-xl border-2 border-primary/30 bg-primary/5 overflow-hidden">
             <CardContent className="p-4 sm:p-6">

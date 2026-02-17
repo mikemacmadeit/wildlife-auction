@@ -9,6 +9,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { isAdminUid } from '@/app/api/admin/notifications/_admin';
 import { emitAndProcessEventForUser, emitEventToUsers } from '@/lib/notifications';
+import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
 import { getSiteUrl } from '@/lib/site-url';
 import { createAuditLog } from '@/lib/audit/logger';
@@ -134,10 +135,10 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
     // ignore
   }
 
-  // Seller notification through canonical pipeline (idempotent).
+  // Seller notification through canonical pipeline (idempotent); dispatch email immediately.
   try {
     const origin = getSiteUrl();
-    await emitAndProcessEventForUser({
+    const sellerRes = await emitAndProcessEventForUser({
       type: 'Listing.Approved',
       actorId: uid,
       entityType: 'listing',
@@ -151,6 +152,9 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
       },
       optionalHash: `listing_approved:${listingId}`,
     });
+    if (sellerRes?.eventId) {
+      void tryDispatchEmailJobNow({ db: db as any, jobId: sellerRes.eventId, waitForJob: true }).catch(() => {});
+    }
   } catch {
     // Do not block moderation actions on notification failures.
   }

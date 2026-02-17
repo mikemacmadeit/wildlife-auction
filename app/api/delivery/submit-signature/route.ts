@@ -172,9 +172,12 @@ export async function POST(request: Request) {
     const orderUpdate = sanitizeFirestorePayload(orderUpdateBase);
     await orderRef.update(orderUpdate);
 
-    // Enqueue review request for buyer (idempotent).
+    // Enqueue review request for buyer (idempotent); dispatch email immediately when created.
     try {
-      await enqueueReviewRequest({ db: db as any, orderId: payload.orderId, order: orderData });
+      const reviewRes = await enqueueReviewRequest({ db: db as any, orderId: payload.orderId, order: orderData });
+      if (reviewRes?.created && reviewRes?.eventId) {
+        void tryDispatchEmailJobNow({ db: db as any, jobId: reviewRes.eventId, waitForJob: true }).catch(() => {});
+      }
     } catch {
       /* best-effort */
     }
