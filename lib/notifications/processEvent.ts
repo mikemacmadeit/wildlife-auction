@@ -1,5 +1,6 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminAuth } from '@/lib/firebase/admin';
+import { getSiteUrl } from '@/lib/site-url';
 import { getDefaultNotificationPreferences, notificationPreferencesSchema } from './preferences';
 import { decideChannels, getEventRule } from './rules';
 import { buildInAppNotification } from './inApp';
@@ -1127,26 +1128,78 @@ export async function processEventDoc(params: {
           });
     if (allowed) {
       const contact = await loadUserContact(db, targetUserId);
-      const built = buildEmailJobPayload({ eventType: eventData.type, payload: eventData.payload as any, recipientName: contact.name });
-      if (contact.email && built) {
-        const jobRef = db.collection('emailJobs').doc(eventId);
-        await jobRef.set(
-          {
-            id: eventId,
-            eventId,
-            userId: targetUserId,
-            toEmail: contact.email,
-            template: built.template,
-            templatePayload: built.templatePayload,
-            status: 'queued',
-            createdAt: FieldValue.serverTimestamp(),
-            attempts: 0,
-            lastAttemptAt: null,
-            ...(decision.channels.email.deliverAfterMs ? { deliverAfterAt: new Date(Date.now() + decision.channels.email.deliverAfterMs) } : {}),
-            ...(eventData.test ? { test: true } : {}),
-          } as any,
-          { merge: true }
-        );
+      if (!contact.email) {
+        // Skip email job if no address (verification and other emails need it)
+      } else if (eventData.type === 'User.EmailVerificationRequested') {
+        // Verification email: generate link server-side (same pipeline as other notifications)
+        try {
+          const auth = getAdminAuth();
+          const userRecord = await auth.getUser(targetUserId);
+          if (userRecord.emailVerified === true) {
+            // Already verified; skip sending
+          } else {
+            const email = userRecord.email || contact.email;
+            if (!email) {
+              // No email on Auth or contact
+            } else {
+              const siteUrl = getSiteUrl();
+              const dashboardUrl = `${siteUrl}/dashboard/account?verified=1`;
+              const verifyUrl = await auth.generateEmailVerificationLink(email, {
+                url: dashboardUrl,
+                handleCodeInApp: false,
+              } as any);
+              const userName =
+                (userRecord.displayName && String(userRecord.displayName).trim()) ||
+                contact.name ||
+                (email.includes('@') ? email.split('@')[0] : 'there');
+              const jobRef = db.collection('emailJobs').doc(eventId);
+              await jobRef.set(
+                {
+                  id: eventId,
+                  eventId,
+                  userId: targetUserId,
+                  toEmail: email,
+                  template: 'verify_email',
+                  templatePayload: { userName, verifyUrl, dashboardUrl },
+                  status: 'queued',
+                  createdAt: FieldValue.serverTimestamp(),
+                  attempts: 0,
+                  lastAttemptAt: null,
+                  ...(eventData.test ? { test: true } : {}),
+                } as any,
+                { merge: true }
+              );
+            }
+          }
+        } catch (e: any) {
+          await eventRef.set(
+            { status: 'failed', processing: { ...(eventData.processing || {}), error: e?.message || 'Verification link failed' } },
+            { merge: true }
+          );
+          return { ok: false, eventId, processed: false, error: e?.message };
+        }
+      } else {
+        const built = buildEmailJobPayload({ eventType: eventData.type, payload: eventData.payload as any, recipientName: contact.name });
+        if (built) {
+          const jobRef = db.collection('emailJobs').doc(eventId);
+          await jobRef.set(
+            {
+              id: eventId,
+              eventId,
+              userId: targetUserId,
+              toEmail: contact.email,
+              template: built.template,
+              templatePayload: built.templatePayload,
+              status: 'queued',
+              createdAt: FieldValue.serverTimestamp(),
+              attempts: 0,
+              lastAttemptAt: null,
+              ...(decision.channels.email.deliverAfterMs ? { deliverAfterAt: new Date(Date.now() + decision.channels.email.deliverAfterMs) } : {}),
+              ...(eventData.test ? { test: true } : {}),
+            } as any,
+            { merge: true }
+          );
+        }
       }
     }
   }

@@ -269,6 +269,10 @@ export const notificationEventPayloadSchema: z.ZodType<NotificationEventPayload>
     missingFields: z.array(z.string()).optional(),
   }),
   z.object({
+    type: z.literal('User.EmailVerificationRequested'),
+    userId: baseString,
+  }),
+  z.object({
     type: z.literal('Marketing.WeeklyDigest'),
     userId: baseString,
     listings: z.array(

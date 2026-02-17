@@ -368,6 +368,15 @@ export function getEventRule(type: NotificationEventType, payload: NotificationE
         rateLimitPerUser: { email: { perHour: 1, perDay: 2 } },
         allowDuringQuietHours: true,
       };
+    case 'User.EmailVerificationRequested':
+      return {
+        category: 'onboarding',
+        urgency: 'normal',
+        channels: ['email'],
+        dedupeWindowMs: 1000 * 60 * 2,
+        rateLimitPerUser: { email: { perHour: 5, perDay: 10 } },
+        allowDuringQuietHours: true,
+      };
     case 'Marketing.WeeklyDigest':
       return {
         category: 'marketing',

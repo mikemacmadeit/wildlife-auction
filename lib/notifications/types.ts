@@ -60,6 +60,7 @@ export const NOTIFICATION_EVENT_TYPES = [
   // ONBOARDING / TRUST
   'User.Welcome',
   'User.ProfileIncompleteReminder',
+  'User.EmailVerificationRequested',
 
   // MARKETING (opt-in only)
   'Marketing.WeeklyDigest',
@@ -449,6 +450,10 @@ export type NotificationEventPayload =
       displayName?: string;
       settingsUrl: string;
       missingFields?: string[];
+    }
+  | {
+      type: 'User.EmailVerificationRequested';
+      userId: string;
     }
   | {
       type: 'Marketing.WeeklyDigest';

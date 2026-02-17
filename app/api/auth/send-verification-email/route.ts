@@ -1,15 +1,14 @@
 /**
  * POST /api/auth/send-verification-email
  *
- * Sends a branded verification email using the same pipeline as notifications:
- * create an emailJobs doc (template verify_email) and dispatch it via tryDispatchEmailJobNow,
- * so rendering and sending go through the same code path as notification emails (same styles, same provider).
- * The link is generated with Firebase Admin generateEmailVerificationLink; email is only
- * confirmed when the user clicks that link (Firebase sets emailVerified server-side).
+ * Sends verification email using the same mechanism as notification emails:
+ * create a User.EmailVerificationRequested event, process it (processEventDoc generates
+ * the verification link and creates the emailJob), then dispatch the job (tryDispatchEmailJobNow).
+ * Same pipeline as Order.Confirmed etc.: event → emailJob → sendEmailHtml.
  */
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { Timestamp } from 'firebase-admin/firestore';
-import { getSiteUrl } from '@/lib/site-url';
+import { processEventDoc } from '@/lib/notifications/processEvent';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { getEmailProvider, FROM_EMAIL, isEmailEnabled } from '@/lib/email/config';
 
@@ -72,36 +71,37 @@ export async function POST(request: Request) {
       return json({ ok: true, alreadyVerified: true });
     }
 
-    const siteUrl = getSiteUrl();
-    const dashboardUrl = `${siteUrl}/dashboard/account?verified=1`;
-
-    const actionCodeSettings = {
-      url: dashboardUrl,
-      handleCodeInApp: false,
-    };
-
-    const verifyUrl = await auth.generateEmailVerificationLink(email, actionCodeSettings as any);
-
-    const userName =
-      (userRecord.displayName && String(userRecord.displayName).trim()) ||
-      (email.includes('@') ? email.split('@')[0] : 'there');
-
-    // Send via the same pipeline as notifications: create job, then dispatch now (same renderEmail + sendEmailHtml path)
+    // Same mechanism as notification emails: create event → processEventDoc creates emailJob → dispatch
     const db = getAdminDb();
-    const jobRef = db.collection('emailJobs').doc();
-    await jobRef.set({
-      template: 'verify_email',
-      templatePayload: { userName, verifyUrl, dashboardUrl },
-      toEmail: email,
-      userId: uid,
-      status: 'queued',
+    const eventRef = db.collection('events').doc();
+    const eventData = {
+      id: eventRef.id,
+      type: 'User.EmailVerificationRequested' as const,
+      payload: { type: 'User.EmailVerificationRequested' as const, userId: uid },
+      targetUserIds: [uid],
+      status: 'pending' as const,
       createdAt: Timestamp.now(),
-    });
+      actorId: null as string | null,
+      entityType: 'user' as const,
+      entityId: uid,
+      processing: { attempts: 0, lastAttemptAt: null as any },
+      eventKey: eventRef.id,
+    };
+    await eventRef.set(eventData);
 
-    const dispatch = await tryDispatchEmailJobNow({ db, jobId: jobRef.id, waitForJob: true });
+    const processRes = await processEventDoc({ db: db as any, eventRef: eventRef as any, eventData: eventData as any });
+    if (!processRes.ok) {
+      console.error('[send-verification-email] processEventDoc failed:', processRes.error);
+      return json(
+        { ok: false, error: processRes.error || 'Failed to queue verification email.', message: 'Please try again or use the fallback.' },
+        { status: 500 }
+      );
+    }
+
+    const dispatch = await tryDispatchEmailJobNow({ db, jobId: eventRef.id, waitForJob: true });
     if (!dispatch.ok) {
       const isNotConfigured = dispatch.error?.toLowerCase().includes('not configured') ?? false;
-      console.error('[send-verification-email] Dispatch failed:', dispatch.error, { provider: getEmailProvider(), to: email.replace(/(.{2}).*@(.*)/, '$1…@$2') });
+      console.error('[send-verification-email] Dispatch failed:', dispatch.error, { provider: getEmailProvider(), uid });
       return json(
         {
           ok: false,
@@ -114,15 +114,13 @@ export async function POST(request: Request) {
       );
     }
     if (!dispatch.sent) {
-      // Job was created but not sent (e.g. already processed); treat as failure so client can fallback
       return json(
         { ok: false, error: 'Verification email could not be sent. Please try again or use the fallback.' },
         { status: 500 }
       );
     }
 
-    const masked = email.replace(/(.{2}).*@(.*)/, '$1…@$2');
-    console.info('[send-verification-email] Sent to', masked, 'via', getEmailProvider(), 'messageId:', dispatch.messageId ?? '—');
+    console.info('[send-verification-email] Sent via', getEmailProvider(), 'messageId:', dispatch.messageId ?? '—');
     return json({ ok: true, sent: true, provider: getEmailProvider() });
   } catch (e: any) {
     console.error('[send-verification-email]', e?.message || e);
