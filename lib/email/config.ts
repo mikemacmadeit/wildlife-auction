@@ -35,14 +35,9 @@ export function getEmailProvider(): EmailProvider {
   if (forced === 'brevo') return process.env.BREVO_API_KEY ? 'brevo' : 'none';
   if (forced === 'resend') return process.env.RESEND_API_KEY ? 'resend' : 'none';
 
-  // Default behavior:
-  // - Prefer SendGrid if configured (transactional).
-  // - Otherwise fall back to Brevo/Resend if configured.
-  if (process.env.NODE_ENV === 'production') {
-    if (process.env.SENDGRID_API_KEY) return 'sendgrid';
-  }
-  if (process.env.SENDGRID_API_KEY) return 'sendgrid';
+  // Default behavior (when EMAIL_PROVIDER not set): prefer Brevo, then SendGrid, then Resend.
   if (process.env.BREVO_API_KEY) return 'brevo';
+  if (process.env.SENDGRID_API_KEY) return 'sendgrid';
   if (process.env.RESEND_API_KEY) return 'resend';
   return 'none';
 }
