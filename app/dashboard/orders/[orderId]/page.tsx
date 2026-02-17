@@ -25,7 +25,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, AlertTriangle, ArrowLeft, Camera, CheckCircle2, MapPin, Package, Star, User } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, Camera, CheckCircle2, KeyRound, MapPin, Package, Star, User } from 'lucide-react';
 import type { Listing, Order, TransactionStatus } from '@/lib/types';
 import { getOrderById, subscribeToOrder } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
@@ -91,6 +91,64 @@ async function getAuthJson(path: string): Promise<any> {
   return json;
 }
 
+function PaymentCompletePinCard({
+  orderId,
+  onDismiss,
+  getAuthToken,
+}: {
+  orderId: string;
+  onDismiss: () => void;
+  getAuthToken: () => Promise<string>;
+}) {
+  const [pin, setPin] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await getAuthToken();
+        const res = await fetch('/api/delivery/buyer-pin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ orderId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled && res.ok && data.deliveryPin) setPin(data.deliveryPin);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [orderId, getAuthToken]);
+
+  return (
+    <div id="payment-complete-pin" className="scroll-mt-24 rounded-xl border-2 border-primary/40 bg-primary/10 p-4 sm:p-5 mb-6 space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">Payment complete</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Here&apos;s your delivery PIN — don&apos;t share it with anyone. You&apos;ll need it when the seller or driver arrives to complete the delivery. They&apos;ll hand you their device; enter this PIN, then sign and complete the steps.
+          </p>
+        </div>
+        <Button variant="ghost" size="sm" className="shrink-0 text-muted-foreground" onClick={onDismiss}>
+          Got it
+        </Button>
+      </div>
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading your PIN…
+        </div>
+      ) : pin ? (
+        <div className="flex items-center gap-2 rounded-lg bg-background/80 px-4 py-3 border border-border">
+          <KeyRound className="h-5 w-5 text-muted-foreground shrink-0" />
+          <span className="font-mono text-xl font-semibold tracking-wider">{pin}</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function BuyerOrderDetailPage() {
   const params = useParams<{ orderId: string }>();
   const searchParams = useSearchParams();
@@ -116,6 +174,7 @@ export default function BuyerOrderDetailPage() {
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [addressMapModalOpen, setAddressMapModalOpen] = useState(false);
   const [addressMapAddress, setAddressMapAddress] = useState<{ line1: string; line2?: string; city: string; state: string; zip: string; lat: number; lng: number; deliveryInstructions?: string } | null>(null);
+  const [showPaymentCompletePinCard, setShowPaymentCompletePinCard] = useState(false);
 
   const SEND_PHOTOS_PROMPT_KEY = 'we:send-photos-prompted:v1';
 
@@ -210,7 +269,8 @@ export default function BuyerOrderDetailPage() {
         const data = await res.json().catch(() => ({}));
         if (res.ok && (data.applied === true || data.alreadyConfirmed === true)) {
           await loadOrder();
-          toast({ title: 'Final payment confirmed', description: 'Your order is updated.' });
+          setShowPaymentCompletePinCard(true);
+          toast({ title: 'Payment complete', description: 'Here’s your delivery PIN — see below.' });
         } else if (!res.ok) {
           toast({ title: 'Update delayed', description: data.error || 'Your payment succeeded. The page will update shortly.', variant: 'default' });
           await loadOrder();
@@ -665,6 +725,20 @@ export default function BuyerOrderDetailPage() {
           }}
         />
 
+        {/* Payment complete — show PIN prominently after final payment return */}
+        {showPaymentCompletePinCard && order && (order as any).finalPaymentConfirmedAt && (
+          <PaymentCompletePinCard
+            orderId={order.id}
+            onDismiss={() => setShowPaymentCompletePinCard(false)}
+            getAuthToken={async () => {
+              const { auth } = await import('@/lib/firebase/config');
+              const u = auth.currentUser;
+              if (!u) throw new Error('Auth required');
+              return u.getIdToken();
+            }}
+          />
+        )}
+
         {/* Order Progress — unified timeline with step-specific info under each milestone */}
         <OrderMilestoneTimeline
           order={order}
@@ -789,105 +863,124 @@ export default function BuyerOrderDetailPage() {
               }
             }
             if (milestone.key === 'out_for_delivery') {
-              const outPhaseBalanceDue = getOrderBalanceDue(o as any) > 0 && !(o as any).finalPaymentConfirmedAt;
-              const outPhaseCurrent = milestone.isCurrent && (txStatus === 'DELIVERY_SCHEDULED' || (txStatus === 'OUT_FOR_DELIVERY' && outPhaseBalanceDue));
+              const balanceDue = getOrderBalanceDue(o as any);
+              const hasBalanceDue = balanceDue > 0 && !(o as any).finalPaymentConfirmedAt;
+              const outPhaseCurrent = milestone.isCurrent && (txStatus === 'DELIVERY_SCHEDULED' || txStatus === 'OUT_FOR_DELIVERY');
+              const paidAndOut = (txStatus === 'DELIVERY_SCHEDULED' || txStatus === 'OUT_FOR_DELIVERY') && (!!(o as any).finalPaymentConfirmedAt || balanceDue <= 0);
+
               if (outPhaseCurrent) {
                 return (
-                  <div className="mt-3 space-y-3">
-                    <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
-                      The seller or driver will deliver during the scheduled window. Complete your final payment in the step below to get your delivery PIN. When they arrive, use the PIN in the <strong>Delivery</strong> step — enter it on their phone, sign, and they&apos;ll take a photo to complete the delivery.
-                    </div>
+                  <div id="out-for-delivery-pay" className="mt-3 space-y-4">
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      The seller or driver will deliver during the scheduled window. When they arrive, they’ll hand you their phone so you can enter your PIN, sign, and complete the delivery. Your PIN appears below once you’ve paid the balance due.
+                    </p>
+                    {hasBalanceDue ? (
+                      <div id="pay-final" className="scroll-mt-24 rounded-lg border-2 border-primary/30 bg-primary/5 p-4 sm:p-5">
+                        <p className="text-sm font-medium text-foreground">Pay balance due to get your delivery PIN</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Complete final payment to unlock your 4-digit PIN. The driver’s checklist also unlocks after you pay.
+                        </p>
+                        {typeof (o as any).depositAmount === 'number' && (o as any).depositAmount > 0 ? (
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            Total ${Number((o as any).amount).toFixed(2)} − Deposit ${(o as any).depositAmount.toFixed(2)} = <span className="font-semibold text-foreground">${balanceDue.toFixed(2)} due</span>
+                          </p>
+                        ) : (
+                          <p className="mt-2 text-lg font-semibold text-foreground">Balance due: ${balanceDue.toFixed(2)}</p>
+                        )}
+                        <Button
+                          className="mt-3 w-full sm:w-auto min-h-[44px] touch-manipulation"
+                          disabled={!!processing}
+                          onClick={async () => {
+                            setProcessing('pay-final');
+                            try {
+                              const { auth } = await import('@/lib/firebase/config');
+                              const u = auth.currentUser;
+                              if (!u) throw new Error('Auth required');
+                              const token = await u.getIdToken(true);
+                              const res = await fetch(`/api/orders/${o.id}/final-payment-session`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                body: JSON.stringify({}),
+                              });
+                              const data = await res.json().catch(() => ({}));
+                              if (!res.ok) throw new Error(data.error || data.details || 'Failed to start payment');
+                              if (data.url) { window.location.href = data.url; return; }
+                              throw new Error('No payment URL returned');
+                            } catch (e: any) {
+                              toast({ title: 'Payment could not start', description: formatUserFacingError(e, 'Failed to start payment'), variant: 'destructive' });
+                            } finally {
+                              setProcessing(null);
+                            }
+                          }}
+                        >
+                          {processing === 'pay-final' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                          Pay now
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <BuyerDeliveryPin
+                          orderId={o.id}
+                          finalPaymentConfirmed={!!(o as any).finalPaymentConfirmedAt}
+                          getAuthToken={async () => {
+                            const { auth } = await import('@/lib/firebase/config');
+                            const u = auth.currentUser;
+                            if (!u) throw new Error('Auth required');
+                            return u.getIdToken();
+                          }}
+                        />
+                        <Collapsible open={outForDeliveryExpanded} onOpenChange={setOutForDeliveryExpanded}>
+                          <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground w-full justify-start rounded px-2 py-1 -mx-2 -my-1">
+                            <MapPin className="h-4 w-4" />
+                            {outForDeliveryExpanded ? 'Hide' : 'Show'} live tracking & delivery info
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="pt-2 space-y-3">
+                            <DeliveryTrackingCard order={o} role="buyer" currentUserUid={user?.uid ?? null} onStartTracking={async () => {}} onStopTracking={async () => {}} onMarkDelivered={async () => {}} />
+                            {!order?.deliveryTracking?.enabled && (
+                              <p className="text-sm text-muted-foreground">
+                                Live tracking will appear when the seller starts delivery. When they arrive, enter your PIN on their device, sign, and they’ll take a photo to complete delivery.
+                              </p>
+                            )}
+                          </CollapsibleContent>
+                        </Collapsible>
+                      </>
+                    )}
                   </div>
                 );
               }
-              if ((milestone.isCurrent || milestone.isComplete) && txStatus === 'OUT_FOR_DELIVERY') {
+              if ((milestone.isCurrent || milestone.isComplete) && paidAndOut && !hasBalanceDue) {
                 return (
-                  <Collapsible open={outForDeliveryExpanded} onOpenChange={setOutForDeliveryExpanded} className="mt-3">
-                    <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground w-full justify-start rounded px-2 py-1 -mx-2 -my-1">
-                      <MapPin className="h-4 w-4" />
-                      {outForDeliveryExpanded ? 'Hide' : 'Show'} live tracking & delivery info
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="pt-2 space-y-3">
-                      <DeliveryTrackingCard order={o} role="buyer" currentUserUid={user?.uid ?? null} onStartTracking={async () => {}} onStopTracking={async () => {}} onMarkDelivered={async () => {}} />
-                      {!order?.deliveryTracking?.enabled && (
-                        <p className="text-sm text-muted-foreground">
-                          Live tracking will appear when the seller starts delivery. When they arrive, complete the delivery checklist (PIN, sign, photo) in the <strong>Delivery</strong> section below.
-                        </p>
-                      )}
-                    </CollapsibleContent>
-                  </Collapsible>
+                  <div className="mt-3 space-y-3">
+                    <BuyerDeliveryPin
+                      orderId={o.id}
+                      finalPaymentConfirmed={!!(o as any).finalPaymentConfirmedAt}
+                      getAuthToken={async () => {
+                        const { auth } = await import('@/lib/firebase/config');
+                        const u = auth.currentUser;
+                        if (!u) throw new Error('Auth required');
+                        return u.getIdToken();
+                      }}
+                    />
+                    <Collapsible open={outForDeliveryExpanded} onOpenChange={setOutForDeliveryExpanded}>
+                      <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground w-full justify-start rounded px-2 py-1 -mx-2 -my-1">
+                        <MapPin className="h-4 w-4" />
+                        {outForDeliveryExpanded ? 'Hide' : 'Show'} live tracking & delivery info
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="pt-2 space-y-3">
+                        <DeliveryTrackingCard order={o} role="buyer" currentUserUid={user?.uid ?? null} onStartTracking={async () => {}} onStopTracking={async () => {}} onMarkDelivered={async () => {}} />
+                        {!order?.deliveryTracking?.enabled && (
+                          <p className="text-sm text-muted-foreground">
+                            Live tracking will appear when the seller starts delivery. When they arrive, enter your PIN on their device, sign, and they’ll take a photo to complete delivery.
+                          </p>
+                        )}
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </div>
                 );
               }
             }
             if (milestone.key === 'inspection_final_payment') {
-              const balanceDue = getOrderBalanceDue(o as any);
-              const hasBalanceDue = balanceDue > 0 && !(o as any).finalPaymentConfirmedAt;
-              if (milestone.isCurrent && hasBalanceDue) {
-                const deposit = typeof (o as any).depositAmount === 'number' ? (o as any).depositAmount : 0;
-                return (
-                  <div id="pay-final" className="mt-3 scroll-mt-24 rounded-lg border-2 border-primary/30 bg-primary/5 p-4 sm:p-5">
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      Complete your final payment (balance due) to receive your delivery PIN and finish the transaction.
-                    </p>
-                    {deposit > 0 ? (
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        Total ${Number((o as any).amount).toFixed(2)} − Deposit ${deposit.toFixed(2)} = <span className="font-semibold text-foreground">Balance due ${balanceDue.toFixed(2)}</span>
-                      </p>
-                    ) : (
-                      <p className="mt-2 text-lg font-semibold text-foreground">
-                        Balance due: ${balanceDue.toFixed(2)}
-                      </p>
-                    )}
-                    <Button
-                      className="mt-3 w-full sm:w-auto min-h-[44px] touch-manipulation"
-                      disabled={!!processing}
-                      onClick={async () => {
-                        setProcessing('pay-final');
-                        try {
-                          const { auth } = await import('@/lib/firebase/config');
-                          const u = auth.currentUser;
-                          if (!u) throw new Error('Auth required');
-                          // Force token refresh so first click succeeds (avoids expired/cached token 401)
-                          const token = await u.getIdToken(true);
-                          const res = await fetch(`/api/orders/${o.id}/final-payment-session`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                            body: JSON.stringify({}),
-                          });
-                          const data = await res.json().catch(() => ({}));
-                          if (!res.ok) {
-                            const msg = data.error || data.details || 'Failed to start payment';
-                            throw new Error(msg);
-                          }
-                          if (data.url) {
-                            window.location.href = data.url;
-                            return;
-                          }
-                          throw new Error('No payment URL returned');
-                        } catch (e: any) {
-                          toast({
-                            title: 'Payment could not start',
-                            description: `${formatUserFacingError(e, 'Failed to start payment')} You can try again.`,
-                            variant: 'destructive',
-                          });
-                        } finally {
-                          setProcessing(null);
-                        }
-                      }}
-                    >
-                      {processing === 'pay-final' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                      Pay now
-                    </Button>
-                  </div>
-                );
-              }
-              if (milestone.isComplete && (o as any).finalPaymentConfirmedAt) {
-                return (
-                  <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
-                    Final payment received. Your delivery PIN is in the <strong>Delivery</strong> step below — use it when the seller or driver arrives.
-                  </div>
-                );
-              }
+              return null;
             }
             if (milestone.key === 'delivered') {
               const deliveredQrSignedAt = (o.delivery as any)?.confirmedMethod === 'qr_public' && (o.delivery as any)?.confirmedAt && ((o.delivery as any)?.signatureUrl || (o.delivery as any)?.deliveryPhotoUrl);

@@ -527,24 +527,25 @@ export default function SellerOrderDetailPage() {
                     }}
                   />
                   {needsMarkOut && (
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-border/60 bg-muted/30 p-3">
-                      <span className="text-sm text-muted-foreground">Can&apos;t use live tracking? Mark out to notify the buyer you&apos;re on the way — complete the checklist at handoff.</span>
+                    <div className="flex flex-col gap-3 rounded-xl border-2 border-primary/40 bg-primary/10 p-4 sm:p-4 sm:flex-row sm:items-center">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-foreground">Can&apos;t use live tracking?</p>
+                        <p className="text-sm text-muted-foreground mt-0.5">Mark out to notify the buyer you&apos;re on the way — complete the checklist at handoff.</p>
+                      </div>
                       <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full sm:w-auto min-h-[44px] touch-manipulation shrink-0"
+                        className="w-full sm:w-auto min-h-[52px] touch-manipulation shrink-0 font-semibold"
                         disabled={!!processing}
                         onClick={() => setMarkOutForDeliveryOpen(true)}
                       >
-                        <Truck className="h-4 w-4 mr-2" />
+                        <Truck className="h-4 w-4 mr-2 shrink-0" />
                         Mark out for delivery
                       </Button>
                     </div>
                   )}
 
                   <div className="pt-2 border-t border-border/60">
-                    <p className="text-sm font-medium text-foreground/90">Someone else delivering?</p>
-                    <p className="text-xs text-muted-foreground mb-2">Send them the driver link. Same steps at handoff.</p>
+                    <p className="text-sm font-medium text-foreground">Using a driver?</p>
+                    <p className="text-xs text-muted-foreground mb-3">Copy the link below and send it to them. They’ll use it for the run and to complete the handoff checklist.</p>
                     {user && (outTxStatus === 'DELIVERY_SCHEDULED' || outTxStatus === 'OUT_FOR_DELIVERY') && (
                       <DeliverySessionCard
                         orderId={o.id}

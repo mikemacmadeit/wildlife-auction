@@ -93,15 +93,7 @@ export async function POST(request: Request) {
 
     const hasFinalPaymentDue = typeof orderData.finalPaymentAmount === 'number' && orderData.finalPaymentAmount > 0;
     const finalPaymentConfirmed = !!orderData.finalPaymentConfirmedAt;
-    if (hasFinalPaymentDue && !finalPaymentConfirmed) {
-      return json(
-        {
-          error: 'Final payment required',
-          details: 'The delivery session (and driver link) is available only after the buyer has completed the final payment.',
-        },
-        { status: 400 }
-      );
-    }
+    const paymentPending = hasFinalPaymentDue && !finalPaymentConfirmed;
 
     // Check for existing session (active or delivered) — return it so QR/links stay visible
     const existing = await db
@@ -129,15 +121,19 @@ export async function POST(request: Request) {
         role: 'buyer',
       });
       const baseUrl = getSiteUrl();
-      return json({
+      const payload: Record<string, unknown> = {
         success: true,
         sessionId: existingDoc.id,
         driverLink: `${baseUrl}/delivery/driver?token=${encodeURIComponent(driverToken)}`,
-        buyerConfirmLink: `${baseUrl}/delivery/confirm?token=${encodeURIComponent(buyerToken)}`,
-        qrValue: `${baseUrl}/delivery/confirm?token=${encodeURIComponent(buyerToken)}`,
-        deliveryPin: pin,
         expiresAt: (data.expiresAt as any)?.toDate?.()?.toISOString?.(),
-      });
+        finalPaymentPending: paymentPending,
+      };
+      if (!paymentPending) {
+        payload.buyerConfirmLink = `${baseUrl}/delivery/confirm?token=${encodeURIComponent(buyerToken)}`;
+        payload.qrValue = `${baseUrl}/delivery/confirm?token=${encodeURIComponent(buyerToken)}`;
+        payload.deliveryPin = pin;
+      }
+      return json(payload);
     }
 
     // Create new session — only when delivery is scheduled or out
@@ -179,15 +175,19 @@ export async function POST(request: Request) {
     const buyerToken = signDeliveryToken({ sessionId, orderId, role: 'buyer' });
     const baseUrl = getSiteUrl();
 
-    return json({
+    const payload: Record<string, unknown> = {
       success: true,
       sessionId,
       driverLink: `${baseUrl}/delivery/driver?token=${encodeURIComponent(driverToken)}`,
-      buyerConfirmLink: `${baseUrl}/delivery/confirm?token=${encodeURIComponent(buyerToken)}`,
-      qrValue: `${baseUrl}/delivery/confirm?token=${encodeURIComponent(buyerToken)}`,
-      deliveryPin,
       expiresAt: expiresAt.toISOString(),
-    });
+      finalPaymentPending: paymentPending,
+    };
+    if (!paymentPending) {
+      payload.buyerConfirmLink = `${baseUrl}/delivery/confirm?token=${encodeURIComponent(buyerToken)}`;
+      payload.qrValue = `${baseUrl}/delivery/confirm?token=${encodeURIComponent(buyerToken)}`;
+      payload.deliveryPin = deliveryPin;
+    }
+    return json(payload);
   } catch (error: any) {
     if (error?.message?.includes('DELIVERY_TOKEN_SECRET')) {
       return json({ error: 'Server misconfigured' }, { status: 503 });

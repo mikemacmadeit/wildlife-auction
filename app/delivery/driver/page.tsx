@@ -29,6 +29,8 @@ interface VerifyResult {
   ranchLabel?: string;
   deliveryWindowStart?: string;
   deliveryWindowEnd?: string;
+  finalPaymentConfirmed?: boolean;
+  finalPaymentPending?: boolean;
   error?: string;
   alreadyDelivered?: boolean;
   expired?: boolean;
@@ -248,6 +250,10 @@ export default function DeliveryDriverPage() {
       setError('Please sign before submitting.');
       return;
     }
+    if (!photoDataUrl) {
+      setError('Please take a photo of the delivery before completing.');
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -256,8 +262,8 @@ export default function DeliveryDriverPage() {
         token,
         signaturePngBase64: base64,
         deliveryPin: verifiedPin,
+        photoBase64: photoDataUrl,
       };
-      if (photoDataUrl) body.photoBase64 = photoDataUrl;
 
       const res = await fetch('/api/delivery/complete-delivery', {
         method: 'POST',
@@ -424,7 +430,21 @@ export default function DeliveryDriverPage() {
           )}
         </div>
 
-        {/* 3-step checklist */}
+        {/* Gate: driver checklist locked until buyer completes final payment */}
+        {verify.role === 'driver' && verify.finalPaymentPending && (
+          <div className="rounded-xl border-2 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-5 sm:p-6 space-y-3">
+            <h2 className="text-sm font-semibold text-amber-900 dark:text-amber-100">Delivery checklist locked</h2>
+            <p className="text-sm text-amber-800 dark:text-amber-200">
+              The checklist will unlock once the buyer completes final payment on their order. They’ll get their 4-digit PIN on their order page after paying — that PIN is needed to complete the handoff.
+            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              You can use <strong>Start live tracking</strong> above in the meantime. When the buyer has paid, refresh this page to open the checklist.
+            </p>
+          </div>
+        )}
+
+        {/* 3-step checklist — shown when buyer has paid (or for non-driver roles) */}
+        {(!verify.role || verify.role !== 'driver' || verify.finalPaymentConfirmed) && (
         <div className="rounded-xl border bg-background shadow-sm overflow-hidden">
           <div className="px-5 sm:px-6 py-3 border-b bg-muted/30">
             <h2 className="text-sm font-semibold">Complete delivery</h2>
@@ -472,7 +492,7 @@ export default function DeliveryDriverPage() {
             <div className={cn('space-y-2', !pinVerified && 'opacity-50 pointer-events-none')}>
               <div className="flex items-center gap-3">
                 <StepDot n={2} done={hasSignature} />
-                <span className="font-medium text-sm">Get signature</span>
+                <span className="font-medium text-sm">Get signature <span className="text-muted-foreground font-normal">(required)</span></span>
               </div>
               <p className="text-xs text-muted-foreground pl-12">Recipient signs below to confirm delivery.</p>
               <div className="pl-12">
@@ -490,9 +510,9 @@ export default function DeliveryDriverPage() {
             <div className={cn('space-y-2', !pinVerified && 'opacity-50 pointer-events-none')}>
               <div className="flex items-center gap-3">
                 <StepDot n={3} done={!!photoDataUrl} />
-                <span className="font-medium text-sm">Take photo</span>
+                <span className="font-medium text-sm">Take photo <span className="text-muted-foreground font-normal">(required)</span></span>
               </div>
-              <p className="text-xs text-muted-foreground pl-12">Picture of the animals at delivery.</p>
+              <p className="text-xs text-muted-foreground pl-12">Picture of the animals or items at delivery.</p>
               <div className="pl-12 space-y-2">
                 <input
                   ref={fileInputRef}
@@ -537,7 +557,7 @@ export default function DeliveryDriverPage() {
 
             <Button
               onClick={handleSubmit}
-              disabled={!pinVerified || !hasSignature || submitting}
+              disabled={!pinVerified || !hasSignature || !photoDataUrl || submitting}
               className="w-full h-12 rounded-lg font-semibold"
             >
               {submitting ? (
@@ -554,6 +574,7 @@ export default function DeliveryDriverPage() {
             </Button>
           </div>
         </div>
+        )}
       </main>
     </div>
   );

@@ -169,14 +169,20 @@ export function getOrderMilestones(order: Order, role?: 'buyer' | 'seller'): Ord
     const outStepLabel =
       combinedPhaseComplete ? 'Out for delivery' : combinedPhaseCurrent && viewerRole === 'seller' ? 'Start delivery' : combinedPhaseCurrent ? 'Out for delivery' : 'Out for delivery';
 
+    // For buyer: step is "complete" when they've paid (inspection/final payment done). For seller: when delivery is done.
+    const outForDeliveryStepComplete = viewerRole === 'buyer' ? inspectionFinalComplete : outForDeliveryComplete;
+    const outForDeliveryCompletedAt = viewerRole === 'buyer'
+      ? (inspectionFinalComplete && isValidNonEpochDate(order.finalPaymentConfirmedAt) ? order.finalPaymentConfirmedAt : undefined)
+      : (outForDeliveryComplete && isValidNonEpochDate(order.deliveredAt) ? order.deliveredAt : undefined);
+
     milestones.push({
       key: 'out_for_delivery',
       label: outStepLabel,
-      isComplete: outForDeliveryComplete,
+      isComplete: outForDeliveryStepComplete,
       isCurrent: combinedPhaseCurrent,
       isBlocked: false,
       ownerRole: 'seller',
-      completedAt: outForDeliveryComplete && isValidNonEpochDate(order.deliveredAt) ? order.deliveredAt : undefined,
+      completedAt: outForDeliveryCompletedAt,
     });
 
     const inspectionLabel =
@@ -184,18 +190,21 @@ export function getOrderMilestones(order: Order, role?: 'buyer' | 'seller'): Ord
         ? 'Waiting on buyer – Inspection and Final payment'
         : 'Inspection and Final payment';
 
-    milestones.push({
-      key: 'inspection_final_payment',
-      label: inspectionLabel,
-      isComplete: combinedPhaseComplete,
-      isCurrent: combinedPhaseCurrent,
-      isBlocked: false,
-      ownerRole: 'buyer',
-      helpText: hasFinalPaymentDue
-        ? 'Complete your final payment (balance due) to receive your delivery PIN and finish the transaction.'
-        : undefined,
-      completedAt: isValidNonEpochDate(order.finalPaymentConfirmedAt) ? order.finalPaymentConfirmedAt : undefined,
-    });
+    // For seller: show Inspection and Final payment as its own step. For buyer: merged into Out for delivery (skip this milestone).
+    if (viewerRole === 'seller') {
+      milestones.push({
+        key: 'inspection_final_payment',
+        label: inspectionLabel,
+        isComplete: combinedPhaseComplete,
+        isCurrent: combinedPhaseCurrent,
+        isBlocked: false,
+        ownerRole: 'buyer',
+        helpText: hasFinalPaymentDue
+          ? 'Complete your final payment (balance due) to receive your delivery PIN and finish the transaction.'
+          : undefined,
+        completedAt: isValidNonEpochDate(order.finalPaymentConfirmedAt) ? order.finalPaymentConfirmedAt : undefined,
+      });
+    }
 
     // Delivery: seller has checklist, buyer has PIN. Label "Delivery" until complete, then "Delivered".
     const deliveredCurrent =

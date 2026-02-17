@@ -76,7 +76,7 @@ export function BuyerDeliveryPin({ orderId, getAuthToken, finalPaymentConfirmed,
       return (
         <div className={className}>
           <p className="text-sm text-muted-foreground">
-            Complete your final payment to receive your delivery PIN. Use the <strong>Pay now</strong> button in the &quot;Inspection and Final payment&quot; section above.
+            Complete your final payment above to receive your delivery PIN. You&apos;ll need it when the seller or driver arrives to complete the delivery.
           </p>
         </div>
       );
@@ -96,10 +96,12 @@ export function BuyerDeliveryPin({ orderId, getAuthToken, finalPaymentConfirmed,
   return (
     <div className={className}>
       <div className="rounded-lg border-2 border-primary/30 bg-primary/5 px-4 py-3">
-        <p className="text-sm font-medium text-foreground/90">Your delivery PIN</p>
-        <p className="text-xs text-muted-foreground mt-0.5">The seller or driver will ask for this when they arrive. Enter it on their phone to unlock the signature and photo steps — only you have this PIN.</p>
+        <p className="text-sm font-medium text-foreground">Your delivery PIN</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Don&apos;t share this with anyone. You&apos;ll need it when the seller or driver arrives — they&apos;ll hand you their device and you enter this PIN to complete the delivery (signature and photo).
+        </p>
         <div className="mt-2 flex items-center gap-2">
-          <KeyRound className="h-4 w-4 text-muted-foreground" />
+          <KeyRound className="h-4 w-4 text-muted-foreground shrink-0" />
           <span className="font-mono text-lg font-semibold tracking-wider">{pin}</span>
         </div>
       </div>

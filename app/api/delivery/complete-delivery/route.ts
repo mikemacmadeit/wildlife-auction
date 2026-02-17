@@ -81,6 +81,9 @@ export async function POST(request: Request) {
     if (!token || !signaturePngBase64) {
       return json({ error: 'token and signaturePngBase64 required' }, { status: 400 });
     }
+    if (!photoBase64 || !photoBase64.trim()) {
+      return json({ error: 'A delivery photo is required. Take a photo of the animals or items at delivery before completing.' }, { status: 400 });
+    }
     if (!deliveryPin || (deliveryPin.length !== 4 && deliveryPin.length !== 6)) {
       return json({ error: 'Valid 4-digit delivery PIN required. Recipient must confirm PIN to prove they are authorized.' }, { status: 400 });
     }
@@ -135,28 +138,26 @@ export async function POST(request: Request) {
       'image/png'
     );
 
-    // Upload photo if provided
-    let photoUrl: string | null = null;
-    if (photoBase64 && photoBase64.trim()) {
-      try {
-        const isJpeg = /^data:image\/jpe?g;base64,/.test(photoBase64);
-        const isPng = /^data:image\/png;base64,/.test(photoBase64);
-        const isWebp = /^data:image\/webp;base64,/.test(photoBase64);
-        const contentType = isJpeg ? 'image/jpeg' : isWebp ? 'image/webp' : isPng ? 'image/png' : 'image/jpeg';
-        photoUrl = await uploadBase64Image(
-          photoBase64,
-          `${pathPrefix}/photo`,
-          contentType
-        );
-      } catch (e: any) {
-        console.error('[complete-delivery] Photo upload failed', e);
-        const msg = e?.message ?? String(e);
-        const userMsg =
-          msg.includes('too large') || msg.includes('Image too large')
-            ? 'Photo is too large. Try taking a new photo or choose a smaller image.'
-            : 'Failed to upload photo. Try a different image or complete without the photo.';
-        return json({ error: userMsg }, { status: 400 });
-      }
+    // Upload photo (required)
+    let photoUrl: string;
+    try {
+      const isJpeg = /^data:image\/jpe?g;base64,/.test(photoBase64);
+      const isPng = /^data:image\/png;base64,/.test(photoBase64);
+      const isWebp = /^data:image\/webp;base64,/.test(photoBase64);
+      const contentType = isJpeg ? 'image/jpeg' : isWebp ? 'image/webp' : isPng ? 'image/png' : 'image/jpeg';
+      photoUrl = await uploadBase64Image(
+        photoBase64,
+        `${pathPrefix}/photo`,
+        contentType
+      );
+    } catch (e: any) {
+      console.error('[complete-delivery] Photo upload failed', e);
+      const msg = e?.message ?? String(e);
+      const userMsg =
+        msg.includes('too large') || msg.includes('Image too large')
+          ? 'Photo is too large. Try taking a new photo or choose a smaller image.'
+          : 'Failed to upload photo. Try a different image.';
+      return json({ error: userMsg }, { status: 400 });
     }
 
     const sessionUpdate = sanitizeFirestorePayload({
@@ -167,7 +168,7 @@ export async function POST(request: Request) {
         storagePath: `${pathPrefix}/signature`,
         hash: createHash('sha256').update(signatureBuffer).digest('hex'),
       },
-      ...(photoUrl ? { deliveryPhotoUrl: photoUrl } : {}),
+      deliveryPhotoUrl: photoUrl,
     });
     await sessionRef.update(sessionUpdate);
 

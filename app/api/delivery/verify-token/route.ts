@@ -81,6 +81,10 @@ export async function POST(request: Request) {
     const windowStart = agreedWindow?.start?.toDate?.() ?? agreedWindow?.start;
     const windowEnd = agreedWindow?.end?.toDate?.() ?? agreedWindow?.end;
 
+    const finalPaymentAmount = typeof order.finalPaymentAmount === 'number' ? order.finalPaymentAmount : 0;
+    const finalPaymentConfirmed = !!order.finalPaymentConfirmedAt;
+    const finalPaymentPending = finalPaymentAmount > 0 && !finalPaymentConfirmed;
+
     return json({
       valid: true,
       role: payload.role,
@@ -91,6 +95,8 @@ export async function POST(request: Request) {
       ranchLabel: sellerProfile?.ranchName || sellerProfile?.brand || '',
       deliveryWindowStart: windowStart ? new Date(windowStart).toISOString() : null,
       deliveryWindowEnd: windowEnd ? new Date(windowEnd).toISOString() : null,
+      finalPaymentConfirmed: !finalPaymentPending,
+      finalPaymentPending,
     });
   } catch (error: any) {
     if (error?.message?.includes('DELIVERY_TOKEN_SECRET')) {

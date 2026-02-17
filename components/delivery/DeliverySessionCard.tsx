@@ -17,8 +17,10 @@ interface DeliverySessionCardProps {
 
 interface SessionData {
   driverLink: string;
-  buyerConfirmLink: string;
+  buyerConfirmLink?: string | null;
+  deliveryPin?: string | null;
   expiresAt?: string;
+  finalPaymentPending?: boolean;
 }
 
 export function DeliverySessionCard({ orderId, getAuthToken, onError }: DeliverySessionCardProps) {
@@ -59,8 +61,10 @@ export function DeliverySessionCard({ orderId, getAuthToken, onError }: Delivery
       }
       setSession({
         driverLink: data.driverLink,
-        buyerConfirmLink: data.buyerConfirmLink,
+        buyerConfirmLink: data.buyerConfirmLink ?? null,
+        deliveryPin: data.deliveryPin ?? null,
         expiresAt: data.expiresAt,
+        finalPaymentPending: data.finalPaymentPending === true,
       });
     } catch (e: any) {
       const msg = e?.message || 'Failed to load session';
@@ -94,9 +98,9 @@ export function DeliverySessionCard({ orderId, getAuthToken, onError }: Delivery
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Loading driver link...
+      <div className="flex items-center gap-2 text-sm text-muted-foreground py-3">
+        <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+        <span>Getting your link...</span>
       </div>
     );
   }
@@ -104,7 +108,7 @@ export function DeliverySessionCard({ orderId, getAuthToken, onError }: Delivery
   if (setupError) {
     return (
       <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-4 text-sm">
-        <p className="font-medium text-amber-800 dark:text-amber-200">Driver link setup required</p>
+        <p className="font-medium text-amber-800 dark:text-amber-200">Couldn&apos;t load driver link</p>
         <p className="mt-1 text-amber-700 dark:text-amber-300">{setupError}</p>
       </div>
     );
@@ -114,18 +118,30 @@ export function DeliverySessionCard({ orderId, getAuthToken, onError }: Delivery
     return null;
   }
 
+  const canCopyBuyer = session.buyerConfirmLink && !session.finalPaymentPending;
+
   return (
-    <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-3">
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" onClick={copyDriver} className="min-h-[36px]">
-          {copied === 'driver' ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
-          Copy Driver Link
+    <div className="rounded-xl border border-border bg-card p-4 space-y-4 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+        <Button
+          onClick={copyDriver}
+          className="min-h-[48px] font-semibold shrink-0 touch-manipulation"
+        >
+          {copied === 'driver' ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+          {copied === 'driver' ? 'Copied!' : 'Copy link for driver'}
         </Button>
-        <Button variant="outline" size="sm" onClick={copyBuyer} className="min-h-[36px]">
-          {copied === 'buyer' ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
-          Copy Buyer Link
-        </Button>
+        {canCopyBuyer && (
+          <Button variant="outline" size="sm" onClick={copyBuyer} className="min-h-[44px] shrink-0">
+            {copied === 'buyer' ? <Check className="h-4 w-4 mr-1.5" /> : <Copy className="h-4 w-4 mr-1.5" />}
+            {copied === 'buyer' ? 'Copied!' : 'Copy buyer link'}
+          </Button>
+        )}
       </div>
+      {session.finalPaymentPending && (
+        <p className="text-sm text-muted-foreground rounded-md bg-muted/50 px-3 py-2">
+          Once the buyer pays the remaining balance, the buyer link and PIN will show here so you can share them at handoff.
+        </p>
+      )}
     </div>
   );
 }
