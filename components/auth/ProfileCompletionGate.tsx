@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { createUserDocument, getUserProfile, isProfileComplete, updateUserProfile } from '@/lib/firebase/users';
@@ -21,9 +21,11 @@ export function ProfileCompletionGate() {
   const { user, loading, initialized } = useAuth();
 
   const [open, setOpen] = useState(false);
-  const [checking, setChecking] = useState(false);
+  const checkingRef = useRef(false);
 
-  const gateOpen = open && !checking;
+  // Use open directly so the modal doesn't flash closed when refresh() runs again (e.g. effect re-run).
+  // Previously "open && !checking" caused a visible flash: setChecking(true) hid the modal, then it reappeared.
+  const gateOpen = open;
 
   const isAuthedArea = useMemo(() => {
     // Only enforce inside authenticated app areas; avoid popping modals while browsing public pages.
@@ -32,7 +34,9 @@ export function ProfileCompletionGate() {
 
   const refresh = useCallback(async () => {
     if (!user?.uid) return;
-    setChecking(true);
+    // Avoid duplicate concurrent checks so we don't race and flash the modal.
+    if (checkingRef.current) return;
+    checkingRef.current = true;
     try {
       // Ensure the user doc exists (Google sign-in/login paths try to do this, but be defensive).
       await createUserDocument(user);
@@ -50,7 +54,7 @@ export function ProfileCompletionGate() {
       // If profile checks fail (offline, rules, transient), don't hard-block the app with a modal.
       setOpen(false);
     } finally {
-      setChecking(false);
+      checkingRef.current = false;
     }
   }, [user]);
 

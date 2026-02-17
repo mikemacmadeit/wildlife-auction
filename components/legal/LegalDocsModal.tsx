@@ -62,7 +62,7 @@ export function LegalDocsModal(props: {
         }
       }}
     >
-      <DialogContent className="border-2 w-[calc(100vw-2rem)] sm:w-full sm:max-w-4xl lg:max-w-5xl max-h-[90dvh] sm:max-h-[90vh] flex flex-col overflow-hidden p-4 sm:p-6">
+      <DialogContent className="border-2 w-[calc(100vw-2rem)] sm:w-full sm:max-w-4xl lg:max-w-5xl max-h-[90dvh] sm:max-h-[90vh] flex flex-col overflow-y-auto overflow-x-hidden p-4 sm:p-6">
         <DialogHeader className="shrink-0">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="min-w-0">
@@ -285,7 +285,7 @@ export function LegalDocsModal(props: {
         </Tabs>
 
         {props.agreeAction ? (
-          <div className="sticky bottom-0 mt-3 rounded-xl border bg-background p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] z-10">
+          <div className="sticky bottom-0 mt-3 rounded-xl border bg-background p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] z-10 border-t">
             <div className="flex items-start gap-3 min-w-0">
               <Checkbox
                 id="legal-agree"
