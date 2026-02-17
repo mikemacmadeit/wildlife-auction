@@ -1,6 +1,9 @@
 /**
  * Email Sender Service
- * Handles sending transactional emails
+ * Handles sending transactional emails (notifications, verification, order emails, etc.).
+ * All notification emails go through sendEmailHtml() → sendTransactionalEmail(), which uses
+ * the provider from config (SendGrid when EMAIL_PROVIDER=sendgrid and SENDGRID_API_KEY is set).
+ * No other code path sends transactional email; Netlify dispatchEmailJobs and API routes use this.
  */
 
 import { getEmailProvider, getResendClient, isEmailEnabled, FROM_EMAIL, FROM_NAME } from './config';

@@ -63,8 +63,8 @@ export function LegalDocsModal(props: {
         }
       }}
     >
-      <DialogContent className="border-2 w-[calc(100vw-2rem)] sm:w-full sm:max-w-4xl lg:max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
-        <DialogHeader>
+      <DialogContent className="border-2 w-[calc(100vw-2rem)] sm:w-full sm:max-w-4xl lg:max-w-5xl max-h-[90dvh] sm:max-h-[90vh] flex flex-col overflow-y-auto overflow-x-hidden p-4 sm:p-6">
+        <DialogHeader className="shrink-0">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="min-w-0">
               <DialogTitle>Legal documents</DialogTitle>
@@ -78,7 +78,7 @@ export function LegalDocsModal(props: {
           </div>
         </DialogHeader>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as LegalDocsModalTab)} className="w-full flex flex-col flex-1 min-h-0 overflow-hidden">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as LegalDocsModalTab)} className="w-full flex flex-col flex-1 min-h-0 overflow-hidden mt-3">
           <TabsList className="grid grid-cols-2 md:grid-cols-4 w-full shrink-0">
             <TabsTrigger value="tos">Terms</TabsTrigger>
             <TabsTrigger value="marketplacePolicies">Marketplace</TabsTrigger>
@@ -290,21 +290,21 @@ export function LegalDocsModal(props: {
         </Tabs>
 
         {props.agreeAction ? (
-          <div className="mt-3 rounded-xl border bg-muted/20 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
-            <div className="flex items-start gap-3">
+          <div className="sticky bottom-0 mt-3 rounded-xl border bg-background p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] z-10">
+            <div className="flex items-start gap-3 min-w-0">
               <Checkbox
                 id="legal-agree"
                 checked={agreeChecked}
                 onCheckedChange={(v) => setAgreeChecked(Boolean(v))}
-                className="mt-0.5"
+                className="mt-0.5 shrink-0"
               />
-              <label htmlFor="legal-agree" className="text-sm text-muted-foreground leading-relaxed">
+              <label htmlFor="legal-agree" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
                 {props.agreeAction.label ||
                   'I have read and agree to the Terms of Service and Marketplace Policies, including the arbitration agreement and class action waiver.'}
               </label>
             </div>
             <Button
-              className="font-semibold"
+              className="font-semibold shrink-0 w-full sm:w-auto"
               disabled={!agreeChecked}
               onClick={() => {
                 if (!agreeChecked) return;
