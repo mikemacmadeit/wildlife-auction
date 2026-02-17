@@ -783,12 +783,11 @@ export default function SellerOverviewPage() {
 
   const setupChecklist = useMemo(() => {
     const profileOk = !!userProfile && isProfileComplete(userProfile);
-    // Only show "verify email" complete when user actually completed our flow (landed on ?verified=1).
-    // Fallback: email/password users who verified before we added emailVerificationCompletedAt.
-    const isPasswordUser = user?.providerData?.some((p) => p?.providerId === 'password') ?? false;
+    // Email counts as verified: (1) user completed our flow (landed on ?verified=1), or
+    // (2) Firebase says emailVerified (e.g. signed up with Google — no verification step needed).
     const emailOk =
       !!userProfile?.emailVerificationCompletedAt ||
-      (user?.emailVerified === true && isPasswordUser);
+      user?.emailVerified === true;
     const payoutsOk =
       !!userProfile &&
       userProfile.stripeOnboardingStatus === 'complete' &&
@@ -801,7 +800,7 @@ export default function SellerOverviewPage() {
     const isComplete = done === total;
 
     return { profileOk, emailOk, payoutsOk, done, total, isComplete };
-  }, [user?.emailVerified, user?.providerData, userProfile, userProfile?.emailVerificationCompletedAt]);
+  }, [user?.emailVerified, userProfile, userProfile?.emailVerificationCompletedAt]);
 
   // Generate alerts from real data
   const alerts = useMemo((): SellerAlert[] => {

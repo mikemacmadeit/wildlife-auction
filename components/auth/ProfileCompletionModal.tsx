@@ -328,6 +328,12 @@ export function ProfileCompletionModal({
         description: 'Your profile has been completed.',
       });
 
+      // Skip verification step for users who signed up with Google (or any provider that sets emailVerified)
+      if (user?.emailVerified === true) {
+        onComplete();
+        return;
+      }
+
       // Show verify-email step (modal stays open) and send verification email immediately
       setShowVerifyEmailStep(true);
       setSendingVerification(true);

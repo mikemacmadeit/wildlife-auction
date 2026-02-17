@@ -1,6 +1,6 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminAuth } from '@/lib/firebase/admin';
-import { getSiteUrl } from '@/lib/site-url';
+import { getCanonicalSiteUrl } from '@/lib/site-url';
 import { getDefaultNotificationPreferences, notificationPreferencesSchema } from './preferences';
 import { decideChannels, getEventRule } from './rules';
 import { buildInAppNotification } from './inApp';
@@ -1142,7 +1142,7 @@ export async function processEventDoc(params: {
             if (!email) {
               // No email on Auth or contact
             } else {
-              const siteUrl = getSiteUrl();
+              const siteUrl = getCanonicalSiteUrl();
               const dashboardUrl = `${siteUrl}/dashboard/account?verified=1`;
               const verifyUrl = await auth.generateEmailVerificationLink(email, {
                 url: dashboardUrl,

@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   const emailEnabled = isEmailEnabled();
   const provider = getEmailProvider();
   if (process.env.NODE_ENV !== 'test') {
-    console.info('[send-verification-email]', { uid, emailEnabled, provider: provider === 'none' ? 'none' : provider });
+    console.info('[send-verification-email] step=check', { uid: uid.slice(0, 8), emailEnabled, provider: provider === 'none' ? 'none' : provider });
   }
   if (!emailEnabled) {
     console.error(
@@ -88,10 +88,13 @@ export async function POST(request: Request) {
       eventKey: eventRef.id,
     };
     await eventRef.set(eventData);
+    if (process.env.NODE_ENV !== 'test') {
+      console.info('[send-verification-email] step=event_created', { eventId: eventRef.id });
+    }
 
     const processRes = await processEventDoc({ db: db as any, eventRef: eventRef as any, eventData: eventData as any });
     if (!processRes.ok) {
-      console.error('[send-verification-email] processEventDoc failed:', processRes.error);
+      console.error('[send-verification-email] step=processEvent_failed', { error: processRes.error });
       return json(
         { ok: false, error: processRes.error || 'Failed to queue verification email.', message: 'Please try again or use the fallback.' },
         { status: 500 }
@@ -101,7 +104,7 @@ export async function POST(request: Request) {
     const dispatch = await tryDispatchEmailJobNow({ db, jobId: eventRef.id, waitForJob: true });
     if (!dispatch.ok) {
       const isNotConfigured = dispatch.error?.toLowerCase().includes('not configured') ?? false;
-      console.error('[send-verification-email] Dispatch failed:', dispatch.error, { provider: getEmailProvider(), uid });
+      console.error('[send-verification-email] step=dispatch_failed', { error: dispatch.error, provider: getEmailProvider(), uid: uid.slice(0, 8) });
       return json(
         {
           ok: false,
@@ -114,16 +117,19 @@ export async function POST(request: Request) {
       );
     }
     if (!dispatch.sent) {
+      console.error('[send-verification-email] step=dispatch_not_sent', { eventId: eventRef.id });
       return json(
         { ok: false, error: 'Verification email could not be sent. Please try again or use the fallback.' },
         { status: 500 }
       );
     }
 
-    console.info('[send-verification-email] Sent via', getEmailProvider(), 'messageId:', dispatch.messageId ?? '—');
+    if (process.env.NODE_ENV !== 'test') {
+      console.info('[send-verification-email] step=sent', { provider: getEmailProvider(), messageId: dispatch.messageId ?? '—' });
+    }
     return json({ ok: true, sent: true, provider: getEmailProvider() });
   } catch (e: any) {
-    console.error('[send-verification-email]', e?.message || e);
+    console.error('[send-verification-email] step=exception', { message: e?.message || String(e) });
     return json(
       { ok: false, error: 'Failed to send verification email', message: 'Please try again or use the fallback.' },
       { status: 500 }

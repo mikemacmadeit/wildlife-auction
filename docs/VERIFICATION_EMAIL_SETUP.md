@@ -33,6 +33,23 @@ If any of these are missing in **production**, the API returns 503 and the clien
 
 Redeploy, then trigger “Send verification email” again. The toast should **not** say “(via Firebase)” if the API is configured correctly.
 
+**5. Find the exact failure (Netlify logs)**
+
+In **Netlify** → Deploys → [latest] → **Functions** (or **Logs**), trigger “Send verification email” then search for `[send-verification-email]`. You’ll see one of:
+
+| Log message | Meaning |
+|-------------|---------|
+| `step=check` with `emailEnabled: false` or `provider: none` | Email provider not configured → set SENDGRID_API_KEY (or Resend/Brevo) and redeploy. |
+| `step=event_created` then `step=processEvent_failed` | Event was created but processing failed (e.g. Firebase Auth error generating link). Check the `error` in the log. |
+| `step=dispatch_failed` | Email job was created but sending failed (e.g. “not configured”, provider error). Check the `error` in the log. |
+| `step=dispatch_not_sent` | Job wasn’t sent (e.g. job doc missing or already processed). Rare; check that processEventDoc created the emailJob. |
+| `step=sent` | API sent the email. If the user still doesn’t get it, it’s deliverability (spam, FROM domain). See [Email deliverability](EMAIL_DELIVERABILITY.md). |
+| `step=exception` | Unexpected error (e.g. getAdminAuth() throw). Check the `message` in the log. |
+
+**Why verification is tricky**
+
+Several things have to be true at once: (1) the API route can reach Firebase Admin and your email provider in the same serverless run, (2) the event processor creates the email job, (3) the job is dispatched with the same provider that works for other notifications. If notifications work, the provider and Firebase Admin are available somewhere; the logs above show whether the verification path is using them or failing at a specific step.
+
 ---
 
 ## 1. Confirm the template exists

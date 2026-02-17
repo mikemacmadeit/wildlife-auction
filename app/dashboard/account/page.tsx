@@ -289,12 +289,12 @@ export default function AccountPage() {
     return providers.some((p) => p?.providerId === 'password');
   }, [user?.providerData]);
 
-  // Same logic as seller checklist: verified if Firestore has completed flow or Auth says verified (email/password).
+  // Same logic as seller checklist: verified if Firestore has completed flow or Auth says verified (includes Google/OAuth).
   const emailVerifiedForUI = useMemo(
     () =>
       !!userProfile?.emailVerificationCompletedAt ||
-      (user?.emailVerified === true && hasPasswordProvider),
-    [userProfile?.emailVerificationCompletedAt, user?.emailVerified, hasPasswordProvider]
+      user?.emailVerified === true,
+    [userProfile?.emailVerificationCompletedAt, user?.emailVerified]
   );
 
   const handleUpdatePassword = async () => {
