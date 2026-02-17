@@ -792,7 +792,7 @@ export interface CheckoutCurrent {
 // ============================================
 // ORDER TIMELINE (SERVER-AUTHORED)
 // ============================================
-export type OrderTimelineActor = 'system' | 'buyer' | 'seller' | 'admin' | 'tpwd' | 'facility';
+export type OrderTimelineActor = 'system' | 'buyer' | 'seller' | 'driver' | 'admin' | 'tpwd' | 'facility';
 export type OrderTimelineVisibility = 'buyer' | 'seller' | 'internal' | 'both';
 
 export type OrderTimelineEventType =
