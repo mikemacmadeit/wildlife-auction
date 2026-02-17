@@ -480,10 +480,23 @@ export default function SellerOrderDetailPage() {
                 );
               }
 
+              // Once out (marked out or tracking), show waiting-on-buyer message if they haven't paid
+              const waitingOnBuyerPay = outTxStatus === 'OUT_FOR_DELIVERY' && !buyerPaid;
+
               return (
                 <div className="mt-3 space-y-3">
-                  <p className="text-sm font-medium text-foreground/90">Delivering?</p>
-                  <p className="text-xs text-muted-foreground">When you arrive, open the delivery checklist in the <strong>Delivery</strong> section below — recipient enters PIN, signs, you take a photo.</p>
+                  {waitingOnBuyerPay && (
+                    <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-3 py-2.5 text-sm">
+                      <p className="font-medium text-amber-900 dark:text-amber-100">Waiting on buyer</p>
+                      <p className="text-amber-800 dark:text-amber-200 mt-0.5">The buyer needs to complete inspection and final payment. Once they pay, the checklist will be ready for handoff.</p>
+                    </div>
+                  )}
+                  {outTxStatus === 'DELIVERY_SCHEDULED' && (
+                    <>
+                      <p className="text-sm font-medium text-foreground/90">Delivering?</p>
+                      <p className="text-xs text-muted-foreground">When you arrive, open the delivery checklist in the <strong>Delivery</strong> section below — recipient enters PIN, signs, you take a photo.</p>
+                    </>
+                  )}
                   <DeliveryTrackingCard
                     order={o}
                     role="seller"
@@ -546,6 +559,17 @@ export default function SellerOrderDetailPage() {
                   <div className="pt-2 border-t border-border/60">
                     <p className="text-sm font-medium text-foreground">Using a driver?</p>
                     <p className="text-xs text-muted-foreground mb-3">Copy the link below and send it to them. They’ll use it for the run and to complete the handoff checklist.</p>
+                    {needsMarkOut && (
+                      <Button
+                        variant="outline"
+                        className="w-full sm:w-auto min-h-[44px] mb-3 border-primary/50 text-primary hover:bg-primary/10"
+                        disabled={!!processing}
+                        onClick={() => setMarkOutForDeliveryOpen(true)}
+                      >
+                        <Truck className="h-4 w-4 mr-2 shrink-0" />
+                        Mark out for delivery
+                      </Button>
+                    )}
                     {user && (outTxStatus === 'DELIVERY_SCHEDULED' || outTxStatus === 'OUT_FOR_DELIVERY') && (
                       <DeliverySessionCard
                         orderId={o.id}
@@ -566,9 +590,16 @@ export default function SellerOrderDetailPage() {
               const outTxStatus = getEffectiveTransactionStatus(o);
               const qrSignedAt = (o.delivery as any)?.confirmedMethod === 'qr_public' && (o.delivery as any)?.confirmedAt;
               const hasDeliveryProof = qrSignedAt && ((o.delivery as any)?.signatureUrl || (o.delivery as any)?.deliveryPhotoUrl);
-              // Show checklist whenever order is out for delivery or delivered-pending (not only when "delivered" is current — it becomes current only after buyer pays)
+              const buyerPaid = !!(o as any).finalPaymentConfirmedAt || getOrderBalanceDue(o as any) <= 0;
+              // Checklist only after buyer pays (same gate as driver link). Before that, show waiting message.
               const showChecklist =
-                (outTxStatus === 'OUT_FOR_DELIVERY' || outTxStatus === 'DELIVERED_PENDING_CONFIRMATION') && !hasDeliveryProof;
+                (outTxStatus === 'OUT_FOR_DELIVERY' || outTxStatus === 'DELIVERED_PENDING_CONFIRMATION') && !hasDeliveryProof && buyerPaid;
+              const deliveryPhaseButBuyerNotPaid =
+                (outTxStatus === 'OUT_FOR_DELIVERY' || outTxStatus === 'DELIVERED_PENDING_CONFIRMATION') && !hasDeliveryProof && !buyerPaid;
+
+              if (deliveryPhaseButBuyerNotPaid) {
+                return null;
+              }
               if (showChecklist) {
                 return (
                   <div id="mark-delivered" className="mt-3 space-y-3 rounded-lg border border-border/60 bg-muted/30 p-4">

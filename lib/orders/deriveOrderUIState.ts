@@ -92,7 +92,7 @@ export function deriveOrderUIState(order: Order): {
       return {
         statusKey: 'action_needed',
         currentStepLabel: 'Inspection and Final payment',
-        waitingOn: 'Complete your final payment to receive your delivery PIN',
+        waitingOn: 'Complete your final payment (balance due)',
         needsAction: true,
         primaryAction: { kind: 'pay_final', label: 'Pay now' },
       };

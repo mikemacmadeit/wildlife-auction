@@ -9,6 +9,8 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { verifyDeliveryToken } from '@/lib/delivery/tokens';
+import { getEffectiveTransactionStatus } from '@/lib/orders/status';
+import type { Order } from '@/lib/types';
 
 function json(body: unknown, init?: { status?: number }) {
   return new Response(JSON.stringify(body), {
@@ -85,6 +87,14 @@ export async function POST(request: Request) {
     const finalPaymentConfirmed = !!order.finalPaymentConfirmedAt;
     const finalPaymentPending = finalPaymentAmount > 0 && !finalPaymentConfirmed;
 
+    const orderForStatus = { ...order, id: payload.orderId } as Order;
+    const effectiveStatus = getEffectiveTransactionStatus(orderForStatus);
+    const outOrLater = ['OUT_FOR_DELIVERY', 'DELIVERED_PENDING_CONFIRMATION', 'COMPLETED'] as const;
+    const canMarkOut =
+      payload.role === 'driver' &&
+      !!windowStart &&
+      !outOrLater.includes(effectiveStatus as (typeof outOrLater)[number]);
+
     return json({
       valid: true,
       role: payload.role,
@@ -97,6 +107,7 @@ export async function POST(request: Request) {
       deliveryWindowEnd: windowEnd ? new Date(windowEnd).toISOString() : null,
       finalPaymentConfirmed: !finalPaymentPending,
       finalPaymentPending,
+      canMarkOut,
     });
   } catch (error: any) {
     if (error?.message?.includes('DELIVERY_TOKEN_SECRET')) {

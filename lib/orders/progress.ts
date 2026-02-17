@@ -165,9 +165,9 @@ export function getOrderMilestones(order: Order, role?: 'buyer' | 'seller'): Ord
     // Out for delivery is complete only when we're past that phase (delivery done or transaction complete)
     const outForDeliveryComplete = delivered || completed;
 
-    // When DELIVERY_SCHEDULED: seller must start (live tracking or mark out); buyer waits. Both steps orange with Inspection until buyer pays.
+    // When DELIVERY_SCHEDULED: seller sees "Start delivery". Once OUT_FOR_DELIVERY, seller sees "Out for delivery" (waiting on buyer to pay).
     const outStepLabel =
-      combinedPhaseComplete ? 'Out for delivery' : combinedPhaseCurrent && viewerRole === 'seller' ? 'Start delivery' : combinedPhaseCurrent ? 'Out for delivery' : 'Out for delivery';
+      combinedPhaseComplete ? 'Out for delivery' : combinedPhaseCurrent && viewerRole === 'seller' && txStatus === 'DELIVERY_SCHEDULED' ? 'Start delivery' : 'Out for delivery';
 
     // For buyer: step is "complete" when they've paid (inspection/final payment done). For seller: when delivery is done.
     const outForDeliveryStepComplete = viewerRole === 'buyer' ? inspectionFinalComplete : outForDeliveryComplete;
@@ -185,26 +185,7 @@ export function getOrderMilestones(order: Order, role?: 'buyer' | 'seller'): Ord
       completedAt: outForDeliveryCompletedAt,
     });
 
-    const inspectionLabel =
-      viewerRole === 'seller' && combinedPhaseCurrent && hasFinalPaymentDue
-        ? 'Waiting on buyer – Inspection and Final payment'
-        : 'Inspection and Final payment';
-
-    // For seller: show Inspection and Final payment as its own step. For buyer: merged into Out for delivery (skip this milestone).
-    if (viewerRole === 'seller') {
-      milestones.push({
-        key: 'inspection_final_payment',
-        label: inspectionLabel,
-        isComplete: combinedPhaseComplete,
-        isCurrent: combinedPhaseCurrent,
-        isBlocked: false,
-        ownerRole: 'buyer',
-        helpText: hasFinalPaymentDue
-          ? 'Complete your final payment (balance due) to receive your delivery PIN and finish the transaction.'
-          : undefined,
-        completedAt: isValidNonEpochDate(order.finalPaymentConfirmedAt) ? order.finalPaymentConfirmedAt : undefined,
-      });
-    }
+    // Inspection and Final payment: only used internally (e.g. stalled-step label). Not shown as a separate milestone for buyer or seller — merged into Out for delivery.
 
     // Delivery: seller has checklist, buyer has PIN. Label "Delivery" until complete, then "Delivered".
     const deliveredCurrent =
@@ -337,7 +318,7 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
     ) {
       return {
         title: 'Inspection and Final payment',
-        description: 'Complete your final payment (balance due) to receive your delivery PIN.',
+        description: 'Complete your final payment (balance due).',
         ctaLabel: 'Pay now',
         ctaAction: `/dashboard/orders/${order.id}#pay-final`,
         severity: 'warning',
@@ -367,7 +348,7 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
     if (['DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY'].includes(txStatus)) {
       return {
         title: 'Out for delivery',
-        description: 'Your order is on its way. Buyer pays final balance to get their PIN; at handoff you’ll complete the delivery checklist.',
+        description: 'Your order is on its way. At handoff you’ll complete the delivery checklist.',
         ctaLabel: 'View Details',
         ctaAction: `/dashboard/orders/${order.id}`,
         severity: 'info',
@@ -388,7 +369,7 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
       }
       return {
         title: 'Waiting on seller',
-        description: 'Seller will propose a delivery date using your address. You’ll confirm the date, pay any balance due to get your PIN, then complete delivery with the checklist when they arrive.',
+        description: 'Seller will propose a delivery date using your address. You’ll confirm the date, pay any balance due, then complete delivery with the checklist when they arrive.',
         ctaLabel: 'View order',
         ctaAction: `/dashboard/orders/${order.id}`,
         severity: 'info',

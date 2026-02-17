@@ -31,6 +31,7 @@ interface VerifyResult {
   deliveryWindowEnd?: string;
   finalPaymentConfirmed?: boolean;
   finalPaymentPending?: boolean;
+  canMarkOut?: boolean;
   error?: string;
   alreadyDelivered?: boolean;
   expired?: boolean;
@@ -46,6 +47,8 @@ export default function DeliveryDriverPage() {
   const [tracking, setTracking] = useState(false);
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [locationDenied, setLocationDenied] = useState(false);
+  const [markOutLoading, setMarkOutLoading] = useState(false);
+  const [markedOut, setMarkedOut] = useState(false);
   const watchIdRef = useRef<number | null>(null);
 
   // 3-step state: Step 1 unlocks 2 and 3
@@ -399,6 +402,52 @@ export default function DeliveryDriverPage() {
           )}
         </div>
 
+        {/* Mark out for delivery — driver only, when status is DELIVERY_SCHEDULED */}
+        {verify.role === 'driver' && (verify.canMarkOut || markedOut) && (
+          <div className="rounded-xl border-2 border-primary/30 bg-primary/5 dark:bg-primary/10 p-5">
+            {markedOut ? (
+              <p className="text-sm font-medium text-primary flex items-center gap-2">
+                <Check className="h-4 w-4 shrink-0" />
+                Out for delivery — the buyer has been notified.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-foreground mb-3">
+                  When you’re on the way, mark the order as out for delivery so the buyer gets notified.
+                </p>
+                <Button
+                  onClick={async () => {
+                    if (!token || markOutLoading) return;
+                    setMarkOutLoading(true);
+                    try {
+                      const res = await fetch('/api/delivery/mark-out-for-delivery', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token }),
+                      });
+                      const data = await res.json();
+                      if (data.success) {
+                        setMarkedOut(true);
+                      } else {
+                        setError(data.error || data.details || 'Failed to mark out for delivery');
+                      }
+                    } catch {
+                      setError('Something went wrong. Try again.');
+                    } finally {
+                      setMarkOutLoading(false);
+                    }
+                  }}
+                  disabled={markOutLoading}
+                  className="w-full h-11 rounded-lg"
+                >
+                  {markOutLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Mark out for delivery
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Live tracking — compact */}
         <div className="rounded-xl border bg-background shadow-sm p-5">
           {!tracking ? (
@@ -435,7 +484,7 @@ export default function DeliveryDriverPage() {
           <div className="rounded-xl border-2 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-5 sm:p-6 space-y-3">
             <h2 className="text-sm font-semibold text-amber-900 dark:text-amber-100">Delivery checklist locked</h2>
             <p className="text-sm text-amber-800 dark:text-amber-200">
-              The checklist will unlock once the buyer completes final payment on their order. They’ll get their 4-digit PIN on their order page after paying — that PIN is needed to complete the handoff.
+              The checklist will unlock once the buyer completes final payment on their order. The recipient has a 4-digit PIN they’ll enter to complete the handoff.
             </p>
             <p className="text-xs text-amber-700 dark:text-amber-300">
               You can use <strong>Start live tracking</strong> above in the meantime. When the buyer has paid, refresh this page to open the checklist.

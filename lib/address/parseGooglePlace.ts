@@ -144,3 +144,26 @@ export function parseNewPlace(place: {
     placeId: place.id ?? '',
   };
 }
+
+/**
+ * Google Geocoder result (reverse geocode) has the same address_components + geometry
+ * shape as Place Details. Normalize to ParsedGoogleAddress.
+ */
+export function parseGeocoderResult(result: {
+  formatted_address?: string;
+  address_components?: AddressComponent[];
+  geometry?: {
+    location?: { lat: () => number; lng: () => number } | { lat: number; lng: number };
+  };
+  place_id?: string;
+}): ParsedGoogleAddress {
+  return parseGooglePlace(
+    {
+      place_id: result.place_id ?? '',
+      formatted_address: result.formatted_address,
+      address_components: result.address_components,
+      geometry: result.geometry,
+    },
+    { formattedAddress: result.formatted_address }
+  );
+}

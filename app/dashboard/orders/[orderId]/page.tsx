@@ -91,6 +91,9 @@ async function getAuthJson(path: string): Promise<any> {
   return json;
 }
 
+const PIN_FETCH_RETRIES = 3;
+const PIN_FETCH_RETRY_MS = 1500;
+
 function PaymentCompletePinCard({
   orderId,
   onDismiss,
@@ -102,21 +105,55 @@ function PaymentCompletePinCard({
 }) {
   const [pin, setPin] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [retrying, setRetrying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
+    let attempt = 0;
+
+    const fetchPin = async (attemptIndex: number) => {
+      const token = await getAuthToken();
+      const res = await fetch('/api/delivery/buyer-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ orderId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.deliveryPin) return data.deliveryPin as string;
+      if (res.status === 404 && attemptIndex < PIN_FETCH_RETRIES - 1) return null;
+      throw new Error(data.error || 'Could not load PIN');
+    };
+
     (async () => {
-      try {
-        const token = await getAuthToken();
-        const res = await fetch('/api/delivery/buyer-pin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ orderId }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!cancelled && res.ok && data.deliveryPin) setPin(data.deliveryPin);
-      } finally {
-        if (!cancelled) setLoading(false);
+      setError(null);
+      while (attempt < PIN_FETCH_RETRIES && !cancelled) {
+        try {
+          if (attempt > 0) setRetrying(true);
+          const value = await fetchPin(attempt);
+          if (cancelled) return;
+          if (value) {
+            setPin(value);
+            setLoading(false);
+            setRetrying(false);
+            return;
+          }
+          attempt++;
+          await new Promise((r) => setTimeout(r, PIN_FETCH_RETRY_MS));
+        } catch (e) {
+          if (cancelled) return;
+          attempt++;
+          if (attempt >= PIN_FETCH_RETRIES) {
+            setError(e instanceof Error ? e.message : 'Could not load PIN');
+            setLoading(false);
+            setRetrying(false);
+            return;
+          }
+          await new Promise((r) => setTimeout(r, PIN_FETCH_RETRY_MS));
+        }
       }
+      if (!cancelled) setLoading(false);
+      setRetrying(false);
     })();
     return () => { cancelled = true; };
   }, [orderId, getAuthToken]);
@@ -136,14 +173,18 @@ function PaymentCompletePinCard({
       </div>
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading your PIN…
+          <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+          {retrying ? 'Getting your PIN…' : 'Loading your PIN…'}
         </div>
       ) : pin ? (
         <div className="flex items-center gap-2 rounded-lg bg-background/80 px-4 py-3 border border-border">
           <KeyRound className="h-5 w-5 text-muted-foreground shrink-0" />
           <span className="font-mono text-xl font-semibold tracking-wider">{pin}</span>
         </div>
+      ) : error ? (
+        <p className="text-sm text-muted-foreground rounded-lg bg-muted/50 px-3 py-2">
+          Your PIN will appear in the <strong className="text-foreground">Out for delivery</strong> step below. If you don&apos;t see it in a moment, refresh the page.
+        </p>
       ) : null}
     </div>
   );
@@ -872,13 +913,13 @@ export default function BuyerOrderDetailPage() {
                 return (
                   <div id="out-for-delivery-pay" className="mt-3 space-y-4">
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      The seller or driver will deliver during the scheduled window. When they arrive, they’ll hand you their phone so you can enter your PIN, sign, and complete the delivery. Your PIN appears below once you’ve paid the balance due.
+                      The seller or driver will deliver during the scheduled window. When they arrive, they’ll hand you their phone so you can enter your PIN, sign, and complete the delivery. Your PIN appears below.
                     </p>
                     {hasBalanceDue ? (
                       <div id="pay-final" className="scroll-mt-24 rounded-lg border-2 border-primary/30 bg-primary/5 p-4 sm:p-5">
-                        <p className="text-sm font-medium text-foreground">Pay balance due to get your delivery PIN</p>
+                        <p className="text-sm font-medium text-foreground">Pay balance due</p>
                         <p className="text-sm text-muted-foreground mt-1">
-                          Complete final payment to unlock your 4-digit PIN. The driver’s checklist also unlocks after you pay.
+                          Complete final payment to pay your remaining balance before delivery.
                         </p>
                         {typeof (o as any).depositAmount === 'number' && (o as any).depositAmount > 0 ? (
                           <p className="mt-2 text-sm text-muted-foreground">

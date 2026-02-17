@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     const finalPaymentConfirmed = !!order.finalPaymentConfirmedAt;
     if (hasFinalPaymentDue && !finalPaymentConfirmed) {
       return json(
-        { error: 'Complete your final payment to receive your delivery PIN.', code: 'FINAL_PAYMENT_REQUIRED' },
+        { error: 'Final payment required.', code: 'FINAL_PAYMENT_REQUIRED' },
         { status: 400 }
       );
     }

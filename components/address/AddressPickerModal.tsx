@@ -10,6 +10,7 @@ import { getUserProfile } from '@/lib/firebase/users';
 import type { SavedAddress } from '@/lib/types';
 import { AddressSearch } from './AddressSearch';
 import { AddressMapConfirm } from './AddressMapConfirm';
+import { AddressDropPinMap } from './AddressDropPinMap';
 import type { ParsedGoogleAddress } from '@/lib/address/parseGooglePlace';
 import { cn } from '@/lib/utils';
 
@@ -108,6 +109,7 @@ export function AddressPickerModal({
     formattedAddress: string;
   } | null>(null);
   const [showManualEntry, setShowManualEntry] = useState(false);
+  const [showDropPin, setShowDropPin] = useState(false);
 
   const permissionErrorHint =
     'Try signing out and back in. If you manage this project, deploy Firestore rules: firebase deploy --only firestore:rules';
@@ -273,6 +275,7 @@ export function AddressPickerModal({
     setManualForm(initialManualForm);
     setNewAddressLabel('');
     setShowManualEntry(false);
+    setShowDropPin(false);
   };
 
   const handleUseProfileLocation = async () => {
@@ -405,6 +408,7 @@ export function AddressPickerModal({
       setAddingNew(false);
       setSearchResult(null);
       setShowManualEntry(false);
+      setShowDropPin(false);
     }
   }, [open]);
 
@@ -637,6 +641,18 @@ export function AddressPickerModal({
                 </Button>
               </div>
             </div>
+          ) : showDropPin ? (
+            <div className="space-y-4">
+              <AddressDropPinMap
+                onSelect={(addr) => {
+                  setSearchResult(addr);
+                  setShowDropPin(false);
+                }}
+                onCancel={() => setShowDropPin(false)}
+                confirmLabel="Use this location"
+                showMyLocation={true}
+              />
+            </div>
           ) : !searchResult ? (
             <div className="space-y-4">
               <AddressSearch
@@ -652,6 +668,14 @@ export function AddressPickerModal({
                   onClick={() => setShowManualEntry(true)}
                 >
                   enter address manually
+                </button>
+                {' · '}
+                <button
+                  type="button"
+                  className="text-primary underline font-medium hover:no-underline"
+                  onClick={() => setShowDropPin(true)}
+                >
+                  drop a pin on the map
                 </button>
               </p>
               {showManualEntry ? (

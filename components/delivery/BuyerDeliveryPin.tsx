@@ -76,7 +76,7 @@ export function BuyerDeliveryPin({ orderId, getAuthToken, finalPaymentConfirmed,
       return (
         <div className={className}>
           <p className="text-sm text-muted-foreground">
-            Complete your final payment above to receive your delivery PIN. You&apos;ll need it when the seller or driver arrives to complete the delivery.
+            Complete your final payment above. You&apos;ll use your delivery PIN when the seller or driver arrives to complete the delivery.
           </p>
         </div>
       );

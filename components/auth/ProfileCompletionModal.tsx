@@ -25,6 +25,7 @@ import { reloadCurrentUser, resendVerificationEmail, sendVerificationEmailFireba
 import { AvatarCropDialog, type AvatarCropResult } from '@/components/profile/AvatarCropDialog';
 import { AddressSearch } from '@/components/address/AddressSearch';
 import { AddressMapConfirm } from '@/components/address/AddressMapConfirm';
+import { AddressDropPinMap } from '@/components/address/AddressDropPinMap';
 import type { ParsedGoogleAddress } from '@/lib/address/parseGooglePlace';
 
 interface ProfileCompletionModalProps {
@@ -71,6 +72,7 @@ export function ProfileCompletionModal({
   const [primaryPlace, setPrimaryPlace] = useState<ParsedGoogleAddress | null>(null);
   const [primaryMapResult, setPrimaryMapResult] = useState<{ lat: number; lng: number; formattedAddress: string } | null>(null);
   const [useManualLocation, setUseManualLocation] = useState(false);
+  const [showDropPin, setShowDropPin] = useState(false);
   const [additionalAddresses, setAdditionalAddresses] = useState<(ParsedGoogleAddress | { line1: string; city: string; state: string; zip: string })[]>([]);
   const [addingAdditional, setAddingAdditional] = useState(false);
 
@@ -714,22 +716,45 @@ export function ProfileCompletionModal({
               </div>
             )}
 
-            {isMapsAvailable === true && !useManualLocation && !primaryPlace && (
+            {isMapsAvailable === true && !useManualLocation && showDropPin && (
+              <div className="space-y-3">
+                <AddressDropPinMap
+                  onSelect={(addr) => {
+                    setPrimaryPlace(addr);
+                    setShowDropPin(false);
+                  }}
+                  onCancel={() => setShowDropPin(false)}
+                  confirmLabel="Use this location"
+                  showMyLocation={true}
+                />
+              </div>
+            )}
+
+            {isMapsAvailable === true && !useManualLocation && !primaryPlace && !showDropPin && (
               <div className="space-y-2">
                 <AddressSearch
                   onSelect={(addr) => setPrimaryPlace(addr)}
                   placeholder="Search for your address…"
                   disabled={isLoading}
                 />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground hover:text-foreground"
-                  onClick={() => setUseManualLocation(true)}
-                >
-                  Enter address manually instead
-                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Or{' '}
+                  <button
+                    type="button"
+                    className="text-primary underline font-medium hover:no-underline"
+                    onClick={() => setShowDropPin(true)}
+                  >
+                    drop a pin on the map
+                  </button>
+                  {' · '}
+                  <button
+                    type="button"
+                    className="text-primary underline font-medium hover:no-underline"
+                    onClick={() => setUseManualLocation(true)}
+                  >
+                    enter address manually
+                  </button>
+                </p>
               </div>
             )}
 
