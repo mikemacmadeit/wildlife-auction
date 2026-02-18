@@ -164,7 +164,7 @@ function PaymentCompletePinCard({
         <div>
           <h2 className="text-lg font-semibold text-foreground">Payment complete</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Here&apos;s your delivery PIN — don&apos;t share it with anyone. You&apos;ll need it when the seller or driver arrives to complete the delivery. They&apos;ll hand you their device; enter this PIN, then sign and complete the steps.
+            Your delivery PIN is below. When the seller or driver arrives, they’ll hand you their device — enter this PIN, then sign to complete delivery.
           </p>
         </div>
         <Button variant="ghost" size="sm" className="shrink-0 text-muted-foreground" onClick={onDismiss}>
@@ -960,6 +960,21 @@ export default function BuyerOrderDetailPage() {
                       </div>
                     ) : (
                       <>
+                        {(o as any).finalPaymentConfirmedAt && (
+                          <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-3 flex items-center gap-3">
+                            <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">Payment complete</p>
+                              <p className="text-xs text-emerald-800 dark:text-emerald-200 mt-0.5">
+                                {typeof (o as any).finalPaymentAmount === 'number' && (o as any).finalPaymentAmount > 0
+                                  ? `$${(o as any).finalPaymentAmount.toFixed(2)} paid`
+                                  : 'Balance paid'}
+                                {' · '}
+                                {formatDate((o as any).finalPaymentConfirmedAt instanceof Date ? (o as any).finalPaymentConfirmedAt : (o as any).finalPaymentConfirmedAt ? new Date((o as any).finalPaymentConfirmedAt) : null)}
+                              </p>
+                            </div>
+                          </div>
+                        )}
                         <BuyerDeliveryPin
                           orderId={o.id}
                           finalPaymentConfirmed={!!(o as any).finalPaymentConfirmedAt}
@@ -992,6 +1007,21 @@ export default function BuyerOrderDetailPage() {
               if ((milestone.isCurrent || milestone.isComplete) && paidAndOut && !hasBalanceDue) {
                 return (
                   <div className="mt-3 space-y-3">
+                    {(o as any).finalPaymentConfirmedAt && (
+                      <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-3 flex items-center gap-3">
+                        <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">Payment complete</p>
+                          <p className="text-xs text-emerald-800 dark:text-emerald-200 mt-0.5">
+                            {typeof (o as any).finalPaymentAmount === 'number' && (o as any).finalPaymentAmount > 0
+                              ? `$${(o as any).finalPaymentAmount.toFixed(2)} paid`
+                              : 'Balance paid'}
+                            {' · '}
+                            {formatDate((o as any).finalPaymentConfirmedAt instanceof Date ? (o as any).finalPaymentConfirmedAt : (o as any).finalPaymentConfirmedAt ? new Date((o as any).finalPaymentConfirmedAt) : null)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     <BuyerDeliveryPin
                       orderId={o.id}
                       finalPaymentConfirmed={!!(o as any).finalPaymentConfirmedAt}

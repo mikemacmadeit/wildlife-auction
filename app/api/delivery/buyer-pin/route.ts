@@ -49,14 +49,8 @@ export async function POST(request: Request) {
       return json({ error: 'Only the buyer can view the delivery PIN' }, { status: 403 });
     }
 
-    const hasFinalPaymentDue = typeof order.finalPaymentAmount === 'number' && order.finalPaymentAmount > 0;
-    const finalPaymentConfirmed = !!order.finalPaymentConfirmedAt;
-    if (hasFinalPaymentDue && !finalPaymentConfirmed) {
-      return json(
-        { error: 'Final payment required.', code: 'FINAL_PAYMENT_REQUIRED' },
-        { status: 400 }
-      );
-    }
+    // PIN is available as soon as the delivery session exists (created at order creation).
+    // No longer gated on final payment so the buyer can see it on the congrats screen after deposit.
 
     const sessionSnap = await db
       .collection('deliverySessions')

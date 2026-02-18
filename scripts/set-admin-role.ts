@@ -71,19 +71,23 @@ async function setAdminRole(email: string) {
     const user = await auth.getUserByEmail(email);
     console.log(`Found user: ${user.uid} (${user.email})`);
     
-    // Update user document in Firestore
+    // 1) Firestore (source of truth for fallback)
     const userRef = db.collection('users').doc(user.uid);
     await userRef.set({
       role: 'super_admin',
     }, { merge: true });
+
+    // 2) Firebase Auth custom claims (so token has role and admin nav shows without re-fetching profile)
+    await auth.setCustomUserClaims(user.uid, { role: 'super_admin', superAdmin: true });
     
     console.log(`✅ Successfully set ${email} as super_admin`);
     console.log(`User ID: ${user.uid}`);
+    console.log(`→ User must sign out and sign back in (or refresh to get a new token) for admin dashboard to appear.`);
     
     // Verify the update
     const userDoc = await userRef.get();
     const userData = userDoc.data();
-    console.log(`Verified role: ${userData?.role}`);
+    console.log(`Verified Firestore role: ${userData?.role}`);
     
   } catch (error: any) {
     if (error.code === 'auth/user-not-found') {

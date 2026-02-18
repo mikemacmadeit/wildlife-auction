@@ -955,6 +955,42 @@ export async function handleCheckoutSessionCompleted(
       source: 'webhook',
     });
 
+    // Create delivery session with PIN at order creation so buyer can see PIN on congrats screen.
+    const orderIdForDelivery = orderRef.id;
+    const existingDeliverySession = await db
+      .collection('deliverySessions')
+      .where('orderId', '==', orderIdForDelivery)
+      .limit(1)
+      .get();
+    if (existingDeliverySession.empty) {
+      const deliverySessionId = nanoid(24);
+      const expiresAt = new Date(now.getTime() + 72 * 60 * 60 * 1000);
+      const deliveryPin = String(Math.floor(1000 + Math.random() * 9000));
+      const sessionData = {
+        orderId: orderIdForDelivery,
+        sellerUid: orderData.sellerId,
+        buyerUid: orderData.buyerId || null,
+        status: 'active',
+        deliveryPin,
+        createdAt: nowTs,
+        expiresAt: Timestamp.fromDate(expiresAt),
+        oneTimeSignature: true,
+        driver: { assignedBySeller: true },
+        tracking: { enabled: false, pingsCount: 0 },
+      };
+      const sanitizedSession = sanitizeFirestorePayload(sessionData);
+      await db.collection('deliverySessions').doc(deliverySessionId).set(sanitizedSession);
+      await orderRef.update({
+        updatedAt: now,
+        'delivery.sessionId': deliverySessionId,
+      });
+      logInfo('Delivery session created at order creation', {
+        requestId,
+        route: '/api/stripe/webhook',
+        orderId: orderIdForDelivery,
+      });
+    }
+
     // Derive public-safe sold metadata (stored on listing doc only; never store buyer PII/order details).
     const saleType: 'auction' | 'offer' | 'buy_now' | 'classified' =
       offerId

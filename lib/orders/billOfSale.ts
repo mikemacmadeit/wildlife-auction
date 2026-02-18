@@ -12,6 +12,11 @@ export function getBillOfSaleStoragePath(orderId: string) {
   return `orders/${orderId}/documents/bill_of_sale_${BILL_OF_SALE_VERSION}.pdf`;
 }
 
+/** Path for signed BOS (with buyer delivery signature). */
+export function getBillOfSaleSignedStoragePath(orderId: string) {
+  return `orders/${orderId}/documents/bill_of_sale_signed_${BILL_OF_SALE_VERSION}.pdf`;
+}
+
 function randomToken(bytes: number = 16) {
   return crypto.randomBytes(bytes).toString('hex');
 }
@@ -68,7 +73,10 @@ export type BillOfSaleData = {
   possessionText: string;
 };
 
-export function validateBillOfSaleInputs(data: BillOfSaleData) {
+export function validateBillOfSaleInputs(
+  data: BillOfSaleData,
+  options?: { requireHorseIdentifiers?: boolean }
+) {
   const missing: string[] = [];
   const requireNonEmpty = (key: string, value: any) => {
     if (!clean(value)) missing.push(key);
@@ -87,15 +95,17 @@ export function validateBillOfSaleInputs(data: BillOfSaleData) {
   requireNonEmpty('horse.listingTitle', data.horse.listingTitle);
   requireNonEmpty('horse.sex', data.horse.sex);
 
-  // At least one identifier OR registration number (so the written transfer is meaningful).
-  const id = data.horse.identifiers || {};
-  const hasAnyId =
-    !!clean(data.horse.registrationNumber) ||
-    !!clean(id.microchip) ||
-    !!clean(id.brand) ||
-    !!clean(id.tattoo) ||
-    !!clean(id.markings);
-  if (!hasAnyId) missing.push('horse.identifiers (microchip/brand/tattoo/markings) or registrationNumber');
+  const requireHorseIds = options?.requireHorseIdentifiers !== false;
+  if (requireHorseIds) {
+    const id = data.horse.identifiers || {};
+    const hasAnyId =
+      !!clean(data.horse.registrationNumber) ||
+      !!clean(id.microchip) ||
+      !!clean(id.brand) ||
+      !!clean(id.tattoo) ||
+      !!clean(id.markings);
+    if (!hasAnyId) missing.push('horse.identifiers (microchip/brand/tattoo/markings) or registrationNumber');
+  }
 
   if (missing.length) {
     const err = new Error(`Bill of sale is missing required fields: ${missing.join(', ')}`) as any;
@@ -173,7 +183,17 @@ export function renderBillOfSaleHtml(data: BillOfSaleData): string {
 </html>`;
 }
 
-export async function renderBillOfSalePdfBuffer(data: BillOfSaleData): Promise<Buffer> {
+export type RenderBillOfSalePdfOptions = {
+  /** Buyer signature image (e.g. from delivery confirmation). */
+  buyerSignatureImage?: Buffer;
+  /** Date buyer signed (ISO date or datetime string). */
+  buyerSignedAtIso?: string;
+};
+
+export async function renderBillOfSalePdfBuffer(
+  data: BillOfSaleData,
+  options?: RenderBillOfSalePdfOptions
+): Promise<Buffer> {
   return await new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({
@@ -234,7 +254,23 @@ export async function renderBillOfSalePdfBuffer(data: BillOfSaleData): Promise<B
       sh('Signatures');
       doc.fontSize(10).font('Helvetica').text('Seller signature: ________________________________   Date: __________');
       doc.moveDown(0.6);
-      doc.text('Buyer signature:  _________________________________   Date: __________');
+      const hasBuyerSig = options?.buyerSignatureImage && options.buyerSignatureImage.length > 0;
+      const signedDate = options?.buyerSignedAtIso ? options.buyerSignedAtIso.slice(0, 10) : '';
+      doc.fontSize(10).font('Helvetica').text('Buyer signature: ');
+      if (hasBuyerSig) {
+        const margin = doc.page.margins;
+        const left = margin?.left ?? 54;
+        const y = doc.y;
+        try {
+          doc.image(options!.buyerSignatureImage!, left, y, { width: 120 });
+          doc.y = y + 32;
+        } catch {
+          doc.text('_________________________________');
+        }
+        if (signedDate) doc.fontSize(10).font('Helvetica').text(`Date: ${signedDate}`);
+      } else {
+        doc.text('_________________________________   Date: __________');
+      }
 
       doc.end();
     } catch (e) {

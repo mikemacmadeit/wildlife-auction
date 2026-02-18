@@ -9,25 +9,22 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, AlertTriangle, ArrowLeft, Truck, Calendar as CalendarIcon, MapPin, Clock, CheckCircle2, ClipboardList, Plus } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, Truck, Calendar as CalendarIcon, MapPin, Clock, CheckCircle2, ClipboardList, Plus, FileText } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
-import type { ComplianceDocument, Listing, Order, TransactionStatus } from '@/lib/types';
+import type { Listing, Order, TransactionStatus } from '@/lib/types';
 import { getOrderById, subscribeToOrder } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
-import { getDocuments } from '@/lib/firebase/documents';
-import { DocumentUpload } from '@/components/compliance/DocumentUpload';
-import { OrderDocumentsPanel } from '@/components/orders/OrderDocumentsPanel';
 import { DeliveryTrackingCard } from '@/components/orders/DeliveryTrackingCard';
 import { DeliverySessionCard } from '@/components/delivery/DeliverySessionCard';
 import { DeliveryProofTimelineBlock } from '@/components/delivery/DeliveryProofTimelineBlock';
@@ -43,6 +40,46 @@ import { cn, formatDate } from '@/lib/utils';
 import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { OrderDetailSkeleton } from '@/components/skeletons/OrderDetailSkeleton';
 import { AddressMapModal } from '@/components/address/AddressMapModal';
+
+/** Button to generate bill of sale with buyer signature (delivered orders only). */
+function BillOfSaleButton({ orderId, onError, onSuccess }: { orderId: string; onError: (msg: string) => void; onSuccess: (url: string) => void }) {
+  const [loading, setLoading] = useState(false);
+  const handleGenerate = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { auth } = await import('@/lib/firebase/config');
+      const user = auth.currentUser;
+      if (!user) throw new Error('Sign in required');
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/orders/${orderId}/bill-of-sale/generate-with-signature`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', authorization: `Bearer ${token}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.message || json?.error || 'Failed to generate');
+      const url = json?.url;
+      if (typeof url === 'string' && url) onSuccess(url);
+      else onError('No download link returned');
+    } catch (e: any) {
+      onError(e?.message || 'Failed to generate Bill of Sale');
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId, onError, onSuccess]);
+  return (
+    <Button
+      type="button"
+      variant="default"
+      size="sm"
+      onClick={handleGenerate}
+      disabled={loading}
+      className="min-h-[44px] touch-manipulation"
+    >
+      {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+      {loading ? 'Generating…' : 'Generate Bill of Sale'}
+    </Button>
+  );
+}
 
 /** Day = 6am–6pm, Night = 6pm–6am (next day) */
 const DELIVERY_DAY_NIGHT_SLOTS: { id: number; label: string; startHour: number; startMin: number; endHour: number; endMin: number; endNextDay: boolean }[] = [
@@ -103,7 +140,6 @@ export default function SellerOrderDetailPage() {
   const backLabel = fromSales ? 'Back to sold' : 'Back to seller dashboard';
   const [order, setOrder] = useState<Order | null>(null);
   const [listing, setListing] = useState<Listing | null>(null);
-  const [billOfSaleDocs, setBillOfSaleDocs] = useState<ComplianceDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState<'preparing' | 'in_transit' | 'delivered' | null>(null);
@@ -124,10 +160,8 @@ export default function SellerOrderDetailPage() {
       if (!o) throw new Error('Order not found');
       if (o.sellerId !== user.uid) throw new Error('You can only view your own sales.');
       const l = await getListingById(o.listingId);
-      const bos = await getDocuments('order', o.id, 'BILL_OF_SALE').catch(() => []);
       setOrder(o);
       setListing(l || null);
-      setBillOfSaleDocs(bos);
     } catch (e: any) {
       setError(formatUserFacingError(e, 'Failed to load order'));
     } finally {
@@ -290,18 +324,31 @@ export default function SellerOrderDetailPage() {
         <Card className="border-border/60 bg-gradient-to-br from-card via-card to-muted/25">
           <CardContent className="pt-6">
             <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div className="space-y-2 min-w-[260px]">
-                <Button asChild variant="outline" size="sm">
+              <div className="space-y-2 min-w-[260px] flex-1 flex flex-col sm:flex-row sm:items-start gap-3">
+                <Button asChild variant="outline" size="sm" className="self-start shrink-0">
                   <Link href={backHref}>
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     {backLabel}
                   </Link>
                 </Button>
-                <div>
-                  <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Sale</h1>
-                  <p className="text-sm text-muted-foreground break-words mt-1">
-                    {listing?.title || 'Listing'} · <span className="font-mono">{order.id}</span>
-                  </p>
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  {(listing?.photos?.[0]?.url ?? listing?.images?.[0]) ? (
+                    <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden shrink-0 bg-muted flex items-center justify-center">
+                      <Image
+                        src={listing.photos?.[0]?.url ?? listing.images?.[0] ?? ''}
+                        alt={listing?.title || 'Listing'}
+                        fill
+                        className="object-cover"
+                        sizes="80px"
+                      />
+                    </div>
+                  ) : null}
+                  <div className="min-w-0">
+                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Sale</h1>
+                    <p className="text-sm text-muted-foreground break-words mt-1">
+                      {listing?.title || 'Listing'} · <span className="font-mono">{order.id}</span>
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -558,18 +605,7 @@ export default function SellerOrderDetailPage() {
 
                   <div className="pt-2 border-t border-border/60">
                     <p className="text-sm font-medium text-foreground">Using a driver?</p>
-                    <p className="text-xs text-muted-foreground mb-3">Copy the link below and send it to them. They’ll use it for the run and to complete the handoff checklist.</p>
-                    {needsMarkOut && (
-                      <Button
-                        variant="outline"
-                        className="w-full sm:w-auto min-h-[44px] mb-3 border-primary/50 text-primary hover:bg-primary/10"
-                        disabled={!!processing}
-                        onClick={() => setMarkOutForDeliveryOpen(true)}
-                      >
-                        <Truck className="h-4 w-4 mr-2 shrink-0" />
-                        Mark out for delivery
-                      </Button>
-                    )}
+                    <p className="text-xs text-muted-foreground mb-3">Copy the link below and send it to them. They’ll use it for the run and to complete the handoff checklist. They can also mark out for delivery from that link.</p>
                     {user && (outTxStatus === 'DELIVERY_SCHEDULED' || outTxStatus === 'OUT_FOR_DELIVERY') && (
                       <DeliverySessionCard
                         orderId={o.id}
@@ -647,6 +683,14 @@ export default function SellerOrderDetailPage() {
                       signatureUrl={(o.delivery as any)?.signatureUrl}
                       deliveryPhotoUrl={(o.delivery as any)?.deliveryPhotoUrl}
                     />
+                    <BillOfSaleButton
+                      orderId={o.id}
+                      onError={(msg) => toast({ title: 'Error', description: msg, variant: 'destructive' })}
+                      onSuccess={(url) => {
+                        toast({ title: 'Bill of Sale ready', description: 'Opening PDF.' });
+                        window.open(url, '_blank', 'noopener');
+                      }}
+                    />
                   </div>
                 );
               }
@@ -657,126 +701,11 @@ export default function SellerOrderDetailPage() {
 
         <div className="grid gap-6 md:grid-cols-2">
           <Card className="border-border/60">
-            <CardHeader className="pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
-              <CardTitle className="text-base">Delivery</CardTitle>
-              <CardDescription className="text-foreground/85 text-sm leading-relaxed">
-                You propose date and time windows; the buyer picks one that works. Only the buyer confirms receipt to complete the transaction.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 px-4 sm:px-6 pb-4 sm:pb-6 pt-0">
+            <CardContent className="pt-6 px-4 sm:px-6 pb-6">
               <FulfillmentPanel />
             </CardContent>
           </Card>
 
-
-          <Card className="border-border/60">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Order details</CardTitle>
-              <CardDescription>Quick reference links and metadata.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div>
-                  <div className="font-semibold text-sm">Listing</div>
-                  <div className="text-xs text-muted-foreground">{listing?.title || 'Listing'}</div>
-                </div>
-                {listing?.id ? (
-                  <Button asChild variant="outline" size="sm">
-                    <Link href={`/listing/${listing.id}`}>View listing</Link>
-                  </Button>
-                ) : null}
-              </div>
-              <Separator />
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg border border-border/60 p-3 bg-background/40">
-                  <div className="text-xs text-muted-foreground">Status</div>
-                  <div className="text-sm font-semibold mt-0.5">{String(order.status).replaceAll('_', ' ')}</div>
-                </div>
-                <div className="rounded-lg border border-border/60 p-3 bg-background/40">
-                  <div className="text-xs text-muted-foreground">Payment</div>
-                  <div className="text-sm font-semibold mt-0.5">
-                    {String((order as any).paymentMethod || '—').replaceAll('_', ' ')}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/60">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Bill of Sale</CardTitle>
-              <CardDescription>View/download the written transfer. You can also upload a signed copy.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {billOfSaleDocs.length > 0 ? (
-                <div className="space-y-2">
-                  {billOfSaleDocs.slice(0, 3).map((d) => (
-                    <div key={d.id} className="flex items-center justify-between gap-3 flex-wrap">
-                      <div className="text-sm">
-                        <div className="font-semibold">Bill of Sale</div>
-                        <div className="text-xs text-muted-foreground break-all">{d.documentUrl}</div>
-                      </div>
-                      <Button asChild variant="outline" size="sm">
-                        <a href={d.documentUrl} target="_blank" rel="noreferrer">
-                          View / Download
-                        </a>
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground">
-                  Not available yet. If this order requires a Bill of Sale, it will be generated when checkout is initiated.
-                </div>
-              )}
-
-              <Separator />
-
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div>
-                  <div className="font-semibold text-sm">Seller signature confirmation</div>
-                  <div className="text-xs text-muted-foreground">
-                    {order.billOfSaleSellerSignedAt ? `Signed at ${order.billOfSaleSellerSignedAt.toLocaleString()}` : 'Not confirmed yet.'}
-                  </div>
-                </div>
-                <Button
-                  variant="default"
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30"
-                  disabled={Boolean(order.billOfSaleSellerSignedAt)}
-                  onClick={async () => {
-                    try {
-                      await postAuthJson(`/api/orders/${order.id}/bill-of-sale/confirm-signed`);
-                      toast({ title: 'Confirmed', description: 'Seller signature confirmation recorded.' });
-                      const refreshed = await getOrderById(order.id);
-                      if (refreshed) setOrder(refreshed);
-                    } catch (e: any) {
-                      toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to confirm'), variant: 'destructive' });
-                    }
-                  }}
-                >
-                  I have signed
-                </Button>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-2">
-                <div className="font-semibold text-sm">Upload signed copy (optional)</div>
-                <DocumentUpload
-                  entityType="order"
-                  entityId={order.id}
-                  documentType="BILL_OF_SALE"
-                  onUploadComplete={async () => {
-                    const bos = await getDocuments('order', order.id, 'BILL_OF_SALE').catch(() => []);
-                    setBillOfSaleDocs(bos);
-                  }}
-                  required={false}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <OrderDocumentsPanel orderId={order.id} listing={listing} excludeDocumentTypes={['BILL_OF_SALE']} />
         </div>
 
         {/* Propose Delivery Dialog — date + day/night time, mobile-friendly */}

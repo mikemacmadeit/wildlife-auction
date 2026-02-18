@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
-import { Package, CheckCircle, Clock, XCircle, Loader2, AlertTriangle, ArrowRight, MapPin, User, MoreVertical, Search, Truck, Filter, PartyPopper } from 'lucide-react';
+import { Package, CheckCircle, Clock, XCircle, Loader2, AlertTriangle, ArrowRight, MapPin, User, MoreVertical, Search, Truck, Filter, PartyPopper, KeyRound } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { getOrderByCheckoutSessionId, getOrdersForUser } from '@/lib/firebase/orders';
@@ -89,6 +89,8 @@ export default function OrdersPage() {
   const [congratsSetAddressLoading, setCongratsSetAddressLoading] = useState(false);
   // Preserve orderId/sessionId for congrats modal after pendingCheckout is cleared (so "Set address" works)
   const [congratsOrderInfo, setCongratsOrderInfo] = useState<{ orderId: string; sessionId: string } | null>(null);
+  const [congratsPin, setCongratsPin] = useState<string | null>(null);
+  const [congratsPinLoading, setCongratsPinLoading] = useState(false);
   const [checkStatusLoading, setCheckStatusLoading] = useState(false);
   const reconcileAttemptedRef = useRef<Record<string, boolean>>({});
   const tickRunnerRef = useRef<{ run: () => Promise<void>; sessionId: string } | null>(null);
@@ -444,6 +446,41 @@ export default function OrdersPage() {
       window.setTimeout(() => setHighlightOrderId(null), 12_000);
     }
   }, [orders, pendingCheckout?.sessionId]);
+
+  // Fetch delivery PIN for congrats modal when we have an order (so buyer sees PIN on congrats screen).
+  const congratsOrderId =
+    congratsOrderInfo?.orderId ??
+    (pendingCheckout?.sessionId && orders.length
+      ? orders.find(
+          (o) => typeof (o as any).stripeCheckoutSessionId === 'string' && (o as any).stripeCheckoutSessionId === pendingCheckout.sessionId
+        )?.id
+      : undefined);
+  useEffect(() => {
+    if (!showCongratsModal || !congratsOrderId || !user) return;
+    let cancelled = false;
+    setCongratsPinLoading(true);
+    setCongratsPin(null);
+    (async () => {
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch('/api/delivery/buyer-pin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ orderId: congratsOrderId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (res.ok && data.deliveryPin) setCongratsPin(String(data.deliveryPin));
+      } catch {
+        if (!cancelled) setCongratsPin(null);
+      } finally {
+        if (!cancelled) setCongratsPinLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showCongratsModal, congratsOrderId, user]);
 
   // Fail-safe: if an order exists but is still pending (common when create-session pre-created the order
   // and webhook delivery was delayed), attempt a one-time reconcile using the stored checkout session id.
@@ -1032,7 +1069,10 @@ export default function OrdersPage() {
         open={showCongratsModal}
         onOpenChange={(open) => {
           setShowCongratsModal(open);
-          if (!open) setCongratsOrderInfo(null);
+          if (!open) {
+            setCongratsOrderInfo(null);
+            setCongratsPin(null);
+          }
         }}
       >
         <DialogContent
@@ -1057,13 +1097,27 @@ export default function OrdersPage() {
             <DialogDescription id="congrats-desc" asChild>
               <div className="text-center space-y-4 pt-2">
                 <p className="text-base text-foreground font-medium">
-                  You’ve secured <span className="font-semibold text-primary">{pendingCheckoutListingTitle || 'your item'}</span> with your deposit.
+                  You’ve secured <span className="font-semibold text-primary">{pendingCheckoutListingTitle || 'your item'}</span>.
                 </p>
+                {congratsPinLoading ? (
+                  <p className="text-sm text-muted-foreground flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading your delivery PIN…
+                  </p>
+                ) : congratsPin ? (
+                  <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4 text-left">
+                    <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                      <KeyRound className="h-4 w-4 text-primary" />
+                      Your delivery PIN
+                    </p>
+                    <p className="text-2xl font-mono font-bold tracking-wider mt-1 text-primary">{congratsPin}</p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Save this. When the seller or driver arrives, they’ll hand you their device — enter this PIN, then sign to complete delivery.
+                    </p>
+                  </div>
+                ) : null}
                 <p className="text-sm text-muted-foreground">
-                  Your deposit is confirmed. The remaining balance will be due when you and the seller finalize delivery. <strong>Next step:</strong> set your delivery address so the seller can propose a delivery date. Your order appears in <strong>My Purchases</strong> below.
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Track progress and message the seller from your order at any time.
+                  <strong>Next:</strong> set your delivery address so the seller can propose a delivery date. Your order is in <strong>My Purchases</strong> below.
                 </p>
               </div>
             </DialogDescription>
